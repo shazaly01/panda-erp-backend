@@ -28,6 +28,9 @@ class User extends Authenticatable
         'username',
         'email',
         'password',
+        'default_cost_center_id',
+        'default_box_id',
+        'default_bank_account_id',
     ];
 
     /**
@@ -60,5 +63,23 @@ class User extends Authenticatable
     public function employee(): HasOne
     {
         return $this->hasOne(Employee::class);
+    }
+
+
+
+    public function defaultCostCenter()
+    {
+        return $this->belongsTo(\App\Modules\Accounting\Models\CostCenter::class, 'default_cost_center_id');
+    }
+
+    public function defaultBox()
+    {
+        return $this->belongsTo(\App\Modules\Accounting\Models\Box::class, 'default_box_id');
+    }
+
+    // 👈 العلاقة الجديدة للبنك
+    public function defaultBankAccount()
+    {
+        return $this->belongsTo(\App\Modules\Accounting\Models\BankAccount::class, 'default_bank_account_id');
     }
 }

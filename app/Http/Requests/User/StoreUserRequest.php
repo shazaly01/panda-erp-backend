@@ -17,13 +17,15 @@ class StoreUserRequest extends FormRequest
         return [
             'full_name' => 'required|string|max:255',
             'username' => 'required|string|max:255|unique:users,username',
-            // --- [تم التعديل هنا] ---
-            // جعل البريد الإلكتروني اختياريًا وغير فريد
             'email' => 'nullable|string|email|max:255',
-            // --- [نهاية التعديل] ---
             'password' => ['required', 'confirmed', Password::defaults()],
             'roles' => 'required|array',
             'roles.*' => 'string|exists:roles,name,guard_name,api',
+
+            // --- [الافتراضيات الذكية] ---
+            'default_cost_center_id'  => 'nullable|integer|exists:cost_centers,id',
+            'default_box_id'          => 'nullable|integer|exists:boxes,id',
+            'default_bank_account_id' => 'nullable|integer|exists:bank_accounts,id',
         ];
     }
 }

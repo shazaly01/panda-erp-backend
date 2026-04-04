@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Kalnoy\Nestedset\NodeTrait;
 use App\Modules\Accounting\Enums\AccountNature;
 use App\Modules\Accounting\Database\Factories\AccountFactory;
+use App\Modules\Accounting\Enums\AccountType;
 
 class Account extends Model
 {
@@ -32,6 +33,7 @@ class Account extends Model
     ];
 
     protected $casts = [
+        'type' => AccountType::class,
         'nature' => AccountNature::class,
         'is_transactional' => 'boolean',
         'requires_cost_center' => 'boolean',

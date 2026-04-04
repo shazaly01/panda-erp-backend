@@ -11,11 +11,17 @@ use App\Modules\Accounting\Services\Reporting\AccountStatementService;
 use App\Modules\Accounting\Models\Box;
 use App\Modules\Accounting\Models\BankAccount;
 use Illuminate\Validation\ValidationException;
+use App\Modules\Accounting\Services\Reporting\TrialBalanceService;
+use App\Modules\Accounting\Services\Reporting\IncomeStatementService;
+use App\Modules\Accounting\Services\Reporting\BalanceSheetService;
 
 class ReportController extends Controller
 {
     public function __construct(
-        protected AccountStatementService $statementService
+        protected AccountStatementService $statementService,
+        protected TrialBalanceService $trialBalanceService,
+        protected IncomeStatementService $incomeStatementService,
+        protected BalanceSheetService $balanceSheetService,
     ) {}
 
     /**
@@ -113,5 +119,74 @@ class ReportController extends Controller
             'party_type' => $partyType,
             'party_id'   => $partyId,
         ];
+    }
+
+
+
+    /**
+     * واجهة برمجة استخراج ميزان المراجعة
+     */
+    public function getTrialBalance(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'as_of_date'     => ['required', 'date'],
+            'include_drafts' => ['nullable', 'boolean'],
+        ]);
+
+        $reportData = $this->trialBalanceService->getTrialBalance(
+            $validated['as_of_date'],
+            $request->boolean('include_drafts')
+        );
+
+        return response()->json([
+            'success' => true,
+            'data'    => $reportData
+        ]);
+    }
+
+
+    /**
+     * واجهة برمجة استخراج قائمة الدخل (الأرباح والخسائر)
+     */
+    public function getIncomeStatement(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'from_date'      => ['required', 'date'],
+            'to_date'        => ['required', 'date', 'after_or_equal:from_date'],
+            'include_drafts' => ['nullable', 'boolean'],
+        ]);
+
+        $reportData = $this->incomeStatementService->getIncomeStatement(
+            $validated['from_date'],
+            $validated['to_date'],
+            $request->boolean('include_drafts')
+        );
+
+        return response()->json([
+            'success' => true,
+            'data'    => $reportData
+        ]);
+    }
+
+
+    /**
+     * واجهة برمجة استخراج الميزانية العمومية
+     */
+    public function getBalanceSheet(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'as_of_date'     => ['required', 'date'],
+            'include_drafts' => ['nullable', 'boolean'],
+        ]);
+
+        $reportData = $this->balanceSheetService->getBalanceSheet(
+            $validated['as_of_date'],
+            $request->boolean('include_drafts')
+        );
+
+        return response()->json([
+            'success' => true,
+            'data'    => $reportData
+        ]);
     }
 }

@@ -52,7 +52,10 @@ Route::middleware('auth:sanctum')
     // 4. التقارير (Reports)
     // ===========================================
     Route::prefix('reports')->group(function () {
-       Route::get('/account-statement', [ReportController::class, 'getAccountStatement']);
+       Route::get('account-statement', [ReportController::class, 'getAccountStatement']);
+       Route::get('trial-balance', [ReportController::class, 'getTrialBalance']);
+       Route::get('income-statement', [ReportController::class, 'getIncomeStatement']);
+       Route::get('balance-sheet', [ReportController::class, 'getBalanceSheet']);
     });
 
     // ===========================================

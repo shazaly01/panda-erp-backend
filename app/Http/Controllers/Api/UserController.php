@@ -23,24 +23,18 @@ class UserController extends Controller
         $users = User::with('roles')->latest()->paginate(15);
         return UserResource::collection($users);
     }
-
-    public function store(StoreUserRequest $request)
+public function store(StoreUserRequest $request)
     {
         $validated = $request->validated();
 
         DB::beginTransaction();
         try {
-            // --- [بداية التعديل هنا] ---
-            // تحضير بيانات المستخدم مع التأكد من وجود قيمة لـ email
-            $userData = [
-                'full_name' => $validated['full_name'],
-                'username' => $validated['username'],
-                'email' => $validated['email'] ?? null, // <-- الحل: استخدم null إذا لم يكن البريد الإلكتروني موجودًا
+            // ✅ الحل: دمج كلمة المرور المشفرة مع باقي البيانات الموثقة تلقائياً
+            $userData = array_merge($validated, [
                 'password' => Hash::make($validated['password']),
-            ];
+            ]);
 
             $user = User::create($userData);
-            // --- [نهاية التعديل هنا] ---
 
             $user->assignRole($validated['roles']);
             DB::commit();
@@ -57,29 +51,23 @@ class UserController extends Controller
         return new UserResource($user->load('roles'));
     }
 
-    public function update(UpdateUserRequest $request, User $user)
+   public function update(UpdateUserRequest $request, User $user)
     {
         $validated = $request->validated();
 
         DB::beginTransaction();
         try {
-            // --- [بداية التعديل هنا] ---
-            // تحضير بيانات المستخدم للتحديث
-            $userData = [
-                'full_name' => $validated['full_name'],
-                'username' => $validated['username'],
-                'email' => $validated['email'] ?? $user->email, // استخدم البريد الإلكتروني القديم إذا لم يتم إرسال الجديد
-            ];
+            $userData = $validated;
 
-            // تحديث كلمة المرور فقط إذا تم إرسالها
+            // تحديث كلمة المرور فقط إذا تم إرسالها، وإلا احذفها من المصفوفة لكي لا تصبح null
             if (!empty($validated['password'])) {
                 $userData['password'] = Hash::make($validated['password']);
+            } else {
+                unset($userData['password']);
             }
 
             $user->update($userData);
-            // --- [نهاية التعديل هنا] ---
 
-            // استخدام syncRoles لتحديث الأدوار
             $user->syncRoles($validated['roles']);
             DB::commit();
 

@@ -93,12 +93,22 @@ class RoleController extends Controller
         $this->authorize('viewAny', Role::class);
 
         // 1. قاموس الترجمة
-        $groupTranslations = [
-            'dashboard' => 'لوحة التحكم', 'user' => 'المستخدمون', 'role' => 'الأدوار',
-            'company' => 'الشركات', 'station' => 'المحطات', 'driver' => 'السائقون',
-            'truck' => 'الشاحنات', 'product' => 'المنتجات', 'region' => 'المناطق',
-            'fuel_order' => 'طلبات الوقود', 'setting' => 'الإعدادات', 'order_status' => 'حالات الطلب',
-        ];
+       $groupTranslations = [
+    'backup'       => 'النسخ الاحتياطي',
+    'accounting'   => 'المحاسبة',
+    'account'      => 'دليل الحسابات',
+    'cost_center'  => 'مراكز التكلفة',
+    'fiscal_year'  => 'السنوات المالية',
+    'currency'     => 'العملات',
+    'box'          => 'الخزائن',
+    'bank_account' => 'الحسابات البنكية',
+    'payment'      => 'سندات الصرف',
+    'receipt'      => 'سندات القبض',
+    'user'         => 'المستخدمون',
+    'role'         => 'الأدوار',
+    'dashboard'    => 'لوحة التحكم',
+    'setting'      => 'الإعدادات',
+];
 
         $actionTranslations = [
             'view' => 'عرض', 'create' => 'إنشاء', 'update' => 'تعديل', 'delete' => 'حذف',
