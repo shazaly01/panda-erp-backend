@@ -11,6 +11,7 @@ use App\Modules\Accounting\Http\Requests\StoreBankAccountRequest;
 use App\Modules\Accounting\Http\Requests\UpdateBankAccountRequest;
 use App\Modules\Accounting\Http\Resources\BankAccountResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class BankAccountController extends Controller
 {
@@ -22,17 +23,34 @@ class BankAccountController extends Controller
         $this->authorizeResource(BankAccount::class, 'bank_account');
     }
 
-    /**
-     * عرض قائمة الحسابات البنكية
-     */
-    public function index(): JsonResponse
-    {
-        $accounts = BankAccount::with(['account', 'currency'])->get();
 
-        return response()->json([
-            'data' => BankAccountResource::collection($accounts)
-        ]);
-    }
+
+public function index(Request $request): JsonResponse
+{
+    $query = BankAccount::with(['account', 'currency']);
+
+    // 1. فلترة البحث (اسم البنك، اسم الحساب، أو رقم الحساب)
+    $query->when($request->search, function ($q, $search) {
+        $q->where(function ($sub) use ($search) {
+            $sub->where('bank_name', 'like', "%{$search}%")
+                ->orWhere('account_name', 'like', "%{$search}%")
+                ->orWhere('account_number', 'like', "%{$search}%");
+        });
+    });
+
+    // 2. فلترة الحالة (نشط / غير نشط)
+    // نستخدم filled لأن القيمة قد تكون '0' وهي قيمة false في php
+    $query->when($request->filled('status'), function ($q) use ($request) {
+        $q->where('is_active', $request->status);
+    });
+
+    $accounts = $query->latest()->get();
+
+    return response()->json([
+        'data' => BankAccountResource::collection($accounts)
+    ]);
+}
+
 
     /**
      * إضافة حساب بنكي جديد

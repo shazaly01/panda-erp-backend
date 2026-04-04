@@ -11,7 +11,7 @@ use App\Modules\Accounting\Http\Requests\StoreBoxRequest;
 use App\Modules\Accounting\Http\Requests\UpdateBoxRequest;
 use App\Modules\Accounting\Http\Resources\BoxResource;
 use Illuminate\Http\JsonResponse;
-
+use Illuminate\Http\Request;
 class BoxController extends Controller
 {
     // حقن السيرفس في الكنترولر (Dependency Injection)
@@ -21,18 +21,38 @@ class BoxController extends Controller
         $this->authorizeResource(Box::class, 'box');
     }
 
-    /**
-     * عرض كل الخزائن
-     */
-    public function index(): JsonResponse
-    {
-        // نحمل علاقة الحساب والعملة لتقليل الاستعلامات (Eager Loading)
-        $boxes = Box::with(['account', 'currency'])->get();
 
-        return response()->json([
-            'data' => BoxResource::collection($boxes)
-        ]);
-    }
+public function index(Request $request): JsonResponse
+{
+    $query = Box::with(['account', 'currency']);
+
+    // 1. فلترة البحث (اسم البنك، اسم الحساب، أو رقم الحساب)
+    $query->when($request->search, function ($q, $search) {
+        $q->where(function ($sub) use ($search) {
+            $sub->where('box_name', 'like', "%{$search}%")
+                ->orWhere('account_name', 'like', "%{$search}%")
+                ->orWhere('account_number', 'like', "%{$search}%");
+        });
+    });
+
+    // 2. فلترة الحالة (نشط / غير نشط)
+    // نستخدم filled لأن القيمة قد تكون '0' وهي قيمة false في php
+    $query->when($request->filled('status'), function ($q) use ($request) {
+        $q->where('is_active', $request->status);
+    });
+
+    $accounts = $query->latest()->get();
+
+    return response()->json([
+        'data' => BoxResource::collection($accounts)
+    ]);
+}
+
+
+
+
+
+
 
     /**
      * إضافة خزينة جديدة

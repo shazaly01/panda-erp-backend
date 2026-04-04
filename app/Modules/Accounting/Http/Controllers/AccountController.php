@@ -20,19 +20,38 @@ class AccountController extends Controller
         protected AccountService $service
     ) {}
 
-    /**
-     * عرض شجرة الحسابات
-     */
-    public function index()
-    {
-        $this->authorize('viewAny', Account::class);
 
-        // ميزة NestedSet: جلب البيانات مرتبة كشجرة
-        // toTree() تقوم بترتيب الأبناء داخل الآباء
-        $accounts = Account::defaultOrder()->get()->toTree();
 
-        return AccountResource::collection($accounts);
+public function index(Request $request)
+{
+    $this->authorize('viewAny', Account::class);
+
+    $query = Account::query();
+
+    // 1. فلترة البحث (الاسم أو الكود)
+    $query->when($request->search, function ($q, $search) {
+        $q->where(function($sub) use ($search) {
+            $sub->where('name', 'like', "%{$search}%")
+               ->orWhere('code', 'like', "%{$search}%");
+        });
+    });
+
+    // 2. فلترة الطبيعة (مدين / دائن)
+    $query->when($request->nature, function ($q, $nature) {
+        $q->where('nature', $nature);
+    });
+
+    // 3. التقرير: هل نرجع شجرة أم قائمة؟
+    // إذا كان هناك بحث، نرجع قائمة مسطحة لتسهيل العثور على النتائج
+    if ($request->filled('search') || $request->filled('nature')) {
+        $accounts = $query->defaultOrder()->get();
+    } else {
+        // إذا لم يكن هناك بحث، نرجع الشجرة كاملة
+        $accounts = $query->defaultOrder()->get()->toTree();
     }
+
+    return AccountResource::collection($accounts);
+}
 
     /**
      * عرض حساب واحد
