@@ -20,6 +20,7 @@ class StoreDepartmentRequest extends FormRequest
             'code' => ['nullable', 'string', 'max:50', 'unique:departments,code'],
             'type' => ['required', Rule::enum(DepartmentType::class)],
             'parent_id' => ['nullable', 'exists:departments,id'],
+            'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
         ];

@@ -11,6 +11,8 @@ use Kalnoy\Nestedset\NodeTrait;
 use App\Modules\HR\Enums\DepartmentType;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Modules\HR\Models\Employee;
+use App\Modules\Accounting\Models\CostCenter;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Department extends Model
 {
@@ -21,6 +23,7 @@ class Department extends Model
         'code',
         'type',
         'parent_id',
+        'cost_center_id',
         'is_active',
         'description',
     ];
@@ -36,5 +39,11 @@ class Department extends Model
     public function employees(): HasMany
     {
         return $this->hasMany(Employee::class);
+    }
+
+
+    public function costCenter(): BelongsTo
+    {
+        return $this->belongsTo(CostCenter::class);
     }
 }

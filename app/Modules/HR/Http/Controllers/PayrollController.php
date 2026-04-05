@@ -1,45 +1,45 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Services\PayrollService;
-use App\Modules\HR\Services\PayrollPostingService; // 1. استدعاء خدمة الترحيل الجديدة
+use App\Modules\HR\Services\PayrollPostingService;
 use App\Modules\HR\Http\Requests\Payroll\PreviewPayrollRequest;
 use App\Modules\HR\Http\Requests\Payroll\PostPayrollBatchRequest;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
 class PayrollController extends Controller
 {
-    protected PayrollService $payrollService;
-    protected PayrollPostingService $payrollPostingService; // 2. تعريف الخاصية
-
-    // 3. حقن الخدمة في البناء
     public function __construct(
-        PayrollService $payrollService,
-        PayrollPostingService $payrollPostingService
+        private readonly PayrollService $payrollService,
+        private readonly PayrollPostingService $payrollPostingService
     ) {
-        $this->payrollService = $payrollService;
-        $this->payrollPostingService = $payrollPostingService;
     }
 
     /**
-     * معاينة قسيمة راتب (قبل الحفظ)
+     * معاينة قسيمة راتب (قبل الاعتماد والحفظ)
+     * التحديث الجديد: تعتمد على "الشهر" لسحب كل المتغيرات آلياً
      */
     public function preview(PreviewPayrollRequest $request): JsonResponse
     {
         try {
             $employee = Employee::findOrFail($request->employee_id);
-            $externalInputs = $request->input('inputs', []);
 
-            $payslipData = $this->payrollService->previewPayslip($employee, $externalInputs);
+            // نأخذ الشهر من الطلب (مثال: '2026-04').
+            // إذا لم يتم تمريره، نأخذ الشهر الحالي كقيمة افتراضية.
+            $month = $request->input('month', now()->format('Y-m'));
+
+            // المحرك الآن يبحث بنفسه عن (السلف، الغياب، الحوافز) الخاصة بهذا الشهر
+            $payslipData = $this->payrollService->previewPayslip($employee, $month);
 
             return response()->json([
-                'message' => 'تم احتساب معاينة الراتب بنجاح',
+                'message' => "تم احتساب معاينة الراتب لشهر {$month} بنجاح",
                 'data' => $payslipData
             ]);
 
@@ -52,17 +52,17 @@ class PayrollController extends Controller
     }
 
    /**
-     * تم تحديث الدالة لتستخدم الـ Request الجديد
+     * اعتماد الرواتب وترحيلها للحسابات
      */
     public function postBatch(PostPayrollBatchRequest $request): JsonResponse
     {
-        // تم حذف $request->validate([...]) لأن الـ PostPayrollBatchRequest تكفل بالأمر
-
         try {
             DB::beginTransaction();
 
             $employees = Employee::whereIn('id', $request->employee_ids)->get();
 
+            // خدمة الترحيل ستقوم بإنشاء القيود المحاسبية، وتغيير حالة السلف إلى "مخصومة"،
+            // وتغيير حالة المدخلات المتغيرة (is_processed = true)
             $this->payrollPostingService->postPayrollBatch(
                 employees: $employees,
                 date: $request->date,
@@ -72,7 +72,7 @@ class PayrollController extends Controller
             DB::commit();
 
             return response()->json([
-                'message' => 'تم اعتماد الرواتب وترحيل القيد المحاسبي بنجاح.',
+                'message' => 'تم اعتماد الرواتب وترحيل القيد المحاسبي وتصفية الأرصدة بنجاح.',
             ]);
 
         } catch (Exception $e) {

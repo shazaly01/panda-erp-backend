@@ -10,8 +10,10 @@ use App\Modules\Accounting\Services\AccountMappingService;
 use App\Modules\Accounting\Services\JournalEntryService;
 use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Models\SalaryRule;
+use App\Modules\HR\Models\LoanInstallment;
+use App\Modules\HR\Models\PayrollInput;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 use Exception;
 
 class PayrollPostingService
@@ -23,108 +25,123 @@ class PayrollPostingService
     ) {}
 
     /**
-     * ترحيل الرواتب وإنشاء قيد محاسبي موحد
-     * @param Employee[]|Collection $employees قائمة الموظفين
-     * @param string $date تاريخ الاستحقاق (نهاية الشهر)
-     * @param string $description شرح القيد
+     * ترحيل الرواتب وإنشاء قيد محاسبي موحد ومفصل
      */
     public function postPayrollBatch($employees, string $date, string $description): void
     {
-        // 1. مصفوفة لتجميع المبالغ حسب الحساب (Account ID)
-        // الشكل: [ 'account_id' => amount ]
-        $aggregatedDebits = [];  // للمصروفات (بدلات)
-        $aggregatedCredits = []; // للاستقطاعات (خصومات)
+        // استخراج صيغة الشهر (مثال: 2026-04) لتمريرها للمحرك
+        $month = Carbon::parse($date)->format('Y-m');
+        $startOfMonth = Carbon::parse($month)->startOfMonth()->format('Y-m-d');
+        $endOfMonth = Carbon::parse($month)->endOfMonth()->format('Y-m-d');
 
-        $totalNetSalary = 0; // إجمالي صافي الرواتب (سيكون الدائن الرئيسي)
+        $groupedDebits = [];
+        $groupedCredits = [];
+        $employeePayables = [];
 
-        // جلب كل قواعد الراتب لنعرف مفاتيح التوجيه الخاصة بها
         $rules = SalaryRule::all()->keyBy('code');
+        $payableAccountId = $this->accountMappingService->getAccountId('hr_salaries_payable');
+        $contributionsPayableAccountId = $this->accountMappingService->getAccountId('hr_contributions_payable');
 
-        // 2. الدوران على الموظفين وحساب الرواتب
         foreach ($employees as $employee) {
-            // حساب الراتب (بدون حفظ، فقط Preview)
-            $payslip = $this->payrollService->previewPayslip($employee);
+            $costCenterId = $employee->department ? $employee->department->cost_center_id : null;
 
-            // التعامل مع سطور الراتب
+            // 1. استدعاء المحرك مع تمرير الشهر المطلوب
+            $payslip = $this->payrollService->previewPayslip($employee, $month);
+
             foreach ($payslip['lines'] as $line) {
                 $code = $line['code'];
                 $amount = $line['amount'];
 
-                // تخطي القيم الصفرية
                 if ($amount == 0) continue;
 
-                // العثور على قاعدة الراتب لجلب مفتاح التوجيه
                 $rule = $rules->get($code);
                 if (!$rule || !$rule->account_mapping_key) {
-                    throw new Exception("قاعدة الراتب {$code} ليس لها مفتاح توجيه محاسبي (Account Mapping Key)!");
+                    throw new Exception("قاعدة الراتب {$code} ليس لها توجيه محاسبي!");
                 }
 
-                // ترجمة المفتاح إلى رقم حساب فعلي
                 $accountId = $this->accountMappingService->getAccountId($rule->account_mapping_key);
 
-                // التصنيف: هل هو استحقاق (Debit) أم استقطاع (Credit)؟
                 if ($line['category'] === 'allowance') {
-                    // المصروفات طبيعتها مدينة
-                    if (!isset($aggregatedDebits[$accountId])) $aggregatedDebits[$accountId] = 0;
-                    $aggregatedDebits[$accountId] += $amount;
-                } else {
-                    // الخصومات طبيعتها دائنة (التزامات للغير)
-                    if (!isset($aggregatedCredits[$accountId])) $aggregatedCredits[$accountId] = 0;
-                    $aggregatedCredits[$accountId] += $amount;
+                    $key = "{$accountId}_{$costCenterId}";
+                    if (!isset($groupedDebits[$key])) {
+                        $groupedDebits[$key] = ['account_id' => $accountId, 'cost_center_id' => $costCenterId, 'amount' => 0];
+                    }
+                    $groupedDebits[$key]['amount'] += $amount;
+                }
+                elseif ($line['category'] === 'deduction') {
+                    if (!isset($groupedCredits[$accountId])) $groupedCredits[$accountId] = 0;
+                    $groupedCredits[$accountId] += $amount;
+                }
+                elseif ($line['category'] === 'company_contribution') {
+                    $key = "{$accountId}_{$costCenterId}";
+                    if (!isset($groupedDebits[$key])) {
+                        $groupedDebits[$key] = ['account_id' => $accountId, 'cost_center_id' => $costCenterId, 'amount' => 0];
+                    }
+                    $groupedDebits[$key]['amount'] += $amount;
+
+                    if (!isset($groupedCredits[$contributionsPayableAccountId])) {
+                        $groupedCredits[$contributionsPayableAccountId] = 0;
+                    }
+                    $groupedCredits[$contributionsPayableAccountId] += $amount;
                 }
             }
 
-            // تجميع صافي الراتب (Net Salary)
-            // هذا المبلغ هو التزام على الشركة تجاه الموظفين
-            $totalNetSalary += $payslip['totals']['net_salary'];
+            $employeePayables[] = new JournalEntryDetailDto(
+                account_id: $payableAccountId,
+                debit: 0,
+                credit: $payslip['totals']['net_salary'],
+                description: "رواتب مستحقة - {$employee->full_name}",
+                party_type: 'employee',
+                party_id: clone $employee->employee_number, // استخدام الرقم الطويل
+                cost_center_id: null
+            );
+
+            // 2. إقفال الحركات المالية المؤقتة لهذا الموظف (لضمان عدم تكرار الخصم/المنح)
+
+            // إقفال أقساط السلف
+            LoanInstallment::whereHas('loan', function ($q) use ($employee) {
+                    $q->where('employee_id', $employee->id);
+                })
+                ->where('status', 'pending')
+                ->whereBetween('due_month', [$startOfMonth, $endOfMonth])
+                ->update(['status' => 'deducted']);
+
+            // إقفال الحوافز والخصومات
+            PayrollInput::where('employee_id', $employee->id)
+                ->where('is_processed', false)
+                ->whereBetween('date', [$startOfMonth, $endOfMonth])
+                ->update(['is_processed' => true]);
         }
 
-        // 3. تجهيز أسطر القيد (DTOs)
         $journalDetails = [];
 
-        // أ. إضافة سطور المصروفات (المدين)
-        foreach ($aggregatedDebits as $accountId => $amount) {
+        foreach ($groupedDebits as $debit) {
             $journalDetails[] = new JournalEntryDetailDto(
-                account_id: $accountId,
-                debit: $amount,
+                account_id: $debit['account_id'],
+                debit: $debit['amount'],
                 credit: 0,
-                description: "إجمالي " . $this->getAccountName($rules, $accountId) // اختياري: تحسين الوصف
+                cost_center_id: $debit['cost_center_id'],
+                description: "مصروفات رواتب - $description"
             );
         }
 
-        // ب. إضافة سطور الخصومات (الدائن)
-        foreach ($aggregatedCredits as $accountId => $amount) {
+        foreach ($groupedCredits as $accountId => $amount) {
             $journalDetails[] = new JournalEntryDetailDto(
                 account_id: $accountId,
                 debit: 0,
-                credit: $amount
+                credit: $amount,
+                description: "استقطاعات والتزامات - $description"
             );
         }
 
-        // ج. إضافة سطر صافي الرواتب المستحقة (الدائن المكمل للقيد)
-        // يجب أن يكون لدينا مفتاح ثابت للرواتب المستحقة، مثلاً 'hr_salaries_payable'
-        $payableAccountId = $this->accountMappingService->getAccountId('hr_salaries_payable');
+        $journalDetails = array_merge($journalDetails, $employeePayables);
 
-        $journalDetails[] = new JournalEntryDetailDto(
-            account_id: $payableAccountId,
-            debit: 0,
-            credit: $totalNetSalary,
-            description: "صافي رواتب مستحقة - $description"
-        );
-
-        // 4. بناء كائن القيد كاملاً
         $journalEntryDto = new JournalEntryDto(
             date: $date,
             details: $journalDetails,
             description: $description
         );
 
-        // 5. إرسال القيد للمحاسبة
         $this->journalEntryService->createEntry($journalEntryDto);
-    }
-
-    // دالة مساعدة لجلب الاسم (يمكن تحسينها)
-    private function getAccountName($rules, $accountId) {
-        return "مصروفات رواتب";
     }
 }
