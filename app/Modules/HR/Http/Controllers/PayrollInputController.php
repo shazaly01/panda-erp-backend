@@ -9,34 +9,53 @@ use App\Modules\HR\Models\PayrollInput;
 use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Http\Requests\Payroll\StorePayrollInputRequest;
 use App\Modules\HR\Http\Requests\Payroll\UpdatePayrollInputRequest;
-use App\Modules\HR\Http\Resources\PayrollInputResource; // المسار المباشر
+use App\Modules\HR\Http\Resources\PayrollInputResource;
 use App\Modules\HR\Services\PayrollInputService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Auth;
 
 class PayrollInputController extends Controller
 {
+    /**
+     * حقن الخدمة وتفعيل السياسة الموحدة
+     */
     public function __construct(private readonly PayrollInputService $payrollInputService)
     {
+        /**
+         * تفعيل السياسة (PayrollInputPolicy)
+         * - يربط العمليات (index, store, show, update, destroy) تلقائياً
+         * - تأكد أن مسمى المتغير في الراوت هو 'payroll_input'
+         */
+        $this->authorizeResource(PayrollInput::class, 'payroll_input');
     }
 
     /**
      * عرض قائمة المدخلات المالية (الحوافز والخصومات)
      */
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
-        $this->authorize('viewAny', PayrollInput::class);
+        // تم الفحص تلقائياً عبر PayrollInputPolicy@viewAny
 
         $user = Auth::user();
         $query = PayrollInput::with(['employee', 'creator']);
 
-        // فلترة بوابة الخدمة الذاتية: الموظف يرى مكافآته وخصوماته فقط
-        if (!$user->hasPermissionTo('hr.payroll_inputs.view') && $user->employee_id) {
+        // فلترة بوابة الخدمة الذاتية (ESS)
+        // إذا لم يكن لديه صلاحية الإدارة أو العرض العام، يرى مدخلاته الشخصية فقط
+        if (!$user->can('hr.payroll_inputs.manage') && !$user->can('hr.payroll_inputs.view') && $user->employee_id) {
             $query->where('employee_id', $user->employee_id);
         }
 
-        // ترتيب تنازلي حسب التاريخ ليعرض أحدث الحركات أولاً
+        // إمكانية الفلترة (حسب الموظف، النوع، أو الحالة)
+        if ($request->filled('employee_id')) {
+            $query->where('employee_id', $request->employee_id);
+        }
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
         return PayrollInputResource::collection($query->orderByDesc('date')->paginate(20));
     }
 
@@ -45,13 +64,12 @@ class PayrollInputController extends Controller
      */
     public function store(StorePayrollInputRequest $request): JsonResponse
     {
-        $this->authorize('create', PayrollInput::class);
+        // تم الفحص تلقائياً عبر PayrollInputPolicy@create
 
         $data = $request->validated();
         $employee = Employee::findOrFail($data['employee_id']);
 
         try {
-            // نستخدم الخدمة لتسجيل الحركة المالية لضمان تطبيق أي قواعد إضافية (Business Logic)
             $payrollInput = $this->payrollInputService->addInput(
                 $employee,
                 $data['type'],
@@ -76,18 +94,17 @@ class PayrollInputController extends Controller
      */
     public function show(PayrollInput $payrollInput): PayrollInputResource
     {
-        $this->authorize('view', $payrollInput);
-
+        // تم الفحص تلقائياً عبر PayrollInputPolicy@view
         return new PayrollInputResource($payrollInput->load(['employee', 'creator']));
     }
 
     /**
-     * تعديل الحركة المالية (مسموح فقط إذا لم تُرحّل في مسير الرواتب)
+     * تعديل الحركة المالية (مسموح فقط إذا لم تُرحّل)
      */
     public function update(UpdatePayrollInputRequest $request, PayrollInput $payrollInput): JsonResponse
     {
-        // السياسة (PayrollInputPolicy) ستمنع التعديل آلياً إذا كان is_processed = true
-        $this->authorize('update', $payrollInput);
+        // تم الفحص تلقائياً عبر PayrollInputPolicy@update
+        // السياسة ستمنع التعديل إذا كانت الحالة is_processed = true
 
         $payrollInput->update($request->validated());
 
@@ -102,9 +119,7 @@ class PayrollInputController extends Controller
      */
     public function destroy(PayrollInput $payrollInput): JsonResponse
     {
-        // السياسة ستمنع الحذف آلياً إذا كانت الحركة قد دخلت في مسير رواتب
-        $this->authorize('delete', $payrollInput);
-
+        // تم الفحص تلقائياً عبر PayrollInputPolicy@delete
         $payrollInput->delete();
 
         return response()->json(['message' => 'تم إلغاء الحركة المالية بنجاح.'], 200);

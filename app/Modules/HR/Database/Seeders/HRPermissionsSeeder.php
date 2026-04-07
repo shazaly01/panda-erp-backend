@@ -35,6 +35,12 @@ class HRPermissionsSeeder extends Seeder
             // 5. الإضافات الجديدة (لخطة الـ ERP الشاملة)
             // ---------------------------------------------------------
 
+            // الورديات (Shifts)
+            'hr.shifts.view',          // مشاهدة الورديات وتعيينات الموظفين
+            'hr.shifts.create',        // إضافة وردية جديدة أو تعيين وردية لموظف
+            'hr.shifts.update',        // تعديل وردية
+            'hr.shifts.delete',        // حذف وردية
+
             // الحضور والانصراف
             'hr.attendance.view',      // مشاهدة سجلات الحضور
             'hr.attendance.manage',    // تعديل السجلات يدوياً (اعتماد تأخيرات/إضافي)
@@ -50,6 +56,11 @@ class HRPermissionsSeeder extends Seeder
             'hr.loans.manage',         // إدارة وجدولة السلف
             'hr.loans.approve',        // اعتماد طلب سلفة
             'hr.loans.request',        // تقديم طلب سلفة (للموظف نفسه)
+
+
+            'hr.payroll_inputs.view',      // مشاهدة سجل المكافآت والجزاءات
+            'hr.payroll_inputs.manage',    // إضافة حافز أو خصم لموظف
+            'hr.payroll_inputs.approve',   // اعتماد الحافز/الخصم (للمدير المباشر أو الـ HR)
         ];
 
         // إنشاء الصلاحيات

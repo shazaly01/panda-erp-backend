@@ -7,36 +7,43 @@ namespace App\Modules\HR\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use App\Modules\HR\Models\SalaryRule;
-// 1. استدعاء الـ Request من المسار الصحيح (داخل المجلد الفرعي)
 use App\Modules\HR\Http\Requests\SalaryRule\SalaryRuleRequest;
-// 2. استدعاء الـ Resource لتنسيق المخرجات
 use App\Modules\HR\Http\Resources\SalaryRuleResource;
 
 class SalaryRuleController extends Controller
 {
     /**
-     * عرض جميع قواعد الراتب
+     * تفعيل السياسة الموحدة وربطها بالصلاحيات
+     */
+    public function __construct()
+    {
+        /**
+         * تفعيل SalaryRulePolicy
+         * - تأكد أن مسمى المتغير في الراوت هو 'salary_rule' ليعمل الربط التلقائي
+         */
+        $this->authorizeResource(SalaryRule::class, 'salary_rule');
+    }
+
+    /**
+     * عرض جميع قواعد الراتب مرتبة حسب الفئة (بدلات/خصومات)
      */
     public function index(): JsonResponse
     {
-        $this->authorizePermission('hr.settings.manage');
-
+        // تم التحقق تلقائياً عبر SalaryRulePolicy@viewAny
         $rules = SalaryRule::query()
-            ->orderBy('category') // ترتيب: بدلات ثم خصومات
+            ->orderBy('category')
             ->orderBy('id')
             ->get();
 
-        // إرجاع البيانات باستخدام Resource Collection
         return response()->json(SalaryRuleResource::collection($rules));
     }
 
     /**
-     * إنشاء قاعدة جديدة
+     * إنشاء قاعدة راتب جديدة
      */
     public function store(SalaryRuleRequest $request): JsonResponse
     {
-        // لا نحتاج للتحقق من الصلاحية هنا لأن الـ Request تكفل بذلك
-
+        // تم التحقق تلقائياً عبر SalaryRulePolicy@create
         $salaryRule = SalaryRule::create($request->validated());
 
         return response()->json([
@@ -48,22 +55,18 @@ class SalaryRuleController extends Controller
     /**
      * عرض تفاصيل قاعدة معينة
      */
-    public function show($id): JsonResponse
+    public function show(SalaryRule $salaryRule): JsonResponse
     {
-        $this->authorizePermission('hr.settings.manage');
-
-        $salaryRule = SalaryRule::findOrFail($id);
-
+        // تم التحقق تلقائياً عبر SalaryRulePolicy@view
         return response()->json(new SalaryRuleResource($salaryRule));
     }
 
     /**
-     * تحديث قاعدة موجودة
+     * تحديث بيانات القاعدة
      */
-    public function update(SalaryRuleRequest $request, $id): JsonResponse
+    public function update(SalaryRuleRequest $request, SalaryRule $salaryRule): JsonResponse
     {
-        $salaryRule = SalaryRule::findOrFail($id);
-
+        // تم التحقق تلقائياً عبر SalaryRulePolicy@update
         $salaryRule->update($request->validated());
 
         return response()->json([
@@ -73,30 +76,17 @@ class SalaryRuleController extends Controller
     }
 
     /**
-     * حذف قاعدة (أرشفة - Soft Delete)
+     * حذف القاعدة (أرشفة)
      */
-    public function destroy($id): JsonResponse
+    public function destroy(SalaryRule $salaryRule): JsonResponse
     {
-        $this->authorizePermission('hr.settings.manage');
+        // تم التحقق تلقائياً عبر SalaryRulePolicy@delete
 
-        $salaryRule = SalaryRule::findOrFail($id);
-
-        // يمكن إضافة تحقق هنا: هل القاعدة مستخدمة في عقود نشطة؟
-        // لكن للآن سنكتفي بالحذف الناعم (Soft Delete) الموجود في الموديل
+        // ملاحظة: يفضل التحقق مستقبلاً إذا كانت القاعدة مرتبطة بهياكل رواتب نشطة
         $salaryRule->delete();
 
         return response()->json([
             'message' => 'تم أرشفة قاعدة الراتب بنجاح'
         ]);
-    }
-
-    /**
-     * دالة مساعدة للتحقق من الصلاحيات
-     */
-    protected function authorizePermission(string $permission): void
-    {
-        if (! auth()->user()->hasPermissionTo($permission)) {
-            abort(403, 'ليس لديك صلاحية للقيام بهذا الإجراء.');
-        }
     }
 }

@@ -48,6 +48,18 @@ use App\Modules\HR\Policies\ContractPolicy;
 use App\Modules\HR\Models\PayrollBatch;     // <--- جديد
 use App\Modules\HR\Policies\PayrollPolicy;
 
+use App\Modules\HR\Models\AttendanceLog;
+use App\Modules\HR\Policies\AttendanceLogPolicy;
+
+use App\Modules\HR\Models\Shift;
+use App\Modules\HR\Policies\ShiftPolicy;
+
+use App\Modules\HR\Models\LeaveRequest;
+use App\Modules\HR\Policies\LeaveRequestPolicy; // أو LeaveRequestPolicy حسب التسمية لديك
+
+use App\Modules\HR\Models\Loan;
+use App\Modules\HR\Policies\LoanPolicy;
+
 class ModuleServiceProvider extends ServiceProvider
 {
 
@@ -71,6 +83,11 @@ class ModuleServiceProvider extends ServiceProvider
         Gate::policy(Employee::class, EmployeePolicy::class);
         Gate::policy(Contract::class, ContractPolicy::class);
         Gate::policy(PayrollBatch::class, PayrollPolicy::class);
+        Gate::policy(AttendanceLog::class, AttendanceLogPolicy::class);
+        Gate::policy(Shift::class, ShiftPolicy::class);
+        Gate::policy(LeaveRequest::class, LeaveRequestPolicy::class);
+        Gate::policy(Loan::class, LoanPolicy::class);
+
         $modulesPath = app_path('Modules');
 
         if (!File::exists($modulesPath)) {
@@ -91,7 +108,7 @@ class ModuleServiceProvider extends ServiceProvider
         // 1. Load Routes (API)
         // يقوم بتحميل ملف api.php ويضيف له البادئة api/v1
         if (File::exists($modulePath . '/Routes/api.php')) {
-            Route::prefix('api/v1')
+            Route::prefix('api')
                 ->middleware('api')
                 ->group($modulePath . '/Routes/api.php');
         }

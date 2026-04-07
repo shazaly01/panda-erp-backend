@@ -20,22 +20,23 @@ class PayrollController extends Controller
         private readonly PayrollService $payrollService,
         private readonly PayrollPostingService $payrollPostingService
     ) {
+        // حماية المتحكم بالكامل بالتأكد من تسجيل الدخول
+        $this->middleware('auth:sanctum');
     }
 
     /**
      * معاينة قسيمة راتب (قبل الاعتماد والحفظ)
-     * التحديث الجديد: تعتمد على "الشهر" لسحب كل المتغيرات آلياً
      */
     public function preview(PreviewPayrollRequest $request): JsonResponse
     {
+        // التحقق من الصلاحية عبر السياسة (PayrollPolicy)
+        // نستخدم المسمى 'view' لأنها عملية عرض بيانات مالية
+        $this->authorize('view', Employee::class);
+
         try {
             $employee = Employee::findOrFail($request->employee_id);
-
-            // نأخذ الشهر من الطلب (مثال: '2026-04').
-            // إذا لم يتم تمريره، نأخذ الشهر الحالي كقيمة افتراضية.
             $month = $request->input('month', now()->format('Y-m'));
 
-            // المحرك الآن يبحث بنفسه عن (السلف، الغياب، الحوافز) الخاصة بهذا الشهر
             $payslipData = $this->payrollService->previewPayslip($employee, $month);
 
             return response()->json([
@@ -51,18 +52,21 @@ class PayrollController extends Controller
         }
     }
 
-   /**
+    /**
      * اعتماد الرواتب وترحيلها للحسابات
      */
     public function postBatch(PostPayrollBatchRequest $request): JsonResponse
     {
+        // التحقق من الصلاحية عبر السياسة (PayrollPolicy)
+        // نستخدم 'post' أو 'manage' حسب ما هو معرف في ملف السياسة لديك
+        $this->authorize('post', Employee::class);
+
         try {
             DB::beginTransaction();
 
             $employees = Employee::whereIn('id', $request->employee_ids)->get();
 
-            // خدمة الترحيل ستقوم بإنشاء القيود المحاسبية، وتغيير حالة السلف إلى "مخصومة"،
-            // وتغيير حالة المدخلات المتغيرة (is_processed = true)
+            // تنفيذ عملية الترحيل المحاسبي وتصفية الأرصدة (العهد والسلف)
             $this->payrollPostingService->postPayrollBatch(
                 employees: $employees,
                 date: $request->date,

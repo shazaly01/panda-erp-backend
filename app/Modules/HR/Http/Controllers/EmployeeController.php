@@ -17,21 +17,39 @@ class EmployeeController extends Controller
         $this->authorizeResource(Employee::class, 'employee');
     }
 
-    public function index(Request $request): JsonResponse
+public function index(Request $request): JsonResponse
     {
-        // دعم البحث والفلترة
         $query = Employee::with(['department', 'position']);
 
-        if ($request->has('department_id')) {
+        // 1. فلتر الإدارة (نتأكد من أنه رقمي)
+        if ($request->filled('department_id') && is_numeric($request->department_id)) {
             $query->where('department_id', $request->department_id);
         }
 
-        if ($request->has('search')) {
-            $query->where('full_name', 'like', "%{$request->search}%")
-                  ->orWhere('employee_number', 'like', "%{$request->search}%");
+        // 2. فلتر المسمى الوظيفي (نتأكد من أنه رقمي)
+        if ($request->filled('position_id') && is_numeric($request->position_id)) {
+            $query->where('position_id', $request->position_id);
         }
 
-        $employees = $query->paginate(20);
+        // 3. فلتر الحالة (نتأكد أنها ليست "الكل" وأنها موجودة فعلاً)
+        if ($request->filled('status') && $request->status !== 'null' && $request->status !== '') {
+            $query->where('status', $request->status);
+        }
+
+        // 4. فلتر البحث المجمع
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                // استخدمنا full_name الصحيح الموجود في قاعدة بياناتك
+                $q->where('full_name', 'like', "%{$search}%")
+                  ->orWhere('employee_number', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        // ترتيب تنازلي لظهور الموظفين الجدد أولاً
+        $employees = $query->latest('id')->paginate(20);
 
         return EmployeeResource::collection($employees)->response();
     }
@@ -46,10 +64,16 @@ class EmployeeController extends Controller
         ], 201);
     }
 
-    public function show(Employee $employee): JsonResponse
+   public function show(Employee $employee): JsonResponse
     {
-        // تحميل العلاقات المهمة، بما فيها العقد الحالي
-        $employee->load(['department', 'position', 'manager', 'currentContract.salaryStructure']);
+        // تحميل العلاقات المهمة، بما فيها العقد الحالي والورديات لمعرفة الوردية النشطة
+        $employee->load([
+            'department',
+            'position',
+            'manager',
+            'currentContract.salaryStructure',
+            'employeeShifts.shift' // <--- الإضافة الدقيقة هنا
+        ]);
 
         return response()->json([
             'data' => new EmployeeResource($employee)

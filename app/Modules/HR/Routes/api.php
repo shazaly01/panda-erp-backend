@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+
+// --- استيراد المتحكمات (Controllers) ---
 use App\Modules\HR\Http\Controllers\DepartmentController;
 use App\Modules\HR\Http\Controllers\PositionController;
 use App\Modules\HR\Http\Controllers\EmployeeController;
@@ -8,12 +10,11 @@ use App\Modules\HR\Http\Controllers\ContractController;
 use App\Modules\HR\Http\Controllers\SalaryRuleController;
 use App\Modules\HR\Http\Controllers\SalaryStructureController;
 use App\Modules\HR\Http\Controllers\PayrollController;
-
-// --- استيراد المتحكمات التشغيلية والخدمة الذاتية (الجديدة) ---
 use App\Modules\HR\Http\Controllers\LeaveRequestController;
 use App\Modules\HR\Http\Controllers\LoanController;
 use App\Modules\HR\Http\Controllers\AttendanceLogController;
 use App\Modules\HR\Http\Controllers\PayrollInputController;
+use App\Modules\HR\Http\Controllers\ShiftController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,47 +22,63 @@ use App\Modules\HR\Http\Controllers\PayrollInputController;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth:sanctum')
+    ->prefix('hr') // 🌟 القفل والمفتاح: هذه البادئة تجعل الروابط تطابق طلبات الـ Vue Service
+    ->group(function () {
 
-    // 1. الإدارات والهيكل التنظيمي
+    // ===========================================
+    // 1. الهيكل التنظيمي (Organizational Structure)
+    // ===========================================
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('positions', PositionController::class);
 
-    // 2. الموظفين
+    // ===========================================
+    // 2. شؤون الموظفين (Employee Management)
+    // ===========================================
     Route::apiResource('employees', EmployeeController::class);
 
-    // 3. العقود
-    Route::apiResource('contracts', ContractController::class)->except(['update']);
+    // ملاحظة: تم تفعيل الـ update للعقود كما طلبتم سابقاً
+    Route::apiResource('contracts', ContractController::class);
 
-    // 4. إعدادات الرواتب
+    // ===========================================
+    // 3. إعدادات الرواتب (Payroll Settings)
+    // ===========================================
     Route::apiResource('salary-rules', SalaryRuleController::class);
     Route::apiResource('salary-structures', SalaryStructureController::class);
 
-    // --- 5. الخدمة الذاتية والعمليات (الإضافات الجديدة) ---
+    // ===========================================
+    // 4. العمليات والخدمة الذاتية (Operations & Self-Service)
+    // ===========================================
 
-    // أ. الإجازات
+    // الإجازات
     Route::post('leave-requests/{leave_request}/approve', [LeaveRequestController::class, 'approve']);
     Route::apiResource('leave-requests', LeaveRequestController::class);
 
-    // ب. السلف
+    // السلف والعهد
     Route::post('loans/{loan}/approve', [LoanController::class, 'approve']);
     Route::post('loans/{loan}/mark-as-paid', [LoanController::class, 'markAsPaid']);
     Route::apiResource('loans', LoanController::class);
 
-    // ج. الحضور والانصراف
+
+    Route::get('employees/{employee}/shifts', [ShiftController::class, 'employeeShifts']); // عرض ورديات موظف محدد
+    Route::post('shifts/assign', [ShiftController::class, 'assignEmployee']); // تعيين موظف على وردية
+    Route::apiResource('shifts', ShiftController::class); // إدارة الورديات الأساسية (CRUD)
+
+    // الحضور والانصراف
     Route::apiResource('attendance-logs', AttendanceLogController::class);
 
-    // د. المدخلات المالية المتغيرة (حوافز/خصومات)
+    // المدخلات المالية المتغيرة (حوافز/خصومات)
     Route::apiResource('payroll-inputs', PayrollInputController::class);
 
-
-    // --- 6. عمليات الرواتب ---
+    // ===========================================
+    // 5. معالجة الرواتب (Payroll Processing)
+    // ===========================================
     Route::prefix('payroll')->name('payroll.')->group(function () {
-        // معاينة الراتب (يتم تمرير employee_id و month)
+        // معاينة الراتب (Preview)
         Route::post('preview', [PayrollController::class, 'preview'])
             ->middleware('can:hr.payroll.view');
 
-        // اعتماد وترحيل الرواتب
+        // اعتماد وترحيل الرواتب (Post Batch)
         Route::post('post-batch', [PayrollController::class, 'postBatch'])
             ->middleware('can:hr.payroll.post');
     });

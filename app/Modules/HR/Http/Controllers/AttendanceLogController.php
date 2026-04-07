@@ -9,50 +9,64 @@ use App\Modules\HR\Models\AttendanceLog;
 use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Http\Requests\Attendance\StoreAttendanceLogRequest;
 use App\Modules\HR\Http\Requests\Attendance\UpdateAttendanceLogRequest;
-use App\Modules\HR\Http\Resources\AttendanceLogResource; // المسار المباشر
+use App\Modules\HR\Http\Resources\AttendanceLogResource;
 use App\Modules\HR\Services\AttendanceService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Auth;
 
 class AttendanceLogController extends Controller
 {
-    // حقن خدمة الحضور المسؤولة عن العمليات الحسابية
+    /**
+     * حقن الخدمة وتفعيل السياسة
+     */
     public function __construct(private readonly AttendanceService $attendanceService)
     {
+        // تفعيل السياسة (AttendanceLogPolicy)
+        // ملاحظة: المتغير في المسار (Route) يجب أن يكون attendance_log
+        $this->authorizeResource(AttendanceLog::class, 'attendance_log');
     }
 
     /**
      * عرض سجلات الحضور
      */
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
-        $this->authorize('viewAny', AttendanceLog::class);
+        // تم الفحص تلقائياً عبر AttendanceLogPolicy@viewAny
 
         $user = Auth::user();
         $query = AttendanceLog::with(['employee', 'shift']);
 
-        // إذا كان الموظف يتصفح النظام (ESS)، يرى سجلاته فقط
-        if (!$user->hasPermissionTo('hr.attendance.view') && $user->employee_id) {
+        // فلترة للبحث (اختياري حسب الحاجة)
+        if ($request->filled('employee_id')) {
+            $query->where('employee_id', $request->employee_id);
+        }
+
+        if ($request->filled('date')) {
+            $query->where('date', $request->date);
+        }
+
+        // منطق الخدمة الذاتية (ESS): إذا لم يكن مديراً، يرى سجلاته فقط
+        // ملاحظة: نتحقق من الصلاحية 'hr.attendance.manage' بدلاً من view لضمان الفصل
+        if (!$user->can('hr.attendance.manage') && $user->employee_id) {
             $query->where('employee_id', $user->employee_id);
         }
 
-        // ترتيب تنازلي حسب التاريخ ليعرض أحدث السجلات أولاً
         return AttendanceLogResource::collection($query->orderByDesc('date')->paginate(30));
     }
 
     /**
-     * إدخال سجل حضور يدوي (صلاحية للإدارة فقط)
+     * إدخال سجل حضور يدوي
      */
     public function store(StoreAttendanceLogRequest $request): JsonResponse
     {
-        $this->authorize('create', AttendanceLog::class);
+        // تم الفحص تلقائياً عبر AttendanceLogPolicy@create
 
         $data = $request->validated();
         $employee = Employee::findOrFail($data['employee_id']);
 
         try {
-            // نمرر البيانات للـ Service وهي ستتكفل بجلب الوردية وحساب التأخير والإضافي
             $log = $this->attendanceService->processDailyAttendance(
                 $employee,
                 $data['date'],
@@ -60,7 +74,7 @@ class AttendanceLogController extends Controller
                 $data['check_out'] ?? null
             );
 
-            // في حال تم تحديد حالة معينة يدوياً (مثل: on_leave) نقوم بتحديثها فوراً
+            // تحديث الحالة يدوياً إذا طُلب ذلك
             if (isset($data['status']) && $data['status'] !== $log->status) {
                 $log->update(['status' => $data['status']]);
             }
@@ -80,17 +94,16 @@ class AttendanceLogController extends Controller
      */
     public function show(AttendanceLog $attendanceLog): AttendanceLogResource
     {
-        $this->authorize('view', $attendanceLog);
-
+        // تم الفحص تلقائياً عبر AttendanceLogPolicy@view
         return new AttendanceLogResource($attendanceLog->load(['employee', 'shift']));
     }
 
     /**
-     * تعديل سجل الحضور (مثال: نسي الموظف البصمة وقام الـ HR بإضافتها لاحقاً)
+     * تعديل سجل حضور
      */
     public function update(UpdateAttendanceLogRequest $request, AttendanceLog $attendanceLog): JsonResponse
     {
-        $this->authorize('update', $attendanceLog);
+        // تم الفحص تلقائياً عبر AttendanceLogPolicy@update
 
         $data = $request->validated();
 
@@ -98,7 +111,7 @@ class AttendanceLogController extends Controller
             $checkIn = $data['check_in'] ?? $attendanceLog->check_in;
             $checkOut = $data['check_out'] ?? $attendanceLog->check_out;
 
-            // نعيد تمرير التحديث للـ Service لكي تقوم "بإعادة حساب" دقائق التأخير والإضافي بناءً على الوقت الجديد
+            // إعادة الحساب بناءً على التعديلات
             $updatedLog = $this->attendanceService->processDailyAttendance(
                 $attendanceLog->employee,
                 $attendanceLog->date->format('Y-m-d'),
@@ -121,12 +134,11 @@ class AttendanceLogController extends Controller
     }
 
     /**
-     * حذف السجل (عملية حساسة جداً)
+     * حذف السجل
      */
     public function destroy(AttendanceLog $attendanceLog): JsonResponse
     {
-        $this->authorize('delete', $attendanceLog);
-
+        // تم الفحص تلقائياً عبر AttendanceLogPolicy@delete
         $attendanceLog->delete();
 
         return response()->json(['message' => 'تم حذف سجل الحضور بنجاح.'], 200);
