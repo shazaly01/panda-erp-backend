@@ -13,26 +13,26 @@ class SalaryRulePolicy
     public function viewAny(User $user): bool
     {
         // استخدام الصلاحية العامة لإعدادات الرواتب
-        return $user->hasPermissionTo('hr.settings.manage');
+        return $user->can('hr.settings.manage');
     }
 
     public function view(User $user, SalaryRule $salaryRule): bool
     {
-        return $user->hasPermissionTo('hr.settings.manage');
+        return $user->can('hr.settings.manage');
     }
 
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('hr.settings.manage');
+        return $user->can('hr.settings.manage');
     }
 
     public function update(User $user, SalaryRule $salaryRule): bool
     {
-        return $user->hasPermissionTo('hr.settings.manage');
+        return $user->can('hr.settings.manage');
     }
 
     public function delete(User $user, SalaryRule $salaryRule): bool
     {
-        return $user->hasPermissionTo('hr.settings.manage');
+        return $user->can('hr.settings.manage');
     }
 }

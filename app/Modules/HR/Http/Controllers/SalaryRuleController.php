@@ -27,10 +27,10 @@ class SalaryRuleController extends Controller
     /**
      * عرض جميع قواعد الراتب مرتبة حسب الفئة (بدلات/خصومات)
      */
-    public function index(): JsonResponse
+  public function index(): JsonResponse
     {
-        // تم التحقق تلقائياً عبر SalaryRulePolicy@viewAny
         $rules = SalaryRule::query()
+            ->with('accountMapping.account') // <--- جلب التوجيه المحاسبي مع الحساب الفعلي
             ->orderBy('category')
             ->orderBy('id')
             ->get();
@@ -57,7 +57,9 @@ class SalaryRuleController extends Controller
      */
     public function show(SalaryRule $salaryRule): JsonResponse
     {
-        // تم التحقق تلقائياً عبر SalaryRulePolicy@view
+        // تحميل العلاقات للقاعدة المحددة قبل تمريرها للـ Resource
+        $salaryRule->load('accountMapping.account');
+
         return response()->json(new SalaryRuleResource($salaryRule));
     }
 

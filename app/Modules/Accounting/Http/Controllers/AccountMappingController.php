@@ -28,13 +28,10 @@ class AccountMappingController extends Controller
     /**
      * عرض جميع إعدادات الربط الحالية
      */
-    public function index(): JsonResponse
+   public function index(): JsonResponse
     {
-        // نتحقق من صلاحية "إدارة الإعدادات المحاسبية"
-        // $this->authorize('viewAny', AccountMapping::class); // يمكن تفعيلها لاحقاً
-
-        $mappings = AccountMapping::with('account') // نجلب اسم الحساب المرتبط
-            ->orderBy('sort_order')
+        $mappings = AccountMapping::with('account')
+            ->orderBy('id') // تم التعديل هنا للترتيب حسب المعرف
             ->get();
 
         return response()->json(AccountMappingResource::collection($mappings));

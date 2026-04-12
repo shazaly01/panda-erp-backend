@@ -33,4 +33,17 @@ class SalaryRule extends Model
         'value' => 'decimal:4',
         'is_active' => 'boolean',
     ];
+
+
+
+    public function accountMapping()
+    {
+        // نحدد المفتاح الأجنبي (account_mapping_key) في هذا النموذج
+        // والمفتاح المحلي (key) في نموذج AccountMapping
+        return $this->belongsTo(
+            \App\Modules\Accounting\Models\AccountMapping::class,
+            'account_mapping_key',
+            'key'
+        );
+    }
 }

@@ -24,6 +24,20 @@ class SalaryRuleResource extends JsonResource
             'percentage_of_code' => $this->percentage_of_code,
             'formula_expression' => $this->formula_expression,
             'account_mapping_key' => $this->account_mapping_key,
+
+            // بيانات الحساب المحاسبي المرتبط (تظهر فقط إذا تم تحميل العلاقة)
+            'account_details' => $this->whenLoaded('accountMapping', function () {
+                // نتحقق أولاً من وجود التوجيه، ثم نتحقق من وجود الحساب الفعلي المرتبط به
+                $account = $this->accountMapping?->account;
+
+                return [
+                    'mapping_name' => $this->accountMapping?->name,
+                    'account_id'   => $account?->id,
+                    'account_name' => $account?->name,
+                    'account_code' => $account?->code,
+                ];
+            }),
+
             'is_active' => (bool) $this->is_active,
             'description' => $this->description,
 

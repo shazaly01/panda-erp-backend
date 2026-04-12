@@ -38,13 +38,18 @@ Route::middleware('auth:sanctum')
     Route::apiResource('employees', EmployeeController::class);
 
     // ملاحظة: تم تفعيل الـ update للعقود كما طلبتم سابقاً
+    Route::post('contracts/{contract}/terminate', [ContractController::class, 'terminate']);
     Route::apiResource('contracts', ContractController::class);
 
     // ===========================================
     // 3. إعدادات الرواتب (Payroll Settings)
     // ===========================================
-    Route::apiResource('salary-rules', SalaryRuleController::class);
-    Route::apiResource('salary-structures', SalaryStructureController::class);
+   Route::apiResource('salary-rules', SalaryRuleController::class)
+    ->parameters(['salary-rules' => 'salary_rule']);
+
+
+   Route::apiResource('salary-structures', SalaryStructureController::class)
+        ->parameters(['salary-structures' => 'salary_structure']);
 
     // ===========================================
     // 4. العمليات والخدمة الذاتية (Operations & Self-Service)
