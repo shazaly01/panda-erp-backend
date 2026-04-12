@@ -12,9 +12,9 @@ class StoreEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create', \App\Modules\HR\Models\Employee::class);
+        // نرجع true لترك المسؤولية للـ Policy المرتبط بالمتحكم
+        return true;
     }
-
     public function rules(): array
     {
         return [

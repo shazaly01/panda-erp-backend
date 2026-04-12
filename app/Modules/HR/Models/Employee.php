@@ -96,4 +96,9 @@ class Employee extends Model
     {
         return EmployeeFactory::new();
     }
+
+    public function employeeShifts(): HasMany
+    {
+        return $this->hasMany(EmployeeShift::class);
+    }
 }

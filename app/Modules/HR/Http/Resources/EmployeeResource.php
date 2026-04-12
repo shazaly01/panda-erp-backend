@@ -15,16 +15,21 @@ class EmployeeResource extends JsonResource
             'employee_number' => $this->employee_number,
             'national_id' => $this->national_id,
 
-            // البيانات الديموغرافية
+            // البيانات الديموغرافية (مع إضافة الـ Labels للفرونت إند)
             'gender' => $this->gender,
+            'gender_label' => $this->gender?->label(),
+
             'marital_status' => $this->marital_status,
+            'marital_status_label' => $this->marital_status?->label(),
 
             // بيانات الوظيفة والإدارة
             'employment_type' => $this->employment_type,
+            'employment_type_label' => $this->employment_type?->label(),
+
             'department' => new DepartmentResource($this->whenLoaded('department')),
             'position' => new PositionResource($this->whenLoaded('position')),
 
-            // المدير المباشر (نحمل الاسم والـ ID فقط لتخفيف الاستجابة)
+            // المدير المباشر
             'manager' => $this->whenLoaded('manager', function () {
                 return [
                     'id' => $this->manager->id,
@@ -41,7 +46,7 @@ class EmployeeResource extends JsonResource
             'phone' => $this->phone,
             'avatar' => $this->user ? $this->user->avatar_url : null,
 
-            // الوردية الحالية النشطة (تفيدنا جداً في شاشة الملف الشخصي)
+            // الوردية الحالية النشطة
             'current_shift' => $this->whenLoaded('employeeShifts', function () {
                 $activeShift = $this->employeeShifts->first(function ($shift) {
                     return is_null($shift->end_date) || $shift->end_date >= now()->startOfDay();
@@ -49,10 +54,14 @@ class EmployeeResource extends JsonResource
                 return $activeShift ? new EmployeeShiftResource($activeShift) : null;
             }),
 
-            // العقد والراتب (محمي بالصلاحيات)
+            // العقد والراتب (مع حماية برمجية ضد الـ Null)
             'current_contract' => $this->when(
-                $request->user()->can('view', $this->whenLoaded('currentContract')),
-                new ContractResource($this->whenLoaded('currentContract'))
+                $this->relationLoaded('currentContract') &&
+                $this->currentContract &&
+                $request->user()->can('view', $this->currentContract),
+                function () {
+                    return new ContractResource($this->currentContract);
+                }
             ),
 
             // معلومات النظام

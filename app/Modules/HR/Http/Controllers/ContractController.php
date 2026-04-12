@@ -73,20 +73,22 @@ class ContractController extends Controller
     /**
      * دالة مخصصة لإنهاء خدمة الموظف أو إيقاف عقده
      */
-    public function terminate(Contract $contract): JsonResponse
-    {
-        $this->authorize('update', $contract); // التحقق من الصلاحية
+ // في ContractController.php
+public function terminate(Contract $contract): JsonResponse
+{
+    $this->authorize('update', $contract);
 
-        $contract->update([
-            'is_active' => false,
-            'end_date' => now()
-        ]);
+    $contract->update([
+        'is_active' => false,
+        'end_date' => now()
+    ]);
 
-        return response()->json([
-            'message' => 'تم إنهاء العقد بنجاح',
-            'data' => new ContractResource($contract)
-        ]);
-    }
+    // 🌟 أضف التحميل هنا أيضاً لكي لا يفقد الـ Vue اسم الموظف بعد التحديث
+    return response()->json([
+        'message' => 'تم إنهاء العقد بنجاح',
+        'data' => new ContractResource($contract->load(['employee', 'salaryStructure']))
+    ]);
+}
 
     public function destroy(Contract $contract): JsonResponse
     {
