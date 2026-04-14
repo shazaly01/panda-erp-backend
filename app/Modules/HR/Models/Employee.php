@@ -28,7 +28,7 @@ class Employee extends Model
     protected $fillable = [
         'full_name', 'date_of_birth', 'gender', 'marital_status',
         'national_id', 'email', 'phone', 'address',
-        'employee_number', 'join_date', 'status', 'employment_type',
+        'employee_number','barcode', 'join_date', 'status', 'employment_type',
         'department_id', 'position_id', 'manager_id', 'user_id'
     ];
 
@@ -101,4 +101,30 @@ class Employee extends Model
     {
         return $this->hasMany(EmployeeShift::class);
     }
+
+
+    /**
+     * الحسابات البنكية للموظف
+     */
+    public function bankAccounts()
+    {
+        return $this->hasMany(EmployeeBankAccount::class);
+    }
+
+    /**
+     * جلب الحساب البنكي الأساسي (الذي سيُحول عليه الراتب)
+     */
+    public function primaryBankAccount()
+    {
+        return $this->hasOne(EmployeeBankAccount::class)->where('is_primary', true);
+    }
+
+
+    /**
+ * الوردية النشطة حالياً للموظف
+ */
+public function latestShift(): HasOne
+{
+    return $this->hasOne(EmployeeShift::class)->whereNull('end_date')->latestOfMany();
+}
 }

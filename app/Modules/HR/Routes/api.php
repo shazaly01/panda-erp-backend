@@ -35,6 +35,9 @@ Route::middleware('auth:sanctum')
     // ===========================================
     // 2. شؤون الموظفين (Employee Management)
     // ===========================================
+    // 🌟 المسار الجديد: كشف الحساب المالي للموظف (يجب أن يكون قبل apiResource لتجنب تداخل الروابط)
+    Route::get('employees/{id}/financial-statement', [EmployeeController::class, 'getFinancialStatement']);
+
     Route::apiResource('employees', EmployeeController::class);
 
     // ملاحظة: تم تفعيل الـ update للعقود كما طلبتم سابقاً
@@ -44,11 +47,10 @@ Route::middleware('auth:sanctum')
     // ===========================================
     // 3. إعدادات الرواتب (Payroll Settings)
     // ===========================================
-   Route::apiResource('salary-rules', SalaryRuleController::class)
-    ->parameters(['salary-rules' => 'salary_rule']);
+    Route::apiResource('salary-rules', SalaryRuleController::class)
+        ->parameters(['salary-rules' => 'salary_rule']);
 
-
-   Route::apiResource('salary-structures', SalaryStructureController::class)
+    Route::apiResource('salary-structures', SalaryStructureController::class)
         ->parameters(['salary-structures' => 'salary_structure']);
 
     // ===========================================
@@ -64,7 +66,7 @@ Route::middleware('auth:sanctum')
     Route::post('loans/{loan}/mark-as-paid', [LoanController::class, 'markAsPaid']);
     Route::apiResource('loans', LoanController::class);
 
-
+    // الورديات
     Route::get('employees/{employee}/shifts', [ShiftController::class, 'employeeShifts']); // عرض ورديات موظف محدد
     Route::post('shifts/assign', [ShiftController::class, 'assignEmployee']); // تعيين موظف على وردية
     Route::apiResource('shifts', ShiftController::class); // إدارة الورديات الأساسية (CRUD)
@@ -72,13 +74,24 @@ Route::middleware('auth:sanctum')
     // الحضور والانصراف
     Route::apiResource('attendance-logs', AttendanceLogController::class);
 
+    Route::post('attendance-logs/scan', [\App\Modules\HR\Http\Controllers\AttendanceLogController::class, 'scanBarcode']);
+
     // المدخلات المالية المتغيرة (حوافز/خصومات)
     Route::apiResource('payroll-inputs', PayrollInputController::class);
+
 
     // ===========================================
     // 5. معالجة الرواتب (Payroll Processing)
     // ===========================================
+    // 🌟 تم تجميع كل مسارات الرواتب في Group واحد لترتيب الكود
     Route::prefix('payroll')->name('payroll.')->group(function () {
+
+        // مسارات الاستعلامات والجلب
+        Route::get('batches', [PayrollController::class, 'getBatches']);
+        Route::post('summary', [PayrollController::class, 'getSummary']);
+        Route::get('processed-employees', [PayrollController::class, 'getProcessedEmployees']);
+        Route::get('batches/{batchId}/export-bank', [PayrollController::class, 'exportBankFile']);
+
         // معاينة الراتب (Preview)
         Route::post('preview', [PayrollController::class, 'preview'])
             ->middleware('can:hr.payroll.view');

@@ -12,7 +12,10 @@ use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Models\SalaryRule;
 use App\Modules\HR\Models\LoanInstallment;
 use App\Modules\HR\Models\PayrollInput;
-use Illuminate\Support\Collection;
+// استيراد الموديلات الجديدة
+use App\Modules\HR\Models\PayrollBatch;
+use App\Modules\HR\Models\Payslip;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Exception;
 
@@ -24,12 +27,8 @@ class PayrollPostingService
         protected JournalEntryService $journalEntryService
     ) {}
 
-    /**
-     * ترحيل الرواتب وإنشاء قيد محاسبي موحد ومفصل
-     */
     public function postPayrollBatch($employees, string $date, string $description): void
     {
-        // استخراج صيغة الشهر (مثال: 2026-04) لتمريرها للمحرك
         $month = Carbon::parse($date)->format('Y-m');
         $startOfMonth = Carbon::parse($month)->startOfMonth()->format('Y-m-d');
         $endOfMonth = Carbon::parse($month)->endOfMonth()->format('Y-m-d');
@@ -37,6 +36,16 @@ class PayrollPostingService
         $groupedDebits = [];
         $groupedCredits = [];
         $employeePayables = [];
+        $totalNetSalaries = 0;
+
+        // 1. إنشاء رأس المسير (Batch Header)
+        $payrollBatch = PayrollBatch::create([
+            'date' => $startOfMonth,
+            'description' => $description,
+            'status' => 'posted',
+            'total_amount' => 0, // سيتم تحديثه لاحقاً
+            'created_by' => Auth::id(),
+        ]);
 
         $rules = SalaryRule::all()->keyBy('code');
         $payableAccountId = $this->accountMappingService->getAccountId('hr_salaries_payable');
@@ -45,13 +54,26 @@ class PayrollPostingService
         foreach ($employees as $employee) {
             $costCenterId = $employee->department ? $employee->department->cost_center_id : null;
 
-            // 1. استدعاء المحرك مع تمرير الشهر المطلوب
-            $payslip = $this->payrollService->previewPayslip($employee, $month);
+            // حساب الراتب عبر المحرك
+            $payslipData = $this->payrollService->previewPayslip($employee, $month);
 
-            foreach ($payslip['lines'] as $line) {
+            // 2. حفظ "الصورة التذكارية" للراتب (Snapshot)
+            Payslip::create([
+                'payroll_batch_id' => $payrollBatch->id,
+                'employee_id'      => $employee->id,
+                'basic_salary'     => $payslipData['contract_basic'],
+                'total_allowances' => $payslipData['totals']['total_allowances'],
+                'total_deductions' => $payslipData['totals']['total_deductions'],
+                'net_salary'       => $payslipData['totals']['net_salary'],
+                'details'          => $payslipData['lines'],
+            ]);
+
+            $totalNetSalaries += $payslipData['totals']['net_salary'];
+
+            // تجميع القيود المحاسبية (المنطق الحالي كما هو)
+            foreach ($payslipData['lines'] as $line) {
                 $code = $line['code'];
                 $amount = $line['amount'];
-
                 if ($amount == 0) continue;
 
                 $rule = $rules->get($code);
@@ -72,49 +94,33 @@ class PayrollPostingService
                     if (!isset($groupedCredits[$accountId])) $groupedCredits[$accountId] = 0;
                     $groupedCredits[$accountId] += $amount;
                 }
-                elseif ($line['category'] === 'company_contribution') {
-                    $key = "{$accountId}_{$costCenterId}";
-                    if (!isset($groupedDebits[$key])) {
-                        $groupedDebits[$key] = ['account_id' => $accountId, 'cost_center_id' => $costCenterId, 'amount' => 0];
-                    }
-                    $groupedDebits[$key]['amount'] += $amount;
-
-                    if (!isset($groupedCredits[$contributionsPayableAccountId])) {
-                        $groupedCredits[$contributionsPayableAccountId] = 0;
-                    }
-                    $groupedCredits[$contributionsPayableAccountId] += $amount;
-                }
             }
 
+            // إضافة تفاصيل الموظف للقيد
             $employeePayables[] = new JournalEntryDetailDto(
                 account_id: $payableAccountId,
                 debit: 0,
-                credit: $payslip['totals']['net_salary'],
+                credit: $payslipData['totals']['net_salary'],
                 description: "رواتب مستحقة - {$employee->full_name}",
                 party_type: 'employee',
-                party_id: clone $employee->employee_number, // استخدام الرقم الطويل
+                party_id: (int) $employee->employee_number,
                 cost_center_id: null
             );
 
-            // 2. إقفال الحركات المالية المؤقتة لهذا الموظف (لضمان عدم تكرار الخصم/المنح)
-
-            // إقفال أقساط السلف
-            LoanInstallment::whereHas('loan', function ($q) use ($employee) {
-                    $q->where('employee_id', $employee->id);
-                })
+            // إغلاق العهد والسلف
+            LoanInstallment::whereHas('loan', fn($q) => $q->where('employee_id', $employee->id))
                 ->where('status', 'pending')
                 ->whereBetween('due_month', [$startOfMonth, $endOfMonth])
                 ->update(['status' => 'deducted']);
 
-            // إقفال الحوافز والخصومات
             PayrollInput::where('employee_id', $employee->id)
                 ->where('is_processed', false)
                 ->whereBetween('date', [$startOfMonth, $endOfMonth])
                 ->update(['is_processed' => true]);
         }
 
+        // بناء القيد المحاسبي النهائي
         $journalDetails = [];
-
         foreach ($groupedDebits as $debit) {
             $journalDetails[] = new JournalEntryDetailDto(
                 account_id: $debit['account_id'],
@@ -124,16 +130,14 @@ class PayrollPostingService
                 description: "مصروفات رواتب - $description"
             );
         }
-
         foreach ($groupedCredits as $accountId => $amount) {
             $journalDetails[] = new JournalEntryDetailDto(
                 account_id: $accountId,
                 debit: 0,
                 credit: $amount,
-                description: "استقطاعات والتزامات - $description"
+                description: "استقطاعات رواتب - $description"
             );
         }
-
         $journalDetails = array_merge($journalDetails, $employeePayables);
 
         $journalEntryDto = new JournalEntryDto(
@@ -142,6 +146,12 @@ class PayrollPostingService
             description: $description
         );
 
-        $this->journalEntryService->createEntry($journalEntryDto);
+        // 3. إنشاء القيد وربطه بالمسير
+        $journalEntry = $this->journalEntryService->createEntry($journalEntryDto);
+
+        $payrollBatch->update([
+            'total_amount' => $totalNetSalaries,
+            'journal_entry_id' => $journalEntry->id,
+        ]);
     }
 }

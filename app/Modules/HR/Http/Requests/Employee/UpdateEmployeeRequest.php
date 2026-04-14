@@ -37,11 +37,18 @@ class UpdateEmployeeRequest extends FormRequest
                 'email',
                 Rule::unique('employees', 'email')->ignore($employeeId)
             ],
-
+// جعلناه nullable ليتوافق مع سياسة التوليد
             'employee_number' => [
-                'required',
+                'nullable',
                 'string',
                 Rule::unique('employees', 'employee_number')->ignore($employeeId)
+            ],
+
+            // 🌟 إضافة حقل الباركود الجديد مع استثناء الموظف الحالي من الفحص
+            'barcode' => [
+                'nullable',
+                'string',
+                Rule::unique('employees', 'barcode')->ignore($employeeId)
             ],
 
             'phone' => ['nullable', 'string', 'max:20'],

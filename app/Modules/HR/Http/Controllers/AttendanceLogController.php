@@ -143,4 +143,66 @@ class AttendanceLogController extends Controller
 
         return response()->json(['message' => 'تم حذف سجل الحضور بنجاح.'], 200);
     }
+
+
+
+
+
+   /**
+     * تسجيل الدخول السريع عبر الباركود (Kiosk Mode)
+     * تستقبل رقم الموظف أو الباركود القديم وتقرر تلقائياً (حضور أم انصراف)
+     */
+    /**
+     * تسجيل الدخول السريع عبر الباركود (Kiosk Mode)
+     */
+    public function scanBarcode(Request $request): JsonResponse
+    {
+        $request->validate([
+            'employee_number' => 'required|string'
+        ]);
+
+        $scannedCode = $request->employee_number;
+        $now = now();
+
+        // 1. البحث عن الموظف
+        $employee = Employee::where('employee_number', $scannedCode)
+                    ->orWhere('barcode', $scannedCode)
+                    ->first();
+
+        if (!$employee) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'بطاقة غير صالحة! الموظف غير مسجل بالنظام.'
+            ], 404);
+        }
+
+        // 2. تسجيل الضربة الخام (بدون أي ذكاء هنا)
+        \App\Modules\HR\Models\BiometricPunch::create([
+            'employee_id' => $employee->id,
+            'punch_time' => $now,
+            'punch_type' => 'auto', // متوافق مع قاعدة البيانات
+            'device_id' => 'barcode_scanner',
+            'is_processed' => true,
+        ]);
+
+        // 3. تفويض معالجة البيانات لمحرك الحضور (الخدمة)
+        try {
+            // سنقوم بإنشاء هذه الدالة في الخطوة القادمة
+            $result = $this->attendanceService->processAutoPunch($employee, $now);
+
+            return response()->json([
+                'status' => $result['status'],
+                'action' => $result['action'],
+                'employee_name' => $employee->full_name,
+                'time' => $now->format('h:i A'),
+                'message' => $result['message']
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'حدث خطأ أثناء معالجة البصمة: ' . $e->getMessage()
+            ], 422);
+        }
+    }
 }

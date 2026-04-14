@@ -23,7 +23,8 @@ class StoreEmployeeRequest extends FormRequest
             'email' => ['nullable', 'email', 'unique:employees,email'],
             'phone' => ['nullable', 'string', 'max:20'],
 
-            'employee_number' => ['required', 'string', 'unique:employees,employee_number'],
+            'employee_number' => ['nullable', 'string', 'unique:employees,employee_number'],
+            'barcode' => ['nullable', 'string', 'unique:employees,barcode'],
             'join_date' => ['required', 'date'],
 
             'gender' => ['nullable', Rule::enum(Gender::class)],

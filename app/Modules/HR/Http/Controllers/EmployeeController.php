@@ -9,6 +9,7 @@ use App\Modules\HR\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Modules\HR\Http\Requests\Employee\UpdateEmployeeRequest; // 🌟 تم التفعيل
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Modules\Core\Services\SequenceService;
 
 class EmployeeController extends Controller
 {
@@ -19,7 +20,7 @@ class EmployeeController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Employee::with(['department', 'position']);
+        $query = Employee::with(['department', 'position', 'latestShift.shift']);
 
         // 1. فلتر الإدارة
         if ($request->filled('department_id') && is_numeric($request->department_id)) {
@@ -51,9 +52,17 @@ class EmployeeController extends Controller
         return EmployeeResource::collection($employees)->response();
     }
 
-    public function store(StoreEmployeeRequest $request): JsonResponse
+   public function store(StoreEmployeeRequest $request, SequenceService $sequenceService): JsonResponse
     {
-        $employee = Employee::create($request->validated());
+        $validatedData = $request->validated();
+
+        // 🌟 المنطق الذكي للترقيم
+        if (empty($validatedData['employee_number'])) {
+            // إذا ترك المستخدم الحقل فارغاً، نولد رقماً جديداً للموظف
+            $validatedData['employee_number'] = $sequenceService->generateNumber(Employee::class);
+        }
+
+        $employee = Employee::create($validatedData);
 
         return response()->json([
             'message' => 'تم إضافة الموظف بنجاح',
@@ -102,6 +111,71 @@ class EmployeeController extends Controller
 
         return response()->json([
             'message' => 'تم أرشفة الموظف بنجاح'
+        ]);
+    }
+
+
+
+    /**
+     * كشف الحساب المالي للموظف (Sub-Ledger Statement)
+     * يجلب كل الاستحقاقات (دائن) والمدفوعات (مدين) من القيود المحاسبية
+     */
+    public function getFinancialStatement($id): \Illuminate\Http\JsonResponse
+    {
+        // التحقق من الصلاحيات (يمكنك تعديلها حسب نظامك)
+        $this->authorize('view', \App\Modules\HR\Models\Employee::class);
+
+        $employee = \App\Modules\HR\Models\Employee::findOrFail($id);
+
+        // بناء استعلام يربط تفاصيل القيد برأس القيد لجلب التاريخ والحالة
+        $transactions = \Illuminate\Support\Facades\DB::table('journal_entry_details')
+            ->join('journal_entries', 'journal_entry_details.journal_entry_id', '=', 'journal_entries.id')
+            ->where('journal_entries.status', 'posted') // القيود المعتمدة فقط
+            ->where('journal_entry_details.party_type', 'employee')
+            // نستخدم employee_number لأنه مسجل كـ DECIMAL(18,0) وهو الرابط المالي الصحيح
+            ->where('journal_entry_details.party_id', $employee->employee_number)
+            ->select(
+                'journal_entries.date',
+                'journal_entries.entry_number',
+                'journal_entries.description as entry_description',
+                'journal_entry_details.description as detail_description',
+                'journal_entry_details.debit',
+                'journal_entry_details.credit'
+            )
+            ->orderBy('journal_entries.date', 'asc') // ترتيب زمني تصاعدي (من الأقدم للأحدث)
+            ->orderBy('journal_entries.id', 'asc')
+            ->get();
+
+        $runningBalance = 0;
+        $statement = [];
+
+        // حساب الرصيد التراكمي (Running Balance)
+        foreach ($transactions as $transaction) {
+            // حساب الرواتب المستحقة هو حساب التزام (Liability)
+            // الرصيد يزيد بالدائن (له) ويقل بالمدين (عليه)
+            $runningBalance += $transaction->credit;
+            $runningBalance -= $transaction->debit;
+
+            $statement[] = [
+                'date'         => $transaction->date,
+                'entry_number' => $transaction->entry_number,
+                'description'  => $transaction->detail_description ?: $transaction->entry_description,
+                'credit'       => (float) $transaction->credit, // استحقاق (راتب نزل في حسابه)
+                'debit'        => (float) $transaction->debit,  // مدفوعات (تم صرفه له)
+                'balance'      => (float) $runningBalance,      // المتبقي الذي تطلبه به الشركة
+            ];
+        }
+
+        return response()->json([
+            'message' => 'تم جلب كشف الحساب بنجاح',
+            'data' => [
+                'employee' => [
+                    'name' => $employee->full_name,
+                    'employee_number' => $employee->employee_number,
+                    'current_balance' => $runningBalance
+                ],
+                'statement' => $statement
+            ]
         ]);
     }
 }
