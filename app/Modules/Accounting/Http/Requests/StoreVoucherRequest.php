@@ -52,6 +52,10 @@ class StoreVoucherRequest extends FormRequest
             'details.*.cost_center_id' => ['nullable', 'exists:cost_centers,id'],
             'details.*.amount' => ['required', 'numeric', 'min:0.01'],
             'details.*.description' => ['nullable', 'string', 'max:255'],
+
+            // 👇 الإضافات الجديدة هنا لربط الأطراف (الموظفين/الموردين/العملاء)
+            'details.*.party_type' => ['nullable', 'string', 'max:255'],
+            'details.*.party_id' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -94,6 +98,10 @@ class StoreVoucherRequest extends FormRequest
             'payee_name' => 'اسم المستفيد / الدافع', // <--- إضافة هذا السطر لتظهر رسالة الخطأ بشكل أنيق
             'details' => 'تفاصيل السند',
             'details.*.account_id' => 'الحساب في السطر',
+
+            // 👇 إضافة ترجمة أنيقة للحقول الجديدة
+            'details.*.party_type' => 'نوع الطرف المستفيد',
+            'details.*.party_id' => 'رقم الطرف المستفيد',
         ];
     }
 }

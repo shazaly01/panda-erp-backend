@@ -34,6 +34,10 @@ class UpdateVoucherRequest extends FormRequest
             'details.*.cost_center_id' => ['nullable', 'exists:cost_centers,id'],
             'details.*.amount' => ['required', 'numeric', 'min:0.01'],
             'details.*.description' => ['nullable', 'string', 'max:255'],
+
+            // 👇 الإضافات الجديدة هنا لربط الأطراف (الموظفين) عند التعديل
+            'details.*.party_type' => ['nullable', 'string', 'max:255'],
+            'details.*.party_id' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -59,5 +63,20 @@ class UpdateVoucherRequest extends FormRequest
                 $validator->errors()->add('amount', "مجموع مبالغ التفاصيل ({$detailsSum}) لا يساوي إجمالي السند ({$totalAmount}).");
             }
         });
+    }
+
+    // 👇 إضافة هذه الدالة لتجميل رسائل الخطأ
+    public function attributes(): array
+    {
+        return [
+            'branch_id' => 'الفرع',
+            'box_id' => 'الخزينة',
+            'bank_account_id' => 'الحساب البنكي',
+            'payee_name' => 'اسم المستفيد / الدافع',
+            'details' => 'تفاصيل السند',
+            'details.*.account_id' => 'الحساب في السطر',
+            'details.*.party_type' => 'نوع الطرف المستفيد',
+            'details.*.party_id' => 'رقم الطرف المستفيد',
+        ];
     }
 }

@@ -12,7 +12,6 @@ use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Models\SalaryRule;
 use App\Modules\HR\Models\LoanInstallment;
 use App\Modules\HR\Models\PayrollInput;
-// استيراد الموديلات الجديدة
 use App\Modules\HR\Models\PayrollBatch;
 use App\Modules\HR\Models\Payslip;
 use Illuminate\Support\Facades\Auth;
@@ -27,35 +26,36 @@ class PayrollPostingService
         protected JournalEntryService $journalEntryService
     ) {}
 
-    public function postPayrollBatch($employees, string $date, string $description): void
+    /**
+     * تم تعديل توقيع الدالة (Signature) لتستقبل تاريخ البداية والنهاية بشكل صريح
+     * $startDate, $endDate بدلاً من $date (شهر)
+     */
+    public function postPayrollBatch($employees, string $startDate, string $endDate, string $description): void
     {
-        $month = Carbon::parse($date)->format('Y-m');
-        $startOfMonth = Carbon::parse($month)->startOfMonth()->format('Y-m-d');
-        $endOfMonth = Carbon::parse($month)->endOfMonth()->format('Y-m-d');
-
         $groupedDebits = [];
         $groupedCredits = [];
         $employeePayables = [];
         $totalNetSalaries = 0;
 
-        // 1. إنشاء رأس المسير (Batch Header)
+        // 1. إنشاء رأس المسير (Batch Header) بالتواريخ الدقيقة
         $payrollBatch = PayrollBatch::create([
-            'date' => $startOfMonth,
-            'description' => $description,
-            'status' => 'posted',
-            'total_amount' => 0, // سيتم تحديثه لاحقاً
-            'created_by' => Auth::id(),
+            'name'        => mb_substr($description, 0, 255),
+            'start_date'  => $startDate,
+            'end_date'    => $endDate,
+            'status'      => 'posted',
+            'approved_at' => now(),
+            'approved_by' => Auth::id(),
         ]);
 
         $rules = SalaryRule::all()->keyBy('code');
         $payableAccountId = $this->accountMappingService->getAccountId('hr_salaries_payable');
-        $contributionsPayableAccountId = $this->accountMappingService->getAccountId('hr_contributions_payable');
+        // $contributionsPayableAccountId = $this->accountMappingService->getAccountId('hr_contributions_payable');
 
         foreach ($employees as $employee) {
             $costCenterId = $employee->department ? $employee->department->cost_center_id : null;
 
-            // حساب الراتب عبر المحرك
-            $payslipData = $this->payrollService->previewPayslip($employee, $month);
+            // 🚀 تمرير التواريخ الجديدة للمحرك لحساب القسيمة
+            $payslipData = $this->payrollService->previewPayslip($employee, $startDate, $endDate);
 
             // 2. حفظ "الصورة التذكارية" للراتب (Snapshot)
             Payslip::create([
@@ -70,7 +70,7 @@ class PayrollPostingService
 
             $totalNetSalaries += $payslipData['totals']['net_salary'];
 
-            // تجميع القيود المحاسبية (المنطق الحالي كما هو)
+            // 3. تجميع القيود المحاسبية
             foreach ($payslipData['lines'] as $line) {
                 $code = $line['code'];
                 $amount = $line['amount'];
@@ -103,23 +103,23 @@ class PayrollPostingService
                 credit: $payslipData['totals']['net_salary'],
                 description: "رواتب مستحقة - {$employee->full_name}",
                 party_type: 'employee',
-                party_id: (int) $employee->employee_number,
+                party_id: (string) $employee->id,
                 cost_center_id: null
             );
 
-            // إغلاق العهد والسلف
+            // 4. إغلاق العهد والسلف والمدخلات اليدوية بناءً على التواريخ الدقيقة
             LoanInstallment::whereHas('loan', fn($q) => $q->where('employee_id', $employee->id))
                 ->where('status', 'pending')
-                ->whereBetween('due_month', [$startOfMonth, $endOfMonth])
+                ->whereBetween('due_month', [$startDate, $endDate])
                 ->update(['status' => 'deducted']);
 
             PayrollInput::where('employee_id', $employee->id)
                 ->where('is_processed', false)
-                ->whereBetween('date', [$startOfMonth, $endOfMonth])
+                ->whereBetween('date', [$startDate, $endDate])
                 ->update(['is_processed' => true]);
         }
 
-        // بناء القيد المحاسبي النهائي
+        // 5. بناء القيد المحاسبي النهائي
         $journalDetails = [];
         foreach ($groupedDebits as $debit) {
             $journalDetails[] = new JournalEntryDetailDto(
@@ -138,19 +138,19 @@ class PayrollPostingService
                 description: "استقطاعات رواتب - $description"
             );
         }
+
         $journalDetails = array_merge($journalDetails, $employeePayables);
 
+        // نستخدم $endDate كتاريخ استحقاق القيد المحاسبي (نهاية فترة العمل)
         $journalEntryDto = new JournalEntryDto(
-            date: $date,
+            date: $endDate,
             details: $journalDetails,
             description: $description
         );
 
-        // 3. إنشاء القيد وربطه بالمسير
         $journalEntry = $this->journalEntryService->createEntry($journalEntryDto);
 
         $payrollBatch->update([
-            'total_amount' => $totalNetSalaries,
             'journal_entry_id' => $journalEntry->id,
         ]);
     }

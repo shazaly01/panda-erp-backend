@@ -64,12 +64,14 @@ class VoucherService
             ]);
 
             // 4. إنشاء التفاصيل (السطور)
-            foreach ($data['details'] as $detail) {
+           foreach ($data['details'] as $detail) {
                 $voucher->details()->create([
                     'account_id'     => $detail['account_id'],
                     'cost_center_id' => $detail['cost_center_id'] ?? null,
                     'amount'         => $detail['amount'],
                     'description'    => $detail['description'] ?? null,
+                    'party_type'     => $detail['party_type'] ?? null, // 👈
+                    'party_id'       => isset($detail['party_id']) ? (string) $detail['party_id'] : null, // 👈
                 ]);
             }
 
@@ -102,12 +104,14 @@ class VoucherService
             // تحديث التفاصيل (الأسهل: حذف القديم وإنشاء الجديد)
             $voucher->details()->delete();
 
-            foreach ($data['details'] as $detail) {
+           foreach ($data['details'] as $detail) {
                 $voucher->details()->create([
                     'account_id'     => $detail['account_id'],
                     'cost_center_id' => $detail['cost_center_id'] ?? null,
                     'amount'         => $detail['amount'],
                     'description'    => $detail['description'] ?? null,
+                    'party_type'     => $detail['party_type'] ?? null, // 👈
+                    'party_id'       => isset($detail['party_id']) ? (string) $detail['party_id'] : null, // 👈
                 ]);
             }
 
@@ -192,6 +196,8 @@ class VoucherService
                     'credit'           => $isPayment ? 0 : $detail->amount,
                     'cost_center_id'   => $detail->cost_center_id,
                     'description'      => $detail->description ?? $voucher->description,
+                    'party_type'       => $detail->party_type, // 👈 نقل النوع للقيد المحاسبي
+                    'party_id'         => $detail->party_id ? (string) $detail->party_id : null, // 👈 نقل الـ ID كـ String
                     // حالياً نتركها null للسطور التفصيلية (لأننا نفترض أنها مصاريف/إيرادات عادية)
                     // لكن إذا كانت الواجهة تدعم اختيار عميل في السطور، ستحتاج لإضافتها هنا.
                 ]);

@@ -31,7 +31,9 @@ class ContractResource extends JsonResource
                     'name' => $this->salaryStructure->name
                 ];
             }),
+            'overtime_policy' => new OvertimePolicyResource($this->whenLoaded('overtimePolicy')),
 
+            'salary_frequency' => $this->salary_frequency?->value ?? 'monthly',
             'start_date' => $this->start_date?->format('Y-m-d'),
             'end_date' => $this->end_date?->format('Y-m-d'),
             'is_active' => $this->is_active,

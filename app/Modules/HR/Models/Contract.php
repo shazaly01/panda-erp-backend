@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Modules\HR\Enums\SalaryFrequency;
+// 👈 تم حذف استيراد Illuminate\Validation\Rules\Enum من هنا
 
 class Contract extends Model
 {
@@ -16,6 +18,8 @@ class Contract extends Model
     protected $fillable = [
         'employee_id',
         'salary_structure_id',
+        'overtime_policy_id',
+        'salary_frequency',
         'basic_salary',
         'start_date',
         'end_date',
@@ -28,6 +32,8 @@ class Contract extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'is_active' => 'boolean',
+        // 👈 التصحيح هنا: نمرر الكلاس مباشرة بدون وضعه داخل دالة Enum()
+        'salary_frequency' => SalaryFrequency::class,
     ];
 
     public function employee(): BelongsTo
@@ -38,5 +44,10 @@ class Contract extends Model
     public function salaryStructure(): BelongsTo
     {
         return $this->belongsTo(SalaryStructure::class);
+    }
+
+    public function overtimePolicy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(OvertimePolicy::class, 'overtime_policy_id');
     }
 }

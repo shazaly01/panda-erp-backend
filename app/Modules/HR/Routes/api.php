@@ -15,6 +15,7 @@ use App\Modules\HR\Http\Controllers\LoanController;
 use App\Modules\HR\Http\Controllers\AttendanceLogController;
 use App\Modules\HR\Http\Controllers\PayrollInputController;
 use App\Modules\HR\Http\Controllers\ShiftController;
+use App\Modules\HR\Http\Controllers\OvertimePolicyController;
 
 /*
 |--------------------------------------------------------------------------
@@ -52,6 +53,10 @@ Route::middleware('auth:sanctum')
 
     Route::apiResource('salary-structures', SalaryStructureController::class)
         ->parameters(['salary-structures' => 'salary_structure']);
+
+
+        Route::apiResource('overtime-policies', OvertimePolicyController::class)
+        ->parameters(['overtime-policies' => 'overtime_policy']);
 
     // ===========================================
     // 4. العمليات والخدمة الذاتية (Operations & Self-Service)

@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\User;
-// نستخدم المسار الكامل للموديل المحاسبي لتجنب الأخطاء إذا لم يكن مستورداً
 use App\Modules\Accounting\Models\JournalEntry;
 
 class PayrollBatch extends Model
@@ -17,32 +16,35 @@ class PayrollBatch extends Model
 
     protected $table = 'payroll_batches';
 
+    // تم تحديث الحقول لتطابق الـ Migration الاحترافي تماماً
     protected $fillable = [
-        'date',             // تاريخ الاستحقاق (شهر الرواتب)
-        'description',      // شرح الدفعة
-        'status',           // draft, posted
-        'total_amount',     // إجمالي الرواتب (اختياري للسرعة)
-        'journal_entry_id', // ربط مع القيد المحاسبي (FK)
-        'created_by',       // من قام بالاعتماد
+        'name',               // اسم المسير (مثال: رواتب شهر 04-2026)
+        'start_date',         // بداية الفترة
+        'end_date',           // نهاية الفترة
+        'status',             // draft, approved, paid, posted
+        'approved_at',        // وقت الاعتماد
+        'approved_by',        // المستخدم الذي اعتمد
+        'journal_entry_id',   // رقم القيد المحاسبي
     ];
 
     protected $casts = [
-        'date' => 'date',
-        'total_amount' => 'decimal:2',
-        'created_at' => 'datetime',
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'approved_at' => 'datetime',
     ];
 
     /**
      * المستخدم الذي قام باعتماد الرواتب
+     * (أبقينا اسم الدالة creator حتى لا نكسر الكود في الواجهة الأمامية،
+     * ولكن ربطناها بالحقل الصحيح approved_by في قاعدة البيانات)
      */
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     /**
      * القيد المحاسبي المرتبط بهذه الدفعة
-     * (مفيد جداً للوصول للقيد من شاشة الرواتب)
      */
     public function journalEntry(): BelongsTo
     {

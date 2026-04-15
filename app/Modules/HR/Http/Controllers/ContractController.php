@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
@@ -7,7 +9,9 @@ use App\Modules\HR\Models\Contract;
 use App\Modules\HR\Http\Resources\ContractResource;
 use App\Modules\HR\Http\Requests\Contract\StoreContractRequest;
 use App\Modules\HR\Http\Requests\Contract\UpdateContractRequest;
+use App\Modules\HR\Enums\SalaryFrequency;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ContractController extends Controller
@@ -17,9 +21,23 @@ class ContractController extends Controller
         $this->authorizeResource(Contract::class, 'contract');
     }
 
-    public function index(): JsonResponse
+    /**
+     * عرض قائمة العقود مع دعم الفلترة
+     */
+    public function index(Request $request): JsonResponse
     {
-        $contracts = Contract::with(['employee', 'salaryStructure'])->orderBy('id', 'desc')->get();
+        // 🚀 التعديل هنا: إضافة overtimePolicy للتحميل المسبق
+        $query = Contract::with(['employee', 'salaryStructure', 'overtimePolicy']);
+
+        if ($request->filled('salary_frequency')) {
+            $query->where('salary_frequency', $request->salary_frequency);
+        }
+
+        if ($request->boolean('active_only')) {
+            $query->where('is_active', true);
+        }
+
+        $contracts = $query->orderBy('id', 'desc')->get();
         return response()->json(ContractResource::collection($contracts));
     }
 
@@ -28,11 +46,9 @@ class ContractController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('attachment')) {
-            // تخزين الملف في الـ public disk
             $data['attachment_path'] = $request->file('attachment')->store('contracts', 'public');
         }
 
-        // إغلاق أي عقد نشط سابق
         Contract::where('employee_id', $data['employee_id'])
                 ->where('is_active', true)
                 ->update(['is_active' => false, 'end_date' => now()]);
@@ -41,13 +57,15 @@ class ContractController extends Controller
 
         return response()->json([
             'message' => 'تم إنشاء العقد وتفعيله بنجاح',
-            'data' => new ContractResource($contract->load(['employee', 'salaryStructure'])),
+            // 🚀 التعديل هنا: تحميل overtimePolicy
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy'])),
         ], 201);
     }
 
     public function show(Contract $contract): JsonResponse
     {
-        return response()->json(new ContractResource($contract->load(['employee', 'salaryStructure'])));
+        // 🚀 التعديل هنا
+        return response()->json(new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy'])));
     }
 
     public function update(UpdateContractRequest $request, Contract $contract): JsonResponse
@@ -55,7 +73,6 @@ class ContractController extends Controller
         $data = $request->validated();
 
         if ($request->hasFile('attachment')) {
-            // حذف المرفق القديم إن وجد
             if ($contract->attachment_path) {
                 Storage::disk('public')->delete($contract->attachment_path);
             }
@@ -66,29 +83,26 @@ class ContractController extends Controller
 
         return response()->json([
             'message' => 'تم تحديث العقد بنجاح',
-            'data' => new ContractResource($contract->load(['employee', 'salaryStructure'])),
+            // 🚀 التعديل هنا
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy'])),
         ]);
     }
 
-    /**
-     * دالة مخصصة لإنهاء خدمة الموظف أو إيقاف عقده
-     */
- // في ContractController.php
-public function terminate(Contract $contract): JsonResponse
-{
-    $this->authorize('update', $contract);
+    public function terminate(Contract $contract): JsonResponse
+    {
+        $this->authorize('update', $contract);
 
-    $contract->update([
-        'is_active' => false,
-        'end_date' => now()
-    ]);
+        $contract->update([
+            'is_active' => false,
+            'end_date' => now()
+        ]);
 
-    // 🌟 أضف التحميل هنا أيضاً لكي لا يفقد الـ Vue اسم الموظف بعد التحديث
-    return response()->json([
-        'message' => 'تم إنهاء العقد بنجاح',
-        'data' => new ContractResource($contract->load(['employee', 'salaryStructure']))
-    ]);
-}
+        return response()->json([
+            'message' => 'تم إنهاء العقد بنجاح',
+            // 🚀 التعديل هنا
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy']))
+        ]);
+    }
 
     public function destroy(Contract $contract): JsonResponse
     {

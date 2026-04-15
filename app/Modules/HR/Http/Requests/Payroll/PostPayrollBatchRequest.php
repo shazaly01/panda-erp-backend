@@ -6,26 +6,20 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class PostPayrollBatchRequest extends FormRequest
 {
-    public function authorize(): bool
+   public function authorize(): bool
     {
-        // التحقق من صلاحية "الاعتماد" (عادة تكون للمدراء فقط)
-        return $this->user()->hasPermissionTo('hr.payroll.post');
+        // نرجع true لأننا نتعامل مع الصلاحيات بشكل أعمق داخل الـ Controller
+        return true;
     }
 
-    public function rules(): array
+   public function rules(): array
     {
         return [
-            // مطلوب قائمة من الموظفين (مصفوفة)
-            'employee_ids' => ['required', 'array', 'min:1'],
-
-            // التأكد من أن كل رقم موظف موجود فعلاً في الجدول
+            'employee_ids'   => ['required', 'array', 'min:1'],
             'employee_ids.*' => ['integer', 'exists:employees,id'],
-
-            // تاريخ الاستحقاق (مهم جداً لتوجيه القيد للفترة المالية الصحيحة)
-            'date' => ['required', 'date'],
-
-            // شرح القيد (يظهر في دفتر الأستاذ)
-            'description' => ['required', 'string', 'max:255'],
+            'start_date'     => ['required', 'date'], // إضافة تاريخ بداية المسير
+            'end_date'       => ['required', 'date', 'after_or_equal:start_date'], // إضافة تاريخ نهاية المسير
+            'description'    => ['required', 'string', 'max:255'],
         ];
     }
 

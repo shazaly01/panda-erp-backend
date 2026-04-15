@@ -8,20 +8,18 @@ class PreviewPayrollRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // التحقق من الصلاحية الأمنية
-        return $this->user()->hasPermissionTo('hr.payroll.view');
+        // نرجع true لأننا نتعامل مع الصلاحيات بشكل أعمق داخل الـ Controller
+        return true;
     }
 
-    public function rules(): array
+   public function rules(): array
     {
         return [
             'employee_id' => ['required', 'exists:employees,id'],
-            'month' => ['nullable', 'date_format:Y-m'], // اختياري، قد نحتاجه لاحقاً لتحديد الشهر
-
-            // المدخلات الخارجية المتغيرة (مثل السلف، الغياب)
-            // نتوقع مصفوفة مثل: inputs[LOAN]=200, inputs[ABSENCE]=100
-            'inputs' => ['nullable', 'array'],
-            'inputs.*' => ['numeric', 'min:0'],
+            'start_date'  => ['required', 'date'], // تغيير من month إلى تاريخ بداية
+            'end_date'    => ['required', 'date', 'after_or_equal:start_date'], // إضافة تاريخ نهاية
+            'inputs'      => ['nullable', 'array'],
+            'inputs.*'    => ['numeric', 'min:0'],
         ];
     }
 }

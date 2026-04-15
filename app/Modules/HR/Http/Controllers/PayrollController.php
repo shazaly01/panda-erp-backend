@@ -10,6 +10,7 @@ use App\Modules\HR\Services\PayrollService;
 use App\Modules\HR\Services\PayrollPostingService;
 use App\Modules\HR\Http\Requests\Payroll\PreviewPayrollRequest;
 use App\Modules\HR\Http\Requests\Payroll\PostPayrollBatchRequest;
+use App\Modules\HR\Policies\PayrollPolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Exception;
@@ -24,26 +25,27 @@ class PayrollController extends Controller
         $this->middleware('auth:sanctum');
     }
 
-    /**
+   /**
      * معاينة قسيمة راتب (قبل الاعتماد والحفظ)
      */
     public function preview(PreviewPayrollRequest $request): JsonResponse
     {
-        // التحقق من الصلاحية عبر السياسة (PayrollPolicy)
-        // نستخدم المسمى 'view' لأنها عملية عرض بيانات مالية
-        $this->authorize('view', Employee::class);
+        $this->authorize('preview', PayrollPolicy::class);
 
         try {
             $employee = Employee::findOrFail($request->employee_id);
-            $month = $request->input('month', now()->format('Y-m'));
 
-            $payslipData = $this->payrollService->previewPayslip($employee, $month);
+            // تمرير التواريخ الجديدة للخدمة
+            $payslipData = $this->payrollService->previewPayslip(
+                $employee,
+                $request->start_date,
+                $request->end_date
+            );
 
             return response()->json([
-                'message' => "تم احتساب معاينة الراتب لشهر {$month} بنجاح",
+                'message' => "تم احتساب معاينة الراتب للفترة بنجاح",
                 'data' => $payslipData
             ]);
-
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'خطأ في احتساب الراتب',
@@ -57,45 +59,37 @@ class PayrollController extends Controller
      */
     public function postBatch(PostPayrollBatchRequest $request): JsonResponse
     {
-        // التحقق من الصلاحية عبر السياسة (PayrollPolicy)
-        // نستخدم 'post' أو 'manage' حسب ما هو معرف في ملف السياسة لديك
-        $this->authorize('post', Employee::class);
+       $this->authorize('postBatch', PayrollPolicy::class);
 
         try {
             DB::beginTransaction();
 
             $employees = Employee::whereIn('id', $request->employee_ids)->get();
 
-            // تنفيذ عملية الترحيل المحاسبي وتصفية الأرصدة (العهد والسلف)
+            // تنفيذ الترحيل باستخدام التواريخ المرنة (أسبوعي/شهري)
             $this->payrollPostingService->postPayrollBatch(
                 employees: $employees,
-                date: $request->date,
+                startDate: $request->start_date, // التعديل هنا
+                endDate:   $request->end_date,   // التعديل هنا
                 description: $request->description
             );
 
             DB::commit();
-
-            return response()->json([
-                'message' => 'تم اعتماد الرواتب وترحيل القيد المحاسبي وتصفية الأرصدة بنجاح.',
-            ]);
+            return response()->json(['message' => 'تم اعتماد الرواتب بنجاح.']);
 
         } catch (Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'message' => 'فشلت عملية الترحيل',
-                'error' => $e->getMessage()
-            ], 422);
+            return response()->json(['message' => 'فشلت عملية الترحيل', 'error' => $e->getMessage()], 422);
         }
     }
 
 
-    public function getBatches(): \Illuminate\Http\JsonResponse
+  public function getBatches(): \Illuminate\Http\JsonResponse
     {
-        // التحقق من الصلاحية (يمكنك تغيير المسمى حسب السياسة لديك)
-        $this->authorize('view', Employee::class);
+        $this->authorize('view', \App\Modules\HR\Policies\PayrollPolicy::class);
 
         $batches = \App\Modules\HR\Models\PayrollBatch::with(['creator:id,name', 'journalEntry:id,entry_number'])
-            ->latest('date')
+            ->latest('start_date') // <--- تم التعديل هنا لتجنب خطأ Unknown column 'date'
             ->paginate(15);
 
         return response()->json($batches);
@@ -103,80 +97,90 @@ class PayrollController extends Controller
 
 
 
-    /**
+ /**
      * حساب ملخص المسير (للواجهة الأمامية)
-     * يرجع إجمالي الرواتب الأساسية، الاستحقاقات، الاستقطاعات، والصافي
+     * يدعم الآن الفترات المرنة (أسبوعية/شهرية)
      */
     public function getSummary(\Illuminate\Http\Request $request): JsonResponse
     {
-        // التحقق من الصلاحيات
-        $this->authorize('view', Employee::class);
+        // 1. التحقق من الصلاحيات
+        $this->authorize('view', PayrollPolicy::class);
 
-        // التحقق من صحة البيانات القادمة
+        // 2. التحقق من صحة البيانات (استبدال month بـ start_date و end_date)
         $request->validate([
-            'employee_ids' => 'required|array',
+            'employee_ids'   => 'required|array',
             'employee_ids.*' => 'exists:employees,id',
-            'month' => 'required|date_format:Y-m',
+            'start_date'     => 'required|date',
+            'end_date'       => 'required|date|after_or_equal:start_date',
         ]);
 
         $employeeIds = $request->employee_ids;
-        $month = $request->month;
+        $startDate   = $request->start_date;
+        $endDate     = $request->end_date;
 
         $employees = Employee::whereIn('id', $employeeIds)->get();
 
-        // تهيئة مصفوفة الملخص
         $summary = [
-            'total_basic' => 0,
+            'total_basic'      => 0,
             'total_allowances' => 0,
             'total_deductions' => 0,
-            'total_net' => 0,
-            'employee_count' => $employees->count(),
+            'total_net'        => 0,
+            'employee_count'   => $employees->count(),
         ];
 
-        // المرور على الموظفين وحساب رواتبهم لتجميع الأرقام
+        // 3. المرور على الموظفين وحساب رواتبهم بناءً على الفترة المحددة
         foreach ($employees as $employee) {
-            $payslip = $this->payrollService->previewPayslip($employee, $month);
+            // تمرير التواريخ الجديدة للمحرك
+            $payslip = $this->payrollService->previewPayslip($employee, $startDate, $endDate);
 
-            $summary['total_basic'] += $payslip['contract_basic'];
+            $summary['total_basic']      += $payslip['contract_basic'];
             $summary['total_allowances'] += $payslip['totals']['total_allowances'];
             $summary['total_deductions'] += $payslip['totals']['total_deductions'];
-            $summary['total_net'] += $payslip['totals']['net_salary'];
+            $summary['total_net']        += $payslip['totals']['net_salary'];
         }
 
         return response()->json([
-            'message' => 'تم حساب الملخص بنجاح',
-            'data' => $summary
+            'message' => 'تم حساب ملخص الفترة بنجاح',
+            'data'    => $summary
         ]);
     }
 
 
-
-    /**
-     * جلب أرقام الموظفين الذين تم ترحيل رواتبهم لشهر محدد
-     * تُستخدم في الواجهة لمنع التحديد المزدوج
+  /**
+     * جلب أرقام الموظفين الذين تم ترحيل رواتبهم لفترة محددة
+     * معدلة لمنع الازدواجية في الفترات المرنة (أسبوعي/شهري)
      */
     public function getProcessedEmployees(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
     {
-        $this->authorize('view', Employee::class);
+        $this->authorize('view', \App\Modules\HR\Policies\PayrollPolicy::class);
 
+        // 1. التحقق من المدخلات الجديدة (الفترة المطلوبة)
         $request->validate([
-            'month' => 'required|date_format:Y-m',
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
         ]);
 
-        // توحيد صيغة التاريخ لبداية الشهر لمطابقته مع ما حفظناه في المسير
-        $startOfMonth = \Carbon\Carbon::parse($request->month)->startOfMonth()->format('Y-m-d');
+        $startDate = $request->start_date;
+        $endDate   = $request->end_date;
 
-        // جلب IDs الموظفين من جدول القسائم الذين ينتمون لمسير في هذا الشهر وحالته 'مرحل'
-        $processedEmployeeIds = \App\Modules\HR\Models\Payslip::whereHas('batch', function ($query) use ($startOfMonth) {
-            $query->where('date', $startOfMonth)
-                  ->where('status', 'posted');
-        })->pluck('employee_id')->toArray();
+        /**
+         * 2. البحث عن أي قسيمة راتب (Payslip) تقع ضمن مسير (Batch)
+         * يتقاطع تاريخه مع الفترة المختارة حالياً.
+         * منطق التقاطع: (تاريخ بداية المسير <= نهاية الفترة المطلوبة)
+         * AND (تاريخ نهاية المسير >= بداية الفترة المطلوبة)
+         */
+        $processedEmployeeIds = \App\Modules\HR\Models\Payslip::whereHas('batch', function ($query) use ($startDate, $endDate) {
+            $query->where('status', 'posted')
+                  ->where(function ($q) use ($startDate, $endDate) {
+                      $q->where('start_date', '<=', $endDate)
+                        ->where('end_date', '>=', $startDate);
+                  });
+        })->distinct()->pluck('employee_id')->toArray();
 
         return response()->json([
             'data' => $processedEmployeeIds
         ]);
     }
-
 
 
     /**
