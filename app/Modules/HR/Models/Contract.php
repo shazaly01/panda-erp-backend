@@ -19,7 +19,7 @@ class Contract extends Model
         'employee_id',
         'salary_structure_id',
         'overtime_policy_id',
-        'salary_frequency',
+        'pay_group_id',
         'basic_salary',
         'start_date',
         'end_date',
@@ -49,5 +49,10 @@ class Contract extends Model
     public function overtimePolicy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(OvertimePolicy::class, 'overtime_policy_id');
+    }
+
+    public function payGroup(): BelongsTo
+    {
+        return $this->belongsTo(PayGroup::class, 'pay_group_id');
     }
 }

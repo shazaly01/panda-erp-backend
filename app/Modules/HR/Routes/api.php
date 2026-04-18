@@ -16,6 +16,8 @@ use App\Modules\HR\Http\Controllers\AttendanceLogController;
 use App\Modules\HR\Http\Controllers\PayrollInputController;
 use App\Modules\HR\Http\Controllers\ShiftController;
 use App\Modules\HR\Http\Controllers\OvertimePolicyController;
+use App\Modules\HR\Http\Controllers\PayGroupController;
+use App\Modules\HR\Http\Controllers\PayPeriodController;
 
 /*
 |--------------------------------------------------------------------------
@@ -57,6 +59,11 @@ Route::middleware('auth:sanctum')
 
         Route::apiResource('overtime-policies', OvertimePolicyController::class)
         ->parameters(['overtime-policies' => 'overtime_policy']);
+
+
+     Route::apiResource('pay-groups', PayGroupController::class);
+     Route::post('pay-periods/generate', [PayPeriodController::class, 'generate']);
+    Route::apiResource('pay-periods', PayPeriodController::class);
 
     // ===========================================
     // 4. العمليات والخدمة الذاتية (Operations & Self-Service)

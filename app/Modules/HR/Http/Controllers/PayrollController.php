@@ -6,12 +6,15 @@ namespace App\Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\HR\Models\Employee;
+use App\Modules\HR\Models\PayPeriod;
+use App\Modules\HR\Models\PayrollBatch;
+use App\Modules\HR\Models\Payslip;
 use App\Modules\HR\Services\PayrollService;
 use App\Modules\HR\Services\PayrollPostingService;
-use App\Modules\HR\Http\Requests\Payroll\PreviewPayrollRequest;
-use App\Modules\HR\Http\Requests\Payroll\PostPayrollBatchRequest;
+use App\Modules\HR\Enums\PayrollRunType;
 use App\Modules\HR\Policies\PayrollPolicy;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -21,26 +24,28 @@ class PayrollController extends Controller
         private readonly PayrollService $payrollService,
         private readonly PayrollPostingService $payrollPostingService
     ) {
-        // حماية المتحكم بالكامل بالتأكد من تسجيل الدخول
         $this->middleware('auth:sanctum');
     }
 
-   /**
+    /**
      * معاينة قسيمة راتب (قبل الاعتماد والحفظ)
      */
-    public function preview(PreviewPayrollRequest $request): JsonResponse
+    public function preview(Request $request): JsonResponse
     {
         $this->authorize('preview', PayrollPolicy::class);
 
+        $request->validate([
+            'employee_id'   => 'required|exists:employees,id',
+            'pay_period_id' => 'required|exists:hr_pay_periods,id',
+            'run_type'      => 'required|in:regular,overtime_only',
+        ]);
+
         try {
             $employee = Employee::findOrFail($request->employee_id);
+            $period = PayPeriod::findOrFail($request->pay_period_id);
+            $runType = PayrollRunType::from($request->run_type);
 
-            // تمرير التواريخ الجديدة للخدمة
-            $payslipData = $this->payrollService->previewPayslip(
-                $employee,
-                $request->start_date,
-                $request->end_date
-            );
+            $payslipData = $this->payrollService->previewPayslip($employee, $period, $runType);
 
             return response()->json([
                 'message' => "تم احتساب معاينة الراتب للفترة بنجاح",
@@ -57,21 +62,30 @@ class PayrollController extends Controller
     /**
      * اعتماد الرواتب وترحيلها للحسابات
      */
-    public function postBatch(PostPayrollBatchRequest $request): JsonResponse
+    public function postBatch(Request $request): JsonResponse
     {
-       $this->authorize('postBatch', PayrollPolicy::class);
+        $this->authorize('postBatch', PayrollPolicy::class);
+
+        $request->validate([
+            'employee_ids'   => 'required|array',
+            'employee_ids.*' => 'exists:employees,id',
+            'pay_period_id'  => 'required|exists:hr_pay_periods,id',
+            'run_type'       => 'required|in:regular,overtime_only',
+            'description'    => 'required|string',
+        ]);
 
         try {
             DB::beginTransaction();
 
             $employees = Employee::whereIn('id', $request->employee_ids)->get();
+            $period = PayPeriod::findOrFail($request->pay_period_id);
+            $runType = PayrollRunType::from($request->run_type);
 
-            // تنفيذ الترحيل باستخدام التواريخ المرنة (أسبوعي/شهري)
             $this->payrollPostingService->postPayrollBatch(
-                employees: $employees,
-                startDate: $request->start_date, // التعديل هنا
-                endDate:   $request->end_date,   // التعديل هنا
-                description: $request->description
+                $employees,
+                $period,
+                $runType,
+                $request->description
             );
 
             DB::commit();
@@ -83,42 +97,35 @@ class PayrollController extends Controller
         }
     }
 
-
-  public function getBatches(): \Illuminate\Http\JsonResponse
+    public function getBatches(): JsonResponse
     {
-        $this->authorize('view', \App\Modules\HR\Policies\PayrollPolicy::class);
+        $this->authorize('view', PayrollPolicy::class);
 
-        $batches = \App\Modules\HR\Models\PayrollBatch::with(['creator:id,name', 'journalEntry:id,entry_number'])
-            ->latest('start_date') // <--- تم التعديل هنا لتجنب خطأ Unknown column 'date'
+        // تم التحديث لقراءة علاقة payPeriod بدلاً من start_date
+        $batches = PayrollBatch::with(['creator:id,name', 'journalEntry:id,entry_number', 'payPeriod:id,name,start_date,end_date'])
+            ->latest('id')
             ->paginate(15);
 
         return response()->json($batches);
     }
 
-
-
- /**
+    /**
      * حساب ملخص المسير (للواجهة الأمامية)
-     * يدعم الآن الفترات المرنة (أسبوعية/شهرية)
      */
-    public function getSummary(\Illuminate\Http\Request $request): JsonResponse
+    public function getSummary(Request $request): JsonResponse
     {
-        // 1. التحقق من الصلاحيات
         $this->authorize('view', PayrollPolicy::class);
 
-        // 2. التحقق من صحة البيانات (استبدال month بـ start_date و end_date)
         $request->validate([
             'employee_ids'   => 'required|array',
             'employee_ids.*' => 'exists:employees,id',
-            'start_date'     => 'required|date',
-            'end_date'       => 'required|date|after_or_equal:start_date',
+            'pay_period_id'  => 'required|exists:hr_pay_periods,id',
+            'run_type'       => 'required|in:regular,overtime_only',
         ]);
 
-        $employeeIds = $request->employee_ids;
-        $startDate   = $request->start_date;
-        $endDate     = $request->end_date;
-
-        $employees = Employee::whereIn('id', $employeeIds)->get();
+        $employees = Employee::whereIn('id', $request->employee_ids)->get();
+        $period = PayPeriod::findOrFail($request->pay_period_id);
+        $runType = PayrollRunType::from($request->run_type);
 
         $summary = [
             'total_basic'      => 0,
@@ -128,10 +135,8 @@ class PayrollController extends Controller
             'employee_count'   => $employees->count(),
         ];
 
-        // 3. المرور على الموظفين وحساب رواتبهم بناءً على الفترة المحددة
         foreach ($employees as $employee) {
-            // تمرير التواريخ الجديدة للمحرك
-            $payslip = $this->payrollService->previewPayslip($employee, $startDate, $endDate);
+            $payslip = $this->payrollService->previewPayslip($employee, $period, $runType);
 
             $summary['total_basic']      += $payslip['contract_basic'];
             $summary['total_allowances'] += $payslip['totals']['total_allowances'];
@@ -145,36 +150,23 @@ class PayrollController extends Controller
         ]);
     }
 
-
-  /**
-     * جلب أرقام الموظفين الذين تم ترحيل رواتبهم لفترة محددة
-     * معدلة لمنع الازدواجية في الفترات المرنة (أسبوعي/شهري)
+    /**
+     * جلب أرقام الموظفين الذين تم ترحيل رواتبهم
      */
-    public function getProcessedEmployees(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    public function getProcessedEmployees(Request $request): JsonResponse
     {
-        $this->authorize('view', \App\Modules\HR\Policies\PayrollPolicy::class);
+        $this->authorize('view', PayrollPolicy::class);
 
-        // 1. التحقق من المدخلات الجديدة (الفترة المطلوبة)
         $request->validate([
-            'start_date' => 'required|date',
-            'end_date'   => 'required|date|after_or_equal:start_date',
+            'pay_period_id' => 'required|exists:hr_pay_periods,id',
+            'run_type'      => 'required|in:regular,overtime_only',
         ]);
 
-        $startDate = $request->start_date;
-        $endDate   = $request->end_date;
-
-        /**
-         * 2. البحث عن أي قسيمة راتب (Payslip) تقع ضمن مسير (Batch)
-         * يتقاطع تاريخه مع الفترة المختارة حالياً.
-         * منطق التقاطع: (تاريخ بداية المسير <= نهاية الفترة المطلوبة)
-         * AND (تاريخ نهاية المسير >= بداية الفترة المطلوبة)
-         */
-        $processedEmployeeIds = \App\Modules\HR\Models\Payslip::whereHas('batch', function ($query) use ($startDate, $endDate) {
+        // البحث بناءً على الفترة ونوع المسير المباشرين
+        $processedEmployeeIds = Payslip::whereHas('batch', function ($query) use ($request) {
             $query->where('status', 'posted')
-                  ->where(function ($q) use ($startDate, $endDate) {
-                      $q->where('start_date', '<=', $endDate)
-                        ->where('end_date', '>=', $startDate);
-                  });
+                  ->where('pay_period_id', $request->pay_period_id)
+                  ->where('run_type', $request->run_type);
         })->distinct()->pluck('employee_id')->toArray();
 
         return response()->json([
@@ -182,18 +174,14 @@ class PayrollController extends Controller
         ]);
     }
 
-
     /**
-     * تصدير ملف تحويل الرواتب للبنك (WPS / Bank Export)
-     * بناءً على رقم المسير (Batch ID)
+     * تصدير ملف تحويل الرواتب للبنك
      */
     public function exportBankFile($batchId)
     {
-        // التحقق من الصلاحيات
-        $this->authorize('view', \App\Modules\HR\Models\Employee::class);
+        $this->authorize('view', Employee::class);
 
-        // جلب المسير مع قسائم الراتب، والموظفين، وحساباتهم البنكية الأساسية
-        $batch = \App\Modules\HR\Models\PayrollBatch::with([
+        $batch = PayrollBatch::with([
             'payslips.employee.primaryBankAccount'
         ])->findOrFail($batchId);
 
@@ -207,15 +195,11 @@ class PayrollController extends Controller
             "Expires"             => "0"
         ];
 
-        // الأعمدة التي يتطلبها البنك عادةً
         $columns = ['اسم الموظف', 'الرقم الوظيفي', 'اسم البنك', 'رقم الحساب', 'الآيبان (IBAN)', 'المبلغ الصافي'];
 
         $callback = function() use($batch, $columns) {
             $file = fopen('php://output', 'w');
-
-            // إضافة BOM لدعم اللغة العربية بشكل صحيح عند فتح الملف في برنامج Excel
             fputs($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
-
             fputcsv($file, $columns);
 
             foreach ($batch->payslips as $payslip) {
@@ -231,11 +215,9 @@ class PayrollController extends Controller
                     $payslip->net_salary
                 ]);
             }
-
             fclose($file);
         };
 
-        // إرجاع الملف كـ Stream ليتم تحميله مباشرة في المتصفح
         return response()->stream($callback, 200, $headers);
     }
 }

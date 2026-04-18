@@ -9,7 +9,6 @@ use App\Modules\HR\Models\Contract;
 use App\Modules\HR\Http\Resources\ContractResource;
 use App\Modules\HR\Http\Requests\Contract\StoreContractRequest;
 use App\Modules\HR\Http\Requests\Contract\UpdateContractRequest;
-use App\Modules\HR\Enums\SalaryFrequency;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,16 +20,14 @@ class ContractController extends Controller
         $this->authorizeResource(Contract::class, 'contract');
     }
 
-    /**
-     * عرض قائمة العقود مع دعم الفلترة
-     */
     public function index(Request $request): JsonResponse
     {
-        // 🚀 التعديل هنا: إضافة overtimePolicy للتحميل المسبق
-        $query = Contract::with(['employee', 'salaryStructure', 'overtimePolicy']);
+        // 🚀 التعديل هنا: إضافة payGroup للتحميل المسبق
+        $query = Contract::with(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup']);
 
-        if ($request->filled('salary_frequency')) {
-            $query->where('salary_frequency', $request->salary_frequency);
+        // 🚀 التعديل هنا: الفلترة باستخدام مجموعة الدفع بدلاً من الدورة
+        if ($request->filled('pay_group_id')) {
+            $query->where('pay_group_id', $request->pay_group_id);
         }
 
         if ($request->boolean('active_only')) {
@@ -57,15 +54,13 @@ class ContractController extends Controller
 
         return response()->json([
             'message' => 'تم إنشاء العقد وتفعيله بنجاح',
-            // 🚀 التعديل هنا: تحميل overtimePolicy
-            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy'])),
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup'])),
         ], 201);
     }
 
     public function show(Contract $contract): JsonResponse
     {
-        // 🚀 التعديل هنا
-        return response()->json(new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy'])));
+        return response()->json(new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup'])));
     }
 
     public function update(UpdateContractRequest $request, Contract $contract): JsonResponse
@@ -83,8 +78,7 @@ class ContractController extends Controller
 
         return response()->json([
             'message' => 'تم تحديث العقد بنجاح',
-            // 🚀 التعديل هنا
-            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy'])),
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup'])),
         ]);
     }
 
@@ -99,8 +93,7 @@ class ContractController extends Controller
 
         return response()->json([
             'message' => 'تم إنهاء العقد بنجاح',
-            // 🚀 التعديل هنا
-            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy']))
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup']))
         ]);
     }
 

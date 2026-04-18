@@ -82,7 +82,8 @@ class ChartOfAccountsSeeder extends Seeder
             ['code' => '6104', 'name' => 'مصروف التأمينات (حصة الشركة)', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '61'], // مربوط بالـ HR
             ['code' => '6105', 'name' => 'مصروف الإيجارات', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '61'],
             ['code' => '6106', 'name' => 'مصروف الكهرباء والماء', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '61'],
-            ['code' => '6107', 'name' => 'مصروف الإهلاك', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '61'],
+
+            ['code' => '6108', 'name' => 'مصروف العمل الإضافي', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '61'],
         ];
 
         // خطوة ذكية لضمان إدخال الآباء أولاً لتجنب خطأ الفورين كي (Foreign Key)

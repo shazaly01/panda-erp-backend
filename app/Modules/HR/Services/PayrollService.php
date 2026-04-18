@@ -9,7 +9,9 @@ use App\Modules\HR\Models\Contract;
 use App\Modules\HR\Models\LoanInstallment;
 use App\Modules\HR\Models\PayrollInput;
 use App\Modules\HR\Models\AttendanceLog;
-use App\Modules\HR\Models\OvertimePolicy; // <-- تمت الإضافة
+use App\Modules\HR\Models\OvertimePolicy;
+use App\Modules\HR\Models\PayPeriod; // <-- الإضافة: نموذج الفترة المالية
+use App\Modules\HR\Enums\PayrollRunType; // <-- الإضافة: نوع المسير
 use App\Modules\HR\Enums\SalaryRuleType;
 use App\Modules\HR\Enums\SalaryRuleCategory;
 use Carbon\Carbon;
@@ -24,10 +26,14 @@ class PayrollService
 
     /**
      * تجميع المدخلات المتغيرة للموظف في فترة معينة (آلياً)
-     * تم التعديل لتستقبل تاريخ بداية ونهاية بدلاً من شهر
+     * 🚀 تم التحديث: إضافة $isOvertimeOnly لتجاهل السلف والحوافز في مسيرات الإضافي
      */
-    protected function gatherAutomatedInputs(Employee $employee, string $startDate, string $endDate): array
+    protected function gatherAutomatedInputs(Employee $employee, string $startDate, string $endDate, bool $isOvertimeOnly = false): array
     {
+        if ($isOvertimeOnly) {
+            return []; // تجاهل كل شيء (الغياب، التأخير، السلف) في مسير الإضافي
+        }
+
         $inputs = [];
 
         // 1. جلب أقساط السلف المستحقة في هذه الفترة
@@ -71,9 +77,9 @@ class PayrollService
 
     /**
      * حساب قسيمة راتب افتراضية (Preview) لموظف معين لفترة محددة
-     * تم التعديل لتستقبل تاريخ بداية ونهاية لتدعم الأسبوعي والشهري
+     * 🚀 تم التحديث: لتستقبل الكيانات الجديدة (PayPeriod, PayrollRunType)
      */
-    public function previewPayslip(Employee $employee, string $startDate, string $endDate): array
+    public function previewPayslip(Employee $employee, PayPeriod $period, PayrollRunType $runType): array
     {
         // 1. جلب العقد النشط
         $contract = $employee->currentContract;
@@ -82,10 +88,15 @@ class PayrollService
             throw new Exception("الموظف {$employee->full_name} ليس لديه عقد نشط!");
         }
 
+        // استخراج التواريخ من الفترة
+        $startDate = $period->start_date->format('Y-m-d');
+        $endDate = $period->end_date->format('Y-m-d');
+        $isOvertimeOnly = ($runType === PayrollRunType::OvertimeOnly);
+
         // 2. جلب القواعد من الهيكل المرتبط بالعقد
         $rules = $contract->salaryStructure->rules;
 
-        // 3. جلب سياسة الأوفرتايم (وضعنا سياسة افتراضية في الذاكرة لتجنب الأخطاء إذا نسي المستخدم ربط السياسة بالعقد)
+        // 3. جلب سياسة الأوفرتايم
         $policy = $contract->overtimePolicy ?? new OvertimePolicy([
             'working_days_per_month' => 30,
             'working_hours_per_day' => 8,
@@ -96,24 +107,55 @@ class PayrollService
         ]);
 
         // 4. تجميع المدخلات الآلية وتقييم الوقت
-        $automatedInputs = $this->gatherAutomatedInputs($employee, $startDate, $endDate);
-
-        // 🚀 السحر هنا: تمرير التواريخ والسياسة لخدمة تقييم الوقت
+        $automatedInputs = $this->gatherAutomatedInputs($employee, $startDate, $endDate, $isOvertimeOnly);
         $timeEvaluations = $this->timeEvaluation->evaluatePeriod($employee, $startDate, $endDate, $policy);
+
+        // حساب أيام الفترة بناءً على التواريخ
+        $periodDays = Carbon::parse($startDate)->diffInDays(Carbon::parse($endDate)) + 1;
+
+        // حساب أيام العمل الفعلية (أيام الفترة ناقص أيام الغياب إن وجدت)
+        $absentDays = $automatedInputs['ABSENT_DAYS'] ?? 0;
+        $workedDays = max(0, $periodDays - $absentDays);
 
         // 5. حساب معدل اليوم ومعدل الساعة ديناميكياً
         $dayRate = $contract->basic_salary / ($policy->working_days_per_month ?: 30);
         $hourRate = $dayRate / ($policy->working_hours_per_day ?: 8);
 
+        // --- جلب ساعات الأوفرتايم ---
+        $otRegularHours = $timeEvaluations['OT_REGULAR_HOURS'] ?? 0;
+        $otWeekendHours = $timeEvaluations['OT_WEEKEND_HOURS'] ?? 0;
+        $otHolidayHours = $timeEvaluations['OT_HOLIDAY_HOURS'] ?? 0;
+
+        // --- جلب أيام الأوفرتايم (الإضافة الجديدة لدعم ذكاء TimeEvaluationService) ---
+        $otRegularDays = $timeEvaluations['OT_REGULAR_DAYS'] ?? 0;
+        $otWeekendDays = $timeEvaluations['OT_WEEKEND_DAYS'] ?? 0;
+        $otHolidayDays = $timeEvaluations['OT_HOLIDAY_DAYS'] ?? 0;
+
+        // --- حساب القيمة النقدية الشاملة للأوفرتايم (ساعات + أيام) ---
+        $overtimeAmount =
+            // حساب الساعات (مضروبة في أجر الساعة)
+            ($otRegularHours * $hourRate * $policy->regular_rate) +
+            ($otWeekendHours * $hourRate * $policy->weekend_rate) +
+            ($otHolidayHours * $hourRate * $policy->holiday_rate) +
+            // حساب الأيام (مضروبة في أجر اليوم)
+            ($otRegularDays * $dayRate * $policy->regular_rate) +
+            ($otWeekendDays * $dayRate * $policy->weekend_rate) +
+            ($otHolidayDays * $dayRate * $policy->holiday_rate);
+
         // 6. ذاكرة المحرك (Context)
-        // دمج كل المتغيرات (الأساسي، قيمة اليوم، قيمة الساعة، معاملات الأوفرتايم، أيام الأوفرتايم وساعاته)
         $context = array_merge([
-            'BASIC'       => $contract->basic_salary,
-            'DAY_RATE'    => round($dayRate, 4),
-            'HOUR_RATE'   => round($hourRate, 4),
-            'OT_REG_RATE' => $policy->regular_rate,
-            'OT_WKD_RATE' => $policy->weekend_rate,
-            'OT_HOL_RATE' => $policy->holiday_rate,
+            // 🚀 التعديل: تصفير الأساسي في سياق العمليات الحسابية إذا كان إضافي فقط
+            'BASIC'           => $isOvertimeOnly ? 0 : $contract->basic_salary,
+            'DAY_RATE'        => round($dayRate, 4),
+            'HOUR_RATE'       => round($hourRate, 4),
+            'OT_REG_RATE'     => $policy->regular_rate,
+            'OT_WKD_RATE'     => $policy->weekend_rate,
+            'OT_HOL_RATE'     => $policy->holiday_rate,
+
+            // المتغيرات الديناميكية الجديدة
+            'PERIOD_DAYS'     => $periodDays,
+            'WORKED_DAYS'     => $workedDays,
+            'OVERTIME_AMOUNT' => round($overtimeAmount, 2),
         ], $automatedInputs, $timeEvaluations);
 
         $lines = [];
@@ -121,13 +163,19 @@ class PayrollService
         $totalDeductions = 0;
         $totalCompanyContributions = 0;
 
-        // 7. الدوران على القواعد وتنفيذها (لا تغيير هنا، الكود الخاص بك ممتاز)
+        // 7. الدوران على القواعد وتنفيذها
         foreach ($rules as $rule) {
             $amount = 0;
             $code = $rule->code;
 
+            // 🚀 توجيه المحرك: في مسير الإضافي، نتخطى كل القواعد باستثناء "OVERTIME_AMOUNT"
+            if ($isOvertimeOnly && $code !== 'OVERTIME_AMOUNT') {
+                continue;
+            }
+
             if ($rule->type === SalaryRuleType::Fixed) {
-                $amount = ($code === 'BASIC') ? $contract->basic_salary : $rule->value;
+                // نأخذ قيمة BASIC من السياق (Context) لضمان أنها 0 في مسير الإضافي
+                $amount = ($code === 'BASIC') ? $context['BASIC'] : $rule->value;
             } elseif ($rule->type === SalaryRuleType::Percentage) {
                 $baseValue = $context[$rule->percentage_of_code] ?? 0;
                 $amount = $baseValue * ($rule->value / 100);
@@ -160,8 +208,9 @@ class PayrollService
         // 8. النتيجة النهائية
         return [
             'employee_name'  => $employee->full_name,
-            'period'         => "{$startDate} to {$endDate}", // استبدلنا month بالفترة لدعم الرواتب الأسبوعية
+            'period'         => "{$startDate} to {$endDate}",
             'contract_basic' => $contract->basic_salary,
+            'run_type'       => $runType->label(), // للتوثيق
             'lines'          => $lines,
             'totals'         => [
                 'total_allowances'            => round($totalAllowances, 2),
@@ -169,8 +218,7 @@ class PayrollService
                 'total_company_contributions' => round($totalCompanyContributions, 2),
                 'net_salary'                  => round($totalAllowances - $totalDeductions, 2),
             ],
-            // جمعنا كل المتغيرات هنا للرجوع إليها عند مراجعة تفاصيل القسيمة (Debug)
-            'raw_inputs' => array_merge($automatedInputs, $timeEvaluations)
+            'raw_inputs' => array_merge($context)
         ];
     }
 

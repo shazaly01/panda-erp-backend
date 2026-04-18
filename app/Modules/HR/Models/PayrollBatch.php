@@ -19,8 +19,8 @@ class PayrollBatch extends Model
     // تم تحديث الحقول لتطابق الـ Migration الاحترافي تماماً
     protected $fillable = [
         'name',               // اسم المسير (مثال: رواتب شهر 04-2026)
-        'start_date',         // بداية الفترة
-        'end_date',           // نهاية الفترة
+        'pay_period_id',      // الإضافة الجديدة
+        'run_type',           // الإضافة الجديدة
         'status',             // draft, approved, paid, posted
         'approved_at',        // وقت الاعتماد
         'approved_by',        // المستخدم الذي اعتمد
@@ -49,5 +49,11 @@ class PayrollBatch extends Model
     public function journalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
+    }
+
+
+    public function payPeriod(): BelongsTo
+    {
+        return $this->belongsTo(PayPeriod::class, 'pay_period_id');
     }
 }

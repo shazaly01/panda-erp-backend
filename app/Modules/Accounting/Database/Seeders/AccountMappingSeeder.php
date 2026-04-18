@@ -26,6 +26,7 @@ class AccountMappingSeeder extends Seeder
             'hr_housing_allowance'     => ['name' => 'مصروف بدل السكن', 'code' => '6102'],
             'hr_transport_allowance'   => ['name' => 'مصروف بدل النقل', 'code' => '6103'],
             'hr_company_contribution'  => ['name' => 'مصروف تأمينات اجتماعية (حصة الشركة)', 'code' => '6104'],
+            'hr_overtime_allowance'    => ['name' => 'مصروف العمل الإضافي', 'code' => '6108'],
 
             // --- ب. الالتزامات (Liabilities) ---
             'hr_salaries_payable'      => ['name' => 'رواتب مستحقة الدفع (الصافي)', 'code' => '2102'],
