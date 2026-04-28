@@ -50,7 +50,7 @@ class CoreConfigurationSeeder extends Seeder
             [
                 'model' => 'hr_employee', // أرقام الموظفين
                 'branch_id' => null,
-                'format' => '9000{00000}', // مثال: 900000001 (رقم وظيفي ثابت لا يتصفر)
+                'format'=> 'EMP-{00000}', // مثال: 900000001 (رقم وظيفي ثابت لا يتصفر)
                 'reset_frequency' => 'never',
                 'next_value' => 1,
                 'current_year' => null,
