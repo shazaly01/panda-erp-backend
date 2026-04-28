@@ -16,6 +16,7 @@ readonly class JournalEntryDto
         public array $details, // مصفوفة من كائنات JournalEntryDetailDto
         public ?string $description = null,
         public ?int $currency_id = null,
+        public ?string $source = null, // 🌟 الإضافة هنا: استقبال مصدر القيد الآلي
     ) {}
 
     /**

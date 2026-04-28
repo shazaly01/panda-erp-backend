@@ -23,47 +23,43 @@ class BankAccountController extends Controller
         $this->authorizeResource(BankAccount::class, 'bank_account');
     }
 
+    public function index(Request $request): JsonResponse
+    {
+        $query = BankAccount::with(['account', 'currency']);
 
-
-public function index(Request $request): JsonResponse
-{
-    $query = BankAccount::with(['account', 'currency']);
-
-    // 1. فلترة البحث (اسم البنك، اسم الحساب، أو رقم الحساب)
-    $query->when($request->search, function ($q, $search) {
-        $q->where(function ($sub) use ($search) {
-            $sub->where('bank_name', 'like', "%{$search}%")
-                ->orWhere('account_name', 'like', "%{$search}%")
-                ->orWhere('account_number', 'like', "%{$search}%");
+        // 1. فلترة البحث (اسم البنك، اسم الحساب، أو رقم الحساب)
+        $query->when($request->search, function ($q, $search) {
+            $q->where(function ($sub) use ($search) {
+                $sub->where('bank_name', 'like', "%{$search}%")
+                    ->orWhere('account_name', 'like', "%{$search}%")
+                    ->orWhere('account_number', 'like', "%{$search}%");
+            });
         });
-    });
 
-    // 2. فلترة الحالة (نشط / غير نشط)
-    // نستخدم filled لأن القيمة قد تكون '0' وهي قيمة false في php
-    $query->when($request->filled('status'), function ($q) use ($request) {
-        $q->where('is_active', $request->status);
-    });
+        // 2. فلترة الحالة (نشط / غير نشط)
+        // نستخدم filled لأن القيمة قد تكون '0' وهي قيمة false في php
+        $query->when($request->filled('status'), function ($q) use ($request) {
+            $q->where('is_active', $request->status);
+        });
 
-    $accounts = $query->latest()->get();
+        // 🌟 توحيد المعيار: استخدام paginate بدلاً من get لتناسب حجم الـ Enterprise
+        $accounts = $query->latest('id')->paginate(20);
 
-    return response()->json([
-        'data' => BankAccountResource::collection($accounts)
-    ]);
-}
-
+        return BankAccountResource::collection($accounts)->response();
+    }
 
     /**
      * إضافة حساب بنكي جديد
      */
     public function store(StoreBankAccountRequest $request): JsonResponse
     {
-        // السيرفس تقوم بإنشاء الحساب المالي (الأصول) + سجل البنك
+        // السيرفس تقوم بإنشاء الحساب المالي (الأصول) آلياً + سجل البنك التشغيلي
         $bankAccount = $this->treasuryService->createBankAccount($request->validated());
 
         $bankAccount->load(['account', 'currency']);
 
         return response()->json([
-            'message' => 'تم إضافة الحساب البنكي وإنشاء حسابه المالي بنجاح',
+            'message' => 'تم إضافة الحساب البنكي وتوليد حسابه المالي آلياً بنجاح',
             'data'    => new BankAccountResource($bankAccount)
         ], 201);
     }
@@ -90,7 +86,7 @@ public function index(Request $request): JsonResponse
 
         return response()->json([
             'message' => 'تم تحديث بيانات الحساب البنكي بنجاح',
-            'data'    => new BankAccountResource($updatedAccount)
+            'data'    => new BankAccountResource($updatedAccount->load(['account', 'currency']))
         ]);
     }
 

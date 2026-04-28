@@ -6,67 +6,63 @@ namespace App\Modules\Accounting\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Accounting\Models\Box;
-use App\Modules\Accounting\Services\TreasuryService; // <--- لاحظ استدعاء السيرفس
+use App\Modules\Accounting\Services\TreasuryService;
+// 🌟 تم تصحيح المسارات (إزالة التخمين الخاص بمجلد Box)
 use App\Modules\Accounting\Http\Requests\StoreBoxRequest;
 use App\Modules\Accounting\Http\Requests\UpdateBoxRequest;
 use App\Modules\Accounting\Http\Resources\BoxResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+
 class BoxController extends Controller
 {
-    // حقن السيرفس في الكنترولر (Dependency Injection)
     public function __construct(protected TreasuryService $treasuryService)
     {
-        // تفعيل الحماية (Policies)
         $this->authorizeResource(Box::class, 'box');
     }
 
+    public function index(Request $request): JsonResponse
+    {
+        $query = Box::with(['account', 'currency']);
 
-public function index(Request $request): JsonResponse
-{
-    $query = Box::with(['account', 'currency']);
-
-    // 1. فلترة البحث (اسم البنك، اسم الحساب، أو رقم الحساب)
-    $query->when($request->search, function ($q, $search) {
-        $q->where(function ($sub) use ($search) {
-            $sub->where('box_name', 'like', "%{$search}%")
-                ->orWhere('account_name', 'like', "%{$search}%")
-                ->orWhere('account_number', 'like', "%{$search}%");
+        // 1. فلترة البحث (البحث في اسم الخزينة تشغيلياً أو كود الحساب المالي المرتبط بها)
+        $query->when($request->search, function ($q, $search) {
+            $q->where(function ($sub) use ($search) {
+                $sub->where('name', 'like', "%{$search}%")
+                    ->orWhereHas('account', function ($acc) use ($search) {
+                        $acc->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+            });
         });
-    });
 
-    // 2. فلترة الحالة (نشط / غير نشط)
-    // نستخدم filled لأن القيمة قد تكون '0' وهي قيمة false في php
-    $query->when($request->filled('status'), function ($q) use ($request) {
-        $q->where('is_active', $request->status);
-    });
+        // 2. فلترة الحالة
+        $query->when($request->filled('status'), function ($q) use ($request) {
+            $q->where('is_active', $request->status);
+        });
 
-    $accounts = $query->latest()->get();
+        // 3. فلترة الفرع (مركز التكلفة) إن وجد
+        $query->when($request->filled('branch_id'), function ($q) use ($request) {
+            $q->where('branch_id', $request->branch_id);
+        });
 
-    return response()->json([
-        'data' => BoxResource::collection($accounts)
-    ]);
-}
+        $boxes = $query->latest('id')->paginate(20);
 
-
-
-
-
-
+        return BoxResource::collection($boxes)->response();
+    }
 
     /**
-     * إضافة خزينة جديدة
+     * إضافة خزينة جديدة (إنشاء تشغيلي + مالي آلي)
      */
     public function store(StoreBoxRequest $request): JsonResponse
     {
-        // هنا السحر: نرسل البيانات للسيرفس لتقوم بإنشاء الحساب والخزينة معاً
+        // نرسل البيانات التشغيلية فقط، والسيرفس سيتولى توليد الحساب المالي تحت 11101
         $box = $this->treasuryService->createBox($request->validated());
 
-        // نعيد تحميل العلاقات لنعرضها في الرد
         $box->load(['account', 'currency']);
 
         return response()->json([
-            'message' => 'تم إنشاء الخزينة والحساب المالي المرتبط بها بنجاح',
+            'message' => 'تم إنشاء الخزينة وتوليد حسابها المالي آلياً بنجاح.',
             'data'    => new BoxResource($box)
         ], 201);
     }
@@ -88,12 +84,12 @@ public function index(Request $request): JsonResponse
      */
     public function update(UpdateBoxRequest $request, Box $box): JsonResponse
     {
-        // السيرفس تتكفل بتحديث اسم الحساب المالي أيضاً ليطابق اسم الخزينة
+        // السيرفس سيقوم بتحديث اسم الخزينة، ومزامنة التعديل مع اسم الحساب المالي في الشجرة
         $updatedBox = $this->treasuryService->updateBox($box, $request->validated());
 
         return response()->json([
-            'message' => 'تم تحديث بيانات الخزينة بنجاح',
-            'data'    => new BoxResource($updatedBox)
+            'message' => 'تم تحديث بيانات الخزينة بنجاح.',
+            'data'    => new BoxResource($updatedBox->load(['account', 'currency']))
         ]);
     }
 
@@ -102,12 +98,11 @@ public function index(Request $request): JsonResponse
      */
     public function destroy(Box $box): JsonResponse
     {
-        // السيرفس تتكفل بحذف الحساب المالي المرتبط (بعد التحقق من عدم وجود قيود)
-        // قد ترمي السيرفس Exception إذا كان هناك قيود، وسيتعامل معها لارافيل تلقائياً
+        // السيرفس سيفحص وجود قيود، وإن كانت آمنة سيحذف الخزينة وحسابها المالي معاً
         $this->treasuryService->deleteBox($box);
 
         return response()->json([
-            'message' => 'تم حذف الخزينة وحسابها المالي بنجاح'
+            'message' => 'تم حذف الخزينة وحسابها المالي بنجاح.'
         ]);
     }
 }

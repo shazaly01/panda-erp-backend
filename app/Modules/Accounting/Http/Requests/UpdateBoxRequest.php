@@ -18,7 +18,6 @@ class UpdateBoxRequest extends FormRequest
             // عادة لا نسمح بتغيير العملة لخزينة تم إنشاؤها وعليها حركات، لذا لم أضع currency_id هنا
             // إذا كنت تريد السماح بذلك بحذر، أضفه للقائمة.
             'branch_id'   => ['nullable', 'integer'],
-            'account_id'  => ['nullable', 'integer', 'exists:accounts,id'],
             'description' => ['nullable', 'string', 'max:255'],
             'is_active'   => ['boolean'],
         ];

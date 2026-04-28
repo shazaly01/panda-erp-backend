@@ -12,7 +12,7 @@ use Exception;
 
 class AttendanceService
 {
-    /**
+   /**
      * تسجيل وتحليل حضور الموظف ليوم معين
      */
     public function processDailyAttendance(Employee $employee, string $date, ?string $checkInTime, ?string $checkOutTime): AttendanceLog
@@ -36,17 +36,31 @@ class AttendanceService
         $earlyLeaveMinutes = 0;
         $overtimeMinutes = 0;
 
+        // 🌟 الذكاء المضاف: تحديد تواريخ بداية ونهاية الوردية الفعلية
+        $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
+        $shiftEnd = Carbon::parse($date . ' ' . $shift->end_time);
+
+        // إذا كانت نهاية الوردية أصغر من بدايتها، إذن الوردية تعبر منتصف الليل لليوم التالي
+        $isNightShift = $shiftEnd->lessThan($shiftStart);
+        if ($isNightShift) {
+            $shiftEnd->addDay();
+        }
+
         // 2. حساب التأخير (إذا وجد وقت حضور)
         if ($checkInTime) {
             $actualCheckIn = Carbon::parse($date . ' ' . $checkInTime);
-            $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
+
+            // معالجة نادرة: إذا سجل الدخول بعد منتصف الليل لوردية تبدأ قبل منتصف الليل
+            if ($isNightShift && $actualCheckIn->format('H:i:s') < $shiftStart->format('H:i:s')) {
+                $actualCheckIn->addDay();
+            }
 
             // إضافة فترة السماح
             $allowedStartTime = $shiftStart->copy()->addMinutes($shift->grace_period_minutes);
 
             if ($actualCheckIn->greaterThan($allowedStartTime)) {
                 $status = 'late';
-                // نحسب التأخير من وقت الوردية الأصلي (وليس من نهاية فترة السماح) كما هو متبع محاسبياً
+                // نحسب التأخير من وقت الوردية الأصلي
                 $delayMinutes = $actualCheckIn->diffInMinutes($shiftStart);
             }
         } else {
@@ -56,7 +70,11 @@ class AttendanceService
         // 3. حساب الانصراف المبكر أو العمل الإضافي (إذا وجد وقت انصراف)
         if ($checkOutTime) {
             $actualCheckOut = Carbon::parse($date . ' ' . $checkOutTime);
-            $shiftEnd = Carbon::parse($date . ' ' . $shift->end_time);
+
+            // 🌟 معالجة الانصراف في الوردية الليلية: إذا كان وقت الانصراف أقل من بداية الوردية، فهو حتماً في اليوم التالي
+            if ($actualCheckOut->lessThan($shiftStart)) {
+                $actualCheckOut->addDay();
+            }
 
             if ($actualCheckOut->lessThan($shiftEnd)) {
                 $earlyLeaveMinutes = $shiftEnd->diffInMinutes($actualCheckOut);
@@ -67,19 +85,18 @@ class AttendanceService
 
         // 4. حفظ أو تحديث السجل في قاعدة البيانات
         return AttendanceLog::updateOrCreate(
-            ['employee_id' => $employee->id, 'date' => $date],
+            ['employee_id' => $employee->id, 'date' => $date], // نستخدم التاريخ المنطقي دائمأً كمفتاح أساسي
             [
-                'shift_id' => $shift->id,
-                'check_in' => $checkInTime,
-                'check_out' => $checkOutTime,
-                'delay_minutes' => $delayMinutes,
+                'shift_id'            => $shift->id,
+                'check_in'            => $checkInTime,
+                'check_out'           => $checkOutTime,
+                'delay_minutes'       => $delayMinutes,
                 'early_leave_minutes' => $earlyLeaveMinutes,
-                'overtime_minutes' => $overtimeMinutes,
-                'status' => $status,
+                'overtime_minutes'    => $overtimeMinutes,
+                'status'              => $status,
             ]
         );
     }
-
 
 
     /**

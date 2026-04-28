@@ -118,8 +118,12 @@ class PayrollService
         $workedDays = max(0, $periodDays - $absentDays);
 
         // 5. حساب معدل اليوم ومعدل الساعة ديناميكياً
-        $dayRate = $contract->basic_salary / ($policy->working_days_per_month ?: 30);
-        $hourRate = $dayRate / ($policy->working_hours_per_day ?: 8);
+        // 🌟 حماية إضافية لتجنب القسمة على صفر في حال خطأ في السياسة
+        $workingDaysPerMonth = $policy->working_days_per_month > 0 ? $policy->working_days_per_month : 30;
+        $workingHoursPerDay = $policy->working_hours_per_day > 0 ? $policy->working_hours_per_day : 8;
+
+        $dayRate = $contract->basic_salary / $workingDaysPerMonth;
+        $hourRate = $dayRate / $workingHoursPerDay;
 
         // --- جلب ساعات الأوفرتايم ---
         $otRegularHours = $timeEvaluations['OT_REGULAR_HOURS'] ?? 0;
@@ -226,6 +230,7 @@ class PayrollService
     {
         if (empty($formula)) return 0;
 
+        // ترتيب المفاتيح من الأطول للأقصر لتجنب الاستبدال الخاطئ (مثل استبدال BAS قبل BASIC)
         uksort($context, function($a, $b) {
             return strlen($b) - strlen($a);
         });
@@ -235,7 +240,16 @@ class PayrollService
             $mathString = str_replace($code, (string)$value, $mathString);
         }
 
-        if (!preg_match('/^[\d\.\+\-\*\/\(\)\s]+$/', $mathString)) {
+        // تنظيف المسافات الزائدة
+        $mathString = str_replace(' ', '', $mathString);
+
+        // 🌟 تعزيز الحماية: منع القسمة على صفر بشكل استباقي
+        if (preg_match('/\/0(\.0+)?(?!\d)/', $mathString)) {
+             return 0; // إرجاع 0 فوراً لحماية النظام من الانهيار (DivisionByZeroError)
+        }
+
+        // السماح فقط بالأرقام والعمليات الحسابية
+        if (!preg_match('/^[\d\.\+\-\*\/\(\)]+$/', $mathString)) {
             return 0;
         }
 

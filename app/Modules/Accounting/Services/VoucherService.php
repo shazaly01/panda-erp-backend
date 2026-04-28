@@ -37,12 +37,13 @@ class VoucherService
 
             // نحدد نوع الترقيم بناء على نوع السند (PAYMENT, RECEIPT)
             // نستخدم القيمة النصية من الـ Enum (مثلاً 'payment') ونحولها لأحرف كبيرة
-            $sequenceType = strtoupper($data['type']);
+           // 🌟 التحديث المعماري: تحويل نوع السند إلى الكود العالمي الموحد
+            $documentCode = strtolower($data['type']) === 'payment' ? 'acc_payment' : 'acc_receipt';
 
             // 2. توليد الرقم باستخدام السيرفس الذكي
             $number = $this->sequenceService->generateNumber(
-                $sequenceType,  // الموديل (PAYMENT أو RECEIPT)
-                null,    // ID الفرع لفصل العداد
+                $documentCode,  // الموديل (acc_payment أو acc_receipt)
+                null,           // ID الفرع لفصل العداد
                 $prefix         // RY أو JD
             );
 
@@ -154,9 +155,7 @@ class VoucherService
             }
 
             // 2. إنشاء رأس القيد (Journal Entry)
-           $entryNumber = $this->sequenceService->generateNumber(
-                \App\Modules\Accounting\Models\JournalEntry::class
-            );
+           $entryNumber = $this->sequenceService->generateNumber('acc_journal_entry');
 
             // 3. إنشاء رأس القيد (Journal Entry) مع الرقم المولد
            $journalEntry = JournalEntry::create([

@@ -56,15 +56,56 @@ class LeaveService
     }
 
     /**
-     * رفض طلب الإجازة
+     * رفض طلب الإجازة (يجب أن يكون معلقاً فقط)
      */
     public function rejectLeaveRequest(LeaveRequest $leaveRequest, int $approverId): LeaveRequest
     {
+        // 🌟 حماية إضافية: لا يمكن رفض طلب إلا إذا كان في حالة انتظار
+        if ($leaveRequest->status !== 'pending') {
+            throw new Exception("لا يمكن رفض هذا الطلب لأنه ليس في حالة انتظار.");
+        }
+
         $leaveRequest->update([
             'status' => 'rejected',
             'approved_by' => $approverId
         ]);
 
         return $leaveRequest;
+    }
+
+    /**
+     * 🌟 إضافة جديدة: إلغاء إجازة معتمدة واسترجاع الرصيد (Refund)
+     */
+    public function cancelLeaveRequest(LeaveRequest $leaveRequest, int $cancelledById): LeaveRequest
+    {
+        if ($leaveRequest->status !== 'approved') {
+            throw new Exception("لا يمكن إلغاء هذا الطلب لأنه ليس معتمداً.");
+        }
+
+        return DB::transaction(function () use ($leaveRequest, $cancelledById) {
+            $year = Carbon::parse($leaveRequest->start_date)->year;
+
+            // 1. جلب الرصيد لعمل الاسترجاع
+            $balanceRecord = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
+                ->where('leave_type_id', $leaveRequest->leave_type_id)
+                ->where('year', $year)
+                ->lockForUpdate()
+                ->first();
+
+            if ($balanceRecord) {
+                // 2. استرجاع الرصيد للموظف (Refund)
+                $balanceRecord->used_days -= $leaveRequest->total_days;
+                $balanceRecord->balance += $leaveRequest->total_days;
+                $balanceRecord->save();
+            }
+
+            // 3. تحديث حالة الطلب
+            $leaveRequest->update([
+                'status' => 'cancelled',
+                // يمكن إضافة حقل 'cancelled_by' إذا كان متوفراً في الموديل
+            ]);
+
+            return $leaveRequest;
+        });
     }
 }

@@ -18,7 +18,6 @@ class StoreBoxRequest extends FormRequest
             'name'        => ['required', 'string', 'max:100'],
             'currency_id' => ['required', 'exists:currencies,id'], // العملة ضرورية للإنشاء
             'branch_id'   => ['nullable', 'integer'], // إذا كان لديك جدول فروع: exists:branches,id
-            'account_id'  => ['nullable', 'integer', 'exists:accounts,id'],
             'description' => ['nullable', 'string', 'max:255'],
             'is_active'   => ['boolean'],
         ];

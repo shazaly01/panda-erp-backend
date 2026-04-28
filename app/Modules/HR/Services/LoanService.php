@@ -45,8 +45,8 @@ class LoanService
                 LoanInstallment::create([
                     'loan_id' => $loan->id,
                     'amount' => $amount,
-                    // إضافة شهر في كل دورة لتحديد تاريخ الاستحقاق
-                    'due_month' => $startDate->copy()->addMonths($i)->format('Y-m-d'),
+                    // 🌟 التحديث هنا: استخدام addMonthsNoOverflow لحماية الأقساط من تخطي الأشهر القصيرة مثل فبراير
+                    'due_month' => $startDate->copy()->addMonthsNoOverflow($i)->format('Y-m-d'),
                     'status' => 'pending',
                 ]);
             }

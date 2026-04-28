@@ -62,6 +62,7 @@ Route::middleware('auth:sanctum')
     // 5. الإعدادات (Settings)
     // ===========================================
     Route::get('account-mappings', [AccountMappingController::class, 'index']);
+    Route::get('account-mappings/candidates', [AccountMappingController::class, 'candidates']);
     Route::put('account-mappings/{id}', [AccountMappingController::class, 'update']);
     Route::get('account-mappings/allowed-accounts/{key}', [AccountMappingController::class, 'allowedAccounts']);
 

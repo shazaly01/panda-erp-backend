@@ -34,43 +34,45 @@ class AccountService
             }
 
             return Account::create([
-                'name'             => $data['name'],
-                'code'             => $data['code'],
-                'parent_id'        => $data['parent_id'] ?? null,
-                'currency_id'      => $data['currency_id'] ?? null,
-                'nature'           => $data['nature'],           // مدين/دائن
-                'type'             => $data['type'],             // أصول/خصوم...
-                'level'            => $level,
-                'is_transactional' => $data['is_transactional'] ?? true, // هل يقبل قيود؟
-                'is_active'        => $data['is_active'] ?? true,
-                'description'      => $data['description'] ?? null,
+                'name'                 => $data['name'],
+                'code'                 => $data['code'],
+                'parent_id'            => $data['parent_id'] ?? null,
+                'currency_id'          => $data['currency_id'] ?? null,
+                'nature'               => $data['nature'],           // مدين/دائن
+                'type'                 => $data['type'],             // أصول/خصوم...
+                'level'                => $level,
+                'is_transactional'     => $data['is_transactional'] ?? true, // هل يقبل قيود؟
+                // 🌟 تصحيح التناسق: إضافة حقل مركز التكلفة عند الإنشاء
+                'requires_cost_center' => $data['requires_cost_center'] ?? false,
+                'is_active'            => $data['is_active'] ?? true,
+                'description'          => $data['description'] ?? null,
             ]);
         });
     }
 
-   public function updateAccount(Account $account, array $data): Account
-{
-    $hasTransactions = $account->details()->exists();
+    public function updateAccount(Account $account, array $data): Account
+    {
+        $hasTransactions = $account->details()->exists();
 
-    if ($hasTransactions && isset($data['code']) && $data['code'] !== $account->code) {
-         throw ValidationException::withMessages([
-            'code' => ['لا يمكن تغيير كود حساب عليه عمليات مالية مسجلة.']
+        if ($hasTransactions && isset($data['code']) && $data['code'] !== $account->code) {
+             throw ValidationException::withMessages([
+                'code' => ['لا يمكن تغيير كود حساب عليه عمليات مالية مسجلة.']
+            ]);
+        }
+
+        $account->update([
+            'name'                 => $data['name'],
+            'description'          => $data['description'] ?? $account->description,
+            'is_active'            => $data['is_active'] ?? $account->is_active,
+            'nature'               => $data['nature'] ?? $account->nature,
+            'type'                 => $data['type'] ?? $account->type,
+            'is_transactional'     => isset($data['is_transactional']) ? (bool)$data['is_transactional'] : $account->is_transactional,
+            'requires_cost_center' => isset($data['requires_cost_center']) ? (bool)$data['requires_cost_center'] : $account->requires_cost_center,
+            'code'                 => (!$hasTransactions && isset($data['code'])) ? $data['code'] : $account->code,
         ]);
+
+        return $account;
     }
-
-    $account->update([
-        'name'                 => $data['name'],
-        'description'          => $data['description'] ?? $account->description,
-        'is_active'            => $data['is_active'] ?? $account->is_active,
-        'nature'               => $data['nature'] ?? $account->nature,
-        'type'                 => $data['type'] ?? $account->type,
-        'is_transactional'     => isset($data['is_transactional']) ? (bool)$data['is_transactional'] : $account->is_transactional,
-        'requires_cost_center' => isset($data['requires_cost_center']) ? (bool)$data['requires_cost_center'] : $account->requires_cost_center,
-        'code'                 => (!$hasTransactions && isset($data['code'])) ? $data['code'] : $account->code,
-    ]);
-
-    return $account;
-}
 
     /**
      * حذف الحساب
@@ -85,17 +87,22 @@ class AccountService
         }
 
         // 2. التحقق من وجود قيود مالية (Transactions)
-        // نفترض أن العلاقة في موديل Account تسمى details للربط مع JournalEntryDetail
         if ($account->details()->exists()) {
             throw ValidationException::withMessages([
                 'account' => ["لا يمكن حذف الحساب ({$account->name}) لوجود قيود مالية مرتبطة به. قم بتعطيله بدلاً من حذفه."]
             ]);
         }
 
-        // 3. التحقق من الارتباطات الأخرى (خزائن، بنوك)
-        // هذه خطوة اختيارية إذا كنت تريد حماية إضافية، لكن الـ Foreign Key في الداتابيز سيمنع الحذف ويعطي خطأ SQL
-        // يفضل تركه لـ SQL Exception أو التحقق يدوياً هنا:
-        // if ($account->boxes()->exists()) ...
+        // 🌟 3. الحماية السيادية: التحقق من وجود ارتباط في إعدادات النظام (Account Mappings)
+        $isMapped = DB::table('account_mappings')->where('account_id', $account->id)->exists();
+        if ($isMapped) {
+            throw ValidationException::withMessages([
+                'account' => ["لا يمكن حذف الحساب ({$account->name}) لأنه مربوط كمفتاح أساسي (System Mapping) في إعدادات تشغيل الـ ERP. الرجاء فك الربط أولاً."]
+            ]);
+        }
+
+        // 4. التحقق من الارتباطات الأخرى (خزائن، بنوك)
+        // إذا كان هناك قيود في SQL ستمنع الحذف وترمي خطأ 500، وهو أمان إضافي ممتاز.
 
         return $account->delete();
     }
@@ -123,9 +130,6 @@ class AccountService
 
         if ($lastChild) {
             // استخراج الرقم الأخير وزيادته
-            // مثال: الكود 101005. طول الأب (3). نقتطع آخر 3 خانات (005)
-            // هذه الطريقة أدق من الجمع المباشر لتجنب مشاكل النصوص
-
             $parentLen = strlen($parentCode);
             $lastChildCode = $lastChild->code;
 

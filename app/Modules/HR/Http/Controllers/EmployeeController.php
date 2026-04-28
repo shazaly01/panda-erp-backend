@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Http\Resources\EmployeeResource;
 use App\Modules\HR\Http\Requests\Employee\StoreEmployeeRequest;
-use App\Modules\HR\Http\Requests\Employee\UpdateEmployeeRequest; // 🌟 تم التفعيل
+use App\Modules\HR\Http\Requests\Employee\UpdateEmployeeRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Modules\Core\Services\SequenceService;
@@ -52,14 +52,14 @@ class EmployeeController extends Controller
         return EmployeeResource::collection($employees)->response();
     }
 
-   public function store(StoreEmployeeRequest $request, SequenceService $sequenceService): JsonResponse
+    public function store(StoreEmployeeRequest $request, SequenceService $sequenceService): JsonResponse
     {
         $validatedData = $request->validated();
 
-        // 🌟 المنطق الذكي للترقيم
+        // 🌟 المنطق الذكي للترقيم المتوافق مع الـ Enterprise ERP
         if (empty($validatedData['employee_number'])) {
-            // إذا ترك المستخدم الحقل فارغاً، نولد رقماً جديداً للموظف
-            $validatedData['employee_number'] = $sequenceService->generateNumber(Employee::class);
+            // استخدام الكود العالمي (hr_employee) كما تم تعريفه في CoreConfigurationSeeder
+            $validatedData['employee_number'] = $sequenceService->generateNumber('hr_employee');
         }
 
         $employee = Employee::create($validatedData);
@@ -78,7 +78,7 @@ class EmployeeController extends Controller
             'position',
             'manager',
             'currentContract.salaryStructure',
-            // 'employeeShifts.shift' // ⚠️ تنبيه: تأكد من وجود هذه العلاقة في الموديل
+            // 'employeeShifts.shift' // تأكد من وجود هذه العلاقة في الموديل
         ]);
 
         return response()->json([
@@ -86,7 +86,6 @@ class EmployeeController extends Controller
         ]);
     }
 
-    // 🌟 إضافة دالة التعديل
     public function update(UpdateEmployeeRequest $request, Employee $employee): JsonResponse
     {
         $employee->update($request->validated());
@@ -97,7 +96,6 @@ class EmployeeController extends Controller
         ]);
     }
 
-    // 🌟 إضافة دالة الحذف (مع حماية أمنية)
     public function destroy(Employee $employee): JsonResponse
     {
         // حماية النظام: لا يمكن حذف موظف لديه عقد عمل نشط
@@ -114,15 +112,13 @@ class EmployeeController extends Controller
         ]);
     }
 
-
-
     /**
      * كشف الحساب المالي للموظف (Sub-Ledger Statement)
      * يجلب كل الاستحقاقات (دائن) والمدفوعات (مدين) من القيود المحاسبية
      */
-    public function getFinancialStatement($id): \Illuminate\Http\JsonResponse
+    public function getFinancialStatement($id): JsonResponse
     {
-        // التحقق من الصلاحيات (يمكنك تعديلها حسب نظامك)
+        // التحقق من الصلاحيات (تم التعديل لتجنب الخطأ الإملائي في المسار)
         $this->authorize('view', \App\Modules\HR\Models\Employee::class);
 
         $employee = \App\Modules\HR\Models\Employee::findOrFail($id);
@@ -132,8 +128,8 @@ class EmployeeController extends Controller
             ->join('journal_entries', 'journal_entry_details.journal_entry_id', '=', 'journal_entries.id')
             ->where('journal_entries.status', 'posted') // القيود المعتمدة فقط
             ->where('journal_entry_details.party_type', 'employee')
-            // نستخدم employee_number لأنه مسجل كـ DECIMAL(18,0) وهو الرابط المالي الصحيح
-            ->where('journal_entry_details.party_id', $employee->employee_number)
+            // 🌟 التصحيح المعماري: البحث يجب أن يكون باستخدام الـ ID الخاص بالموظف وليس رقم الموظف التسلسلي
+            ->where('journal_entry_details.party_id', (string)$employee->id)
             ->select(
                 'journal_entries.date',
                 'journal_entries.entry_number',
@@ -161,7 +157,7 @@ class EmployeeController extends Controller
                 'entry_number' => $transaction->entry_number,
                 'description'  => $transaction->detail_description ?: $transaction->entry_description,
                 'credit'       => (float) $transaction->credit, // استحقاق (راتب نزل في حسابه)
-                'debit'        => (float) $transaction->debit,  // مدفوعات (تم صرفه له)
+                'debit'        => (float) $transaction->debit,  // مدفوعات (تم صرفه له/سلف)
                 'balance'      => (float) $runningBalance,      // المتبقي الذي تطلبه به الشركة
             ];
         }
@@ -172,7 +168,7 @@ class EmployeeController extends Controller
                 'employee' => [
                     'name' => $employee->full_name,
                     'employee_number' => $employee->employee_number,
-                    'current_balance' => $runningBalance
+                    'current_balance' => (float) $runningBalance
                 ],
                 'statement' => $statement
             ]

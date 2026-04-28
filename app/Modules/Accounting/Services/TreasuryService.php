@@ -39,7 +39,8 @@ class TreasuryService
                 $accountId = (int) $data['account_id'];
             } else {
                 // مدرسة الإنشاء التلقائي: نطلب من AccountService إنشاء حساب فرعي
-                $parentAccountId = $this->mappingService->getAccountId('default_box_parent', $data['branch_id'] ?? null);
+                // 🌟 التعديل هنا: استخدام المفتاح المعياري الجديد treasury_box_parent
+                $parentAccountId = $this->mappingService->getAccountId('treasury_box_parent', $data['branch_id'] ?? null);
 
                 $newAccount = $this->accountService->createAccount([
                     'name'             => $data['name'],
@@ -124,7 +125,8 @@ class TreasuryService
             if (!empty($data['account_id'])) {
                 $accountId = (int) $data['account_id'];
             } else {
-                $parentAccountId = $this->mappingService->getAccountId('default_bank_parent', $data['branch_id'] ?? null);
+                // 🌟 التعديل هنا: استخدام المفتاح المعياري الجديد treasury_bank_parent
+                $parentAccountId = $this->mappingService->getAccountId('treasury_bank_parent', $data['branch_id'] ?? null);
 
                 // تنسيق اسم الحساب المالي (اسم البنك + رقم الحساب) لسهولة التعرف عليه في الشجرة
                 $accountName = $data['bank_name'] . ' - ' . $data['account_number'];

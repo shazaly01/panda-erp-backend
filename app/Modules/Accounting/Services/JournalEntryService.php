@@ -114,7 +114,6 @@ class JournalEntryService
         }
 
         // إعادة التحقق من التوازن قبل الترحيل (كإجراء احترازي أخير)
-        // نحتاج لتحويل الموديل إلى DTO أو حساب المجاميع يدوياً
         $debitSum = $entry->details()->sum('debit');
         $creditSum = $entry->details()->sum('credit');
 
@@ -125,12 +124,10 @@ class JournalEntryService
         }
 
         return DB::transaction(function () use ($entry) {
-            // توليد الرقم التسلسلي عبر SequenceService
-            // هذا قد يرمي Exception عام إذا لم تكن الإعدادات موجودة، سنتركه يظهر كـ 500 Error
-            // لأن هذا خطأ إعدادات وليس خطأ مستخدم
+            // 🌟 التعديل المعماري هنا: استدعاء الكود العالمي بدلاً من مسار الموديل
             $entryNumber = $this->sequenceService->generateNumber(
-                modelClass: JournalEntry::class,
-                branchId: null // يمكن تمرير فرع المستخدم هنا لاحقاً
+                modelClass: 'acc_journal_entry',
+                branchId: null
             );
 
             $entry->update([
@@ -154,7 +151,7 @@ class JournalEntryService
                 'cost_center_id' => $detail->cost_center_id,
                 'debit'          => $detail->debit,
                 'credit'         => $detail->credit,
-                'description'    => $detail->description, // تم التأكد من استخدام description
+                'description'    => $detail->description,
                 'party_type'     => $detail->party_type,
                 'party_id'       => $detail->party_id,
             ]);

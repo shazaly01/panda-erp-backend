@@ -7,7 +7,7 @@ namespace App\Modules\Accounting\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use App\Modules\Accounting\Models\CostCenter;
-use App\Modules\Accounting\Enums\CostCenterType;
+// use App\Modules\Accounting\Enums\CostCenterType; // تم الإبقاء عليه إن كنت تحتاجه لاحقاً
 
 class StoreCostCenterRequest extends FormRequest
 {
@@ -19,12 +19,13 @@ class StoreCostCenterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => ['required', 'string', 'max:50', 'unique:cost_centers,code'],
-            'name' => ['required', 'string', 'max:150'],
-            'parent_id' => ['nullable', 'exists:cost_centers,id'],
-            'is_active' => ['boolean'],
-            'notes' => ['nullable', 'string', 'max:255'],
-            'is_branch' => ['boolean'],
+            // 🚫 تمت إزالة حقل 'code' بالكامل لتفعيل الإنشاء الهرمي الآلي (Auto-generation)
+
+            'name'        => ['required', 'string', 'max:150'],
+            'parent_id'   => ['nullable', 'integer', 'exists:cost_centers,id'],
+            'is_active'   => ['boolean'],
+            'notes'       => ['nullable', 'string', 'max:255'],
+            'is_branch'   => ['boolean'],
             'code_prefix' => ['nullable', 'string', 'max:10'],
         ];
     }
