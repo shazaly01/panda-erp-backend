@@ -10,60 +10,78 @@ class HRPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
-        // قائمة الصلاحيات المطلوبة (القديمة + الجديدة للتوسعات القادمة)
+        // قائمة الصلاحيات المطلوبة (شاملة التجاوزات الفردية للورديات)
         $permissions = [
             // 1. الهيكل التنظيمي
             'hr.departments.view', 'hr.departments.create', 'hr.departments.update', 'hr.departments.delete',
             'hr.positions.view', 'hr.positions.create', 'hr.positions.update', 'hr.positions.delete',
 
             // 2. الموظفين
-            'hr.employees.view',       // مشاهدة الملف الشخصي فقط
-            'hr.employees.create',     // تعيين موظف
+            'hr.employees.view',
+            'hr.employees.create',
             'hr.employees.update',
             'hr.employees.delete',
 
-            // 3. البيانات المالية والحساسة (هام جداً فصلها)
-            'hr.contracts.view',       // مشاهدة العقود
-            'hr.contracts.manage',     // إنشاء وتعديل العقود
-            'hr.payroll.view',         // مشاهدة مسير الرواتب
-            'hr.payroll.post',         // اعتماد وصرف الرواتب (ترحيل القيد)
+            // 3. البيانات المالية والحساسة
+            'hr.contracts.view',
+            'hr.contracts.manage',
+            'hr.payroll.view',
+            'hr.payroll.post',
 
             // 4. إعدادات الرواتب
-            'hr.settings.manage',      // تعديل القواعد والهياكل
+            'hr.settings.manage',
 
             // ---------------------------------------------------------
-            // 5. الإضافات الجديدة (لخطة الـ ERP الشاملة)
+            // 5. الجدولة والحضور (الورديات والقوالب والطوارئ والتجاوزات)
             // ---------------------------------------------------------
 
-            // الورديات (Shifts)
-            'hr.shifts.view',          // مشاهدة الورديات وتعيينات الموظفين
-            'hr.shifts.create',        // إضافة وردية جديدة أو تعيين وردية لموظف
-            'hr.shifts.update',        // تعديل وردية
-            'hr.shifts.delete',        // حذف وردية
+            // الورديات الأساسية
+            'hr.shifts.view',
+            'hr.shifts.create',
+            'hr.shifts.update',
+            'hr.shifts.delete',
+
+            // قوالب الجدولة (Working Schedules)
+            'hr.working_schedules.view',
+            'hr.working_schedules.create',
+            'hr.working_schedules.update',
+            'hr.working_schedules.delete',
+
+            // الاستثناءات التقويمية والطوارئ (Calendar Exceptions)
+            'hr.calendar_exceptions.view',
+            'hr.calendar_exceptions.create',
+            'hr.calendar_exceptions.update',
+            'hr.calendar_exceptions.delete',
+
+            // 🌟 التجاوزات الفردية وتبديل الورديات (Shift Overrides) 🌟
+            'hr.shift_overrides.view',
+            'hr.shift_overrides.create',
+            'hr.shift_overrides.update',
+            'hr.shift_overrides.delete',
 
             // الحضور والانصراف
-            'hr.attendance.view',      // مشاهدة سجلات الحضور
-            'hr.attendance.manage',    // تعديل السجلات يدوياً (اعتماد تأخيرات/إضافي)
+            'hr.attendance.view',
+            'hr.attendance.manage',
 
             // الإجازات
-            'hr.leaves.view',          // مشاهدة أرصدة وطلبات الإجازات
-            'hr.leaves.manage',        // إدارة أرصدة الإجازات
-            'hr.leaves.approve',       // اعتماد أو رفض طلب إجازة (للمدير)
-            'hr.leaves.request',       // تقديم طلب إجازة (للموظف نفسه)
+            'hr.leaves.view',
+            'hr.leaves.manage',
+            'hr.leaves.approve',
+            'hr.leaves.request',
 
             // السلف
-            'hr.loans.view',           // مشاهدة سجلات السلف
-            'hr.loans.manage',         // إدارة وجدولة السلف
-            'hr.loans.approve',        // اعتماد طلب سلفة
-            'hr.loans.request',        // تقديم طلب سلفة (للموظف نفسه)
+            'hr.loans.view',
+            'hr.loans.manage',
+            'hr.loans.approve',
+            'hr.loans.request',
 
-
-            'hr.payroll_inputs.view',      // مشاهدة سجل المكافآت والجزاءات
-            'hr.payroll_inputs.manage',    // إضافة حافز أو خصم لموظف
-            'hr.payroll_inputs.approve',   // اعتماد الحافز/الخصم (للمدير المباشر أو الـ HR)
+            // المكافآت والجزاءات
+            'hr.payroll_inputs.view',
+            'hr.payroll_inputs.manage',
+            'hr.payroll_inputs.approve',
         ];
 
-        // إنشاء الصلاحيات
+        // إنشاء الصلاحيات في قاعدة البيانات
         foreach ($permissions as $permission) {
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'api']);
         }
@@ -72,23 +90,32 @@ class HRPermissionsSeeder extends Seeder
         // توزيع الأدوار (Roles) الافتراضية
         // ---------------------------------------------------------
 
-        // 1. إنشاء دور "مدير موارد بشرية" وإعطاؤه كل الصلاحيات
+        // 1. مدير الموارد البشرية
         $hrManagerRole = Role::firstOrCreate(['name' => 'HR Manager', 'guard_name' => 'api']);
         $hrManagerRole->givePermissionTo($permissions);
 
-        // 2. دور "موظف موارد بشرية" (صلاحيات تشغيلية، بدون صلاحيات الاعتماد المالي أو الترحيل)
+        // 2. موظف الموارد البشرية (صلاحيات تشغيلية)
         $hrOfficerRole = Role::firstOrCreate(['name' => 'HR Officer', 'guard_name' => 'api']);
         $hrOfficerRole->givePermissionTo([
             'hr.departments.view', 'hr.positions.view',
             'hr.employees.view', 'hr.employees.create', 'hr.employees.update',
             'hr.contracts.view',
-            'hr.payroll.view', // يشاهد الرواتب لكن لا يرحلها
+            'hr.payroll.view',
+
+            // صلاحيات الجدولة والطوارئ
+            'hr.shifts.view',
+            'hr.working_schedules.view',
+            'hr.calendar_exceptions.view',
+
+            // 🌟 منح موظف الـ HR صلاحية إدارة التجاوزات الفردية 🌟
+            'hr.shift_overrides.view', 'hr.shift_overrides.create', 'hr.shift_overrides.update', 'hr.shift_overrides.delete',
+
             'hr.attendance.view', 'hr.attendance.manage',
             'hr.leaves.view', 'hr.leaves.manage',
             'hr.loans.view'
         ]);
 
-        // 3. دور "موظف عادي" (بوابة الخدمة الذاتية ESS - مشاهدة وطلب فقط)
+        // 3. الموظف العادي
         $employeeRole = Role::firstOrCreate(['name' => 'Employee', 'guard_name' => 'api']);
         $employeeRole->givePermissionTo([
             'hr.leaves.request',

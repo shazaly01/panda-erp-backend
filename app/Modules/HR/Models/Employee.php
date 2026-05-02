@@ -97,11 +97,6 @@ class Employee extends Model
         return EmployeeFactory::new();
     }
 
-    public function employeeShifts(): HasMany
-    {
-        return $this->hasMany(EmployeeShift::class);
-    }
-
 
     /**
      * الحسابات البنكية للموظف
@@ -118,13 +113,4 @@ class Employee extends Model
     {
         return $this->hasOne(EmployeeBankAccount::class)->where('is_primary', true);
     }
-
-
-    /**
- * الوردية النشطة حالياً للموظف
- */
-public function latestShift(): HasOne
-{
-    return $this->hasOne(EmployeeShift::class)->whereNull('end_date')->latestOfMany();
-}
 }

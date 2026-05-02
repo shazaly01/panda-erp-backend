@@ -24,11 +24,11 @@ class Shift extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
-        // ملاحظة: الأوقات يمكن عمل cast لها إذا أردت تنسيقها لاحقاً
     ];
 
-    public function employeeShifts(): HasMany
+    // 🔥 العلاقة الجديدة (أين تُستخدم هذه الوردية في قوالب الجداول)
+    public function scheduleLines(): HasMany
     {
-        return $this->hasMany(EmployeeShift::class);
+        return $this->hasMany(WorkingScheduleLine::class, 'shift_id');
     }
 }

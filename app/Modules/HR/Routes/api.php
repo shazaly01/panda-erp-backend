@@ -19,6 +19,11 @@ use App\Modules\HR\Http\Controllers\OvertimePolicyController;
 use App\Modules\HR\Http\Controllers\PayGroupController;
 use App\Modules\HR\Http\Controllers\PayPeriodController;
 
+// 🌟 المتحكمات الجديدة الخاصة بمعمارية الجدولة
+use App\Modules\HR\Http\Controllers\WorkingScheduleController;
+use App\Modules\HR\Http\Controllers\CalendarExceptionController;
+use App\Modules\HR\Http\Controllers\ShiftOverrideController;
+
 /*
 |--------------------------------------------------------------------------
 | HR Module API Routes
@@ -56,13 +61,11 @@ Route::middleware('auth:sanctum')
     Route::apiResource('salary-structures', SalaryStructureController::class)
         ->parameters(['salary-structures' => 'salary_structure']);
 
-
-        Route::apiResource('overtime-policies', OvertimePolicyController::class)
+    Route::apiResource('overtime-policies', OvertimePolicyController::class)
         ->parameters(['overtime-policies' => 'overtime_policy']);
 
-
-     Route::apiResource('pay-groups', PayGroupController::class);
-     Route::post('pay-periods/generate', [PayPeriodController::class, 'generate']);
+    Route::apiResource('pay-groups', PayGroupController::class);
+    Route::post('pay-periods/generate', [PayPeriodController::class, 'generate']);
     Route::apiResource('pay-periods', PayPeriodController::class);
 
     // ===========================================
@@ -78,15 +81,24 @@ Route::middleware('auth:sanctum')
     Route::post('loans/{loan}/mark-as-paid', [LoanController::class, 'markAsPaid']);
     Route::apiResource('loans', LoanController::class);
 
-    // الورديات
-    Route::get('employees/{employee}/shifts', [ShiftController::class, 'employeeShifts']); // عرض ورديات موظف محدد
-    Route::post('shifts/assign', [ShiftController::class, 'assignEmployee']); // تعيين موظف على وردية
-    Route::apiResource('shifts', ShiftController::class); // إدارة الورديات الأساسية (CRUD)
+    // -------------------------------------------
+    // الجدولة والورديات (Scheduling & Shifts)
+    // -------------------------------------------
+    // إدارة الورديات الأساسية
+    Route::apiResource('shifts', ShiftController::class);
+
+    // قوالب الجدولة (تحديد دورات العمل)
+    Route::apiResource('working-schedules', WorkingScheduleController::class);
+
+    // الاستثناءات التقويمية (الطوارئ والعطلات الرسمية)
+    Route::apiResource('calendar-exceptions', CalendarExceptionController::class);
+
+    Route::apiResource('shift-overrides', ShiftOverrideController::class);
+    // -------------------------------------------
 
     // الحضور والانصراف
     Route::apiResource('attendance-logs', AttendanceLogController::class);
-
-    Route::post('attendance-logs/scan', [\App\Modules\HR\Http\Controllers\AttendanceLogController::class, 'scanBarcode']);
+    Route::post('attendance-logs/scan', [AttendanceLogController::class, 'scanBarcode']);
 
     // المدخلات المالية المتغيرة (حوافز/خصومات)
     Route::apiResource('payroll-inputs', PayrollInputController::class);

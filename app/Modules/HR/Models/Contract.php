@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Modules\HR\Enums\SalaryFrequency;
-// 👈 تم حذف استيراد Illuminate\Validation\Rules\Enum من هنا
 
 class Contract extends Model
 {
@@ -20,6 +19,8 @@ class Contract extends Model
         'salary_structure_id',
         'overtime_policy_id',
         'pay_group_id',
+        'working_schedule_id',
+        'schedule_start_date',
         'basic_salary',
         'start_date',
         'end_date',
@@ -31,10 +32,25 @@ class Contract extends Model
         'basic_salary' => 'decimal:2',
         'start_date' => 'date',
         'end_date' => 'date',
+        'schedule_start_date' => 'date',
         'is_active' => 'boolean',
-        // 👈 التصحيح هنا: نمرر الكلاس مباشرة بدون وضعه داخل دالة Enum()
         'salary_frequency' => SalaryFrequency::class,
     ];
+
+    /**
+     * البوت المخصص للموديل (Model Events)
+     * هنا يتم تطبيق النقطة المرجعية الثابتة لضمان مزامنة الجداول
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Contract $contract) {
+            // 🔥 حقن النقطة المرجعية (Epoch Date) آلياً لكل عقد جديد
+            // استخدمنا بداية عام 2026 كنقطة انطلاق لجميع حسابات دورة الورديات
+            if (empty($contract->schedule_start_date)) {
+                $contract->schedule_start_date = '2026-01-01';
+            }
+        });
+    }
 
     public function employee(): BelongsTo
     {
@@ -46,7 +62,7 @@ class Contract extends Model
         return $this->belongsTo(SalaryStructure::class);
     }
 
-    public function overtimePolicy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function overtimePolicy(): BelongsTo
     {
         return $this->belongsTo(OvertimePolicy::class, 'overtime_policy_id');
     }
@@ -54,5 +70,10 @@ class Contract extends Model
     public function payGroup(): BelongsTo
     {
         return $this->belongsTo(PayGroup::class, 'pay_group_id');
+    }
+
+    public function workingSchedule(): BelongsTo
+    {
+        return $this->belongsTo(WorkingSchedule::class, 'working_schedule_id');
     }
 }

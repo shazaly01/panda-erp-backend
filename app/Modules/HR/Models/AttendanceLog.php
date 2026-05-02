@@ -16,7 +16,8 @@ class AttendanceLog extends Model
 
     protected $fillable = [
         'employee_id',
-        'shift_id',
+        'shift_id', // 👈 سيبقى موجوداً لتوثيق الوردية التي تم العمل بها فعلياً في ذلك اليوم
+        'calendar_exception_id', // 👈 تمت الإضافة لتوثيق الطوارئ أو الأعياد
         'date',
         'check_in',
         'check_out',
@@ -38,5 +39,11 @@ class AttendanceLog extends Model
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class);
+    }
+
+    // 🔥 العلاقة الجديدة
+    public function calendarException(): BelongsTo
+    {
+        return $this->belongsTo(CalendarException::class, 'calendar_exception_id');
     }
 }
