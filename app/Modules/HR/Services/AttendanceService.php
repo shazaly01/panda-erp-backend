@@ -46,11 +46,13 @@ class AttendanceService
                 // كل الدوام يعتبر إضافي لأنه يعمل في يوم راحة أو طوارئ
                 $in = Carbon::parse($date . ' ' . $checkInTime);
                 $out = Carbon::parse($date . ' ' . $checkOutTime);
+
                 if ($out->lessThan($in)) {
                     $out->addDay(); // الدوام امتد لليوم التالي
                 }
+
                 $overtimeMinutes = $in->diffInMinutes($out);
-          } elseif (!$checkInTime && !$checkOutTime) {
+            } elseif (!$checkInTime && !$checkOutTime) {
                 // الموظف لم يداوم، وهذا حقه لأنه يوم راحة أو طوارئ أو إجازة معتمدة
                 if ($resolution['type'] === 'leave_day') {
                     $status = 'on_leave';
@@ -108,7 +110,7 @@ class AttendanceService
             ['employee_id' => $employee->id, 'date' => $date],
             [
                 'shift_id'              => $shift ? $shift->id : null,
-                'calendar_exception_id' => $exception ? $exception->id : null, // 👈 حفظ الاستثناء للتدقيق
+                'calendar_exception_id' => $exception ? $exception->id : null,
                 'check_in'              => $checkInTime,
                 'check_out'             => $checkOutTime,
                 'delay_minutes'         => $delayMinutes,
@@ -159,8 +161,6 @@ class AttendanceService
 
         // إذا كان يوم استثناء بالكامل أو يوم راحة، لا يوجد منتصف وردية لحسابه
         if (!$resolution['shift']) {
-            // يمكن هنا إضافة منطق مرن لتسجيل دخول/خروج في يوم الإجازة (Overtime)
-            // لتسهيل الأمر في الـ Midpoint، إذا بصم في يوم إجازة ولم يمر 12 ساعة بين بصمتين، نعتبرها خروج.
             return $this->handleOffDayPunch($employee, $date, $punchTime, $resolution);
         }
 
@@ -193,7 +193,7 @@ class AttendanceService
         // 5. تحديد نوع البصمة (دخول أم خروج؟)
         // ==========================================
         $isCheckIn = $punchTime->lessThan($midPoint);
-        $actionData = $this->determinePunchAction($isCheckIn, $punchTime, $date, $physicalDate, $checkInTime, $checkOutTime);
+        $actionData = $this->determinePunchAction($isCheckIn, $punchTime, $checkInTime, $checkOutTime);
 
         if ($actionData['status'] === 'warning') {
             return $actionData; // تجاهل البصمة المكررة
@@ -223,32 +223,46 @@ class AttendanceService
     }
 
     /**
-     * دالة مساعدة لتحديد نوع البصمة ومنع التكرار
+     * تحديد نوع البصمة مع الاعتماد على العزل الزمني لسد ثغرة منتصف الليل
      */
-    private function determinePunchAction(bool $isCheckIn, Carbon $punchTime, string $date, string $physicalDate, ?string $checkInTime, ?string $checkOutTime): array
+    private function determinePunchAction(bool $isCheckIn, Carbon $punchTime, ?string $checkInTime, ?string $checkOutTime): array
     {
         if ($isCheckIn) {
-            if ($checkInTime) {
-                $existingCheckIn = Carbon::parse($date . ' ' . $checkInTime);
-                if ($punchTime->diffInMinutes($existingCheckIn) < 5) {
-                    return ['status' => 'warning', 'action' => 'ignored', 'message' => 'تم تسجيل حضورك بالفعل قبل قليل.'];
-                }
+            if ($checkInTime && $this->isDuplicatePunch($punchTime, $checkInTime)) {
+                return ['status' => 'warning', 'action' => 'ignored', 'message' => 'تم تسجيل حضورك بالفعل قبل قليل.'];
             }
             return ['status' => 'success', 'action' => 'check_in', 'time' => $punchTime->toTimeString(), 'message' => 'أهلاً بك، تم تسجيل الحضور بنجاح.'];
         } else {
-            if ($checkOutTime) {
-                $existingCheckOut = Carbon::parse($physicalDate . ' ' . $checkOutTime);
-                if ($punchTime->diffInMinutes($existingCheckOut) < 5) {
-                    return ['status' => 'warning', 'action' => 'ignored', 'message' => 'تم تسجيل انصرافك بالفعل قبل قليل.'];
-                }
+            if ($checkOutTime && $this->isDuplicatePunch($punchTime, $checkOutTime)) {
+                return ['status' => 'warning', 'action' => 'ignored', 'message' => 'تم تسجيل انصرافك بالفعل قبل قليل.'];
             }
             return ['status' => 'success', 'action' => 'check_out', 'time' => $punchTime->toTimeString(), 'message' => 'رافقتك السلامة، تم تسجيل الانصراف.'];
         }
     }
 
     /**
+     * 🚀 دالة العزل الرياضي: تكتشف البصمات المكررة حتى لو حدثت إحداها قبل منتصف الليل بدقيقة والأخرى بعده
+     */
+    private function isDuplicatePunch(Carbon $punchTime, string $storedTimeStr): bool
+    {
+        // نركب الوقت المخزن على تاريخ لحظة البصمة الحالية لنوحد المعيار الزمني
+        $existingTime = Carbon::parse($punchTime->toDateString() . ' ' . $storedTimeStr);
+
+        // إذا كان الفارق بينهما ضخماً (أكثر من 12 ساعة)، هذا يعني أن إحدى البصمتين في يوم والأخرى في اليوم التالي
+        if ($existingTime->diffInMinutes($punchTime) > 720) {
+            if ($existingTime->greaterThan($punchTime)) {
+                $existingTime->subDay();
+            } else {
+                $existingTime->addDay();
+            }
+        }
+
+        // الآن نقارن الفارق الحقيقي، إذا كان أقل من 5 دقائق فهي بصمة مكررة (Spam)
+        return $punchTime->diffInMinutes($existingTime) < 5;
+    }
+
+    /**
      * معالجة استثنائية: إذا جاء الموظف وبصم في يوم راحة أو طوارئ
-     * بما أنه لا توجد وردية لتحديد الـ Midpoint، نعتمد على الفارق الزمني
      */
     private function handleOffDayPunch(Employee $employee, string $date, Carbon $punchTime, array $resolution): array
     {
