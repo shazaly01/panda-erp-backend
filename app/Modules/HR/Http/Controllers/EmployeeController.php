@@ -20,7 +20,7 @@ class EmployeeController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Employee::with(['department', 'position', 'latestShift.shift']);
+        $query = Employee::with(['department', 'position']);
 
         // 1. فلتر الإدارة
         if ($request->filled('department_id') && is_numeric($request->department_id)) {
