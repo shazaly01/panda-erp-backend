@@ -18,8 +18,9 @@ class EmployeeController extends Controller
         $this->authorizeResource(Employee::class, 'employee');
     }
 
-    public function index(Request $request): JsonResponse
+public function index(Request $request): JsonResponse
     {
+        // تم تنظيف العلاقة المفقودة (latestShift) لتجنب خطأ 500
         $query = Employee::with(['department', 'position']);
 
         // 1. فلتر الإدارة
@@ -44,6 +45,13 @@ class EmployeeController extends Controller
                 $q->where('full_name', 'like', "%{$search}%")
                   ->orWhere('employee_number', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%");
+            });
+        }
+
+        // 5. 🌟 فلتر استبعاد الموظفين الذين لديهم عقد عمل نشط (تُستخدم في شاشة إنشاء العقود)
+        if ($request->boolean('without_active_contract')) {
+            $query->whereDoesntHave('contracts', function ($q) {
+                $q->where('is_active', true);
             });
         }
 
