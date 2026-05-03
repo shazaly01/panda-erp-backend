@@ -121,8 +121,8 @@ class AttendanceService
         );
     }
 
-    /**
-     * معالجة البصمات التلقائية (مثل الباركود) بناءً على نقطة منتصف الوردية (Midpoint Logic)
+/**
+     * معالجة البصمات التلقائية (مثل الباركود) بناءً على سياسة الحضور (صارم أم بصمة واحدة)
      */
     public function processAutoPunch(Employee $employee, Carbon $punchTime): array
     {
@@ -167,20 +167,7 @@ class AttendanceService
         $shift = $resolution['shift'];
 
         // ==========================================
-        // 3. حساب نقطة المنتصف (Midpoint Logic) لليوم العادي
-        // ==========================================
-        $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
-        $shiftEnd = Carbon::parse($date . ' ' . $shift->end_time);
-
-        if ($shiftEnd->lessThan($shiftStart)) {
-            $shiftEnd->addDay();
-        }
-
-        $shiftDuration = $shiftStart->diffInMinutes($shiftEnd);
-        $midPoint = $shiftStart->copy()->addMinutes($shiftDuration / 2);
-
-        // ==========================================
-        // 4. جلب سجل الحضور إن وجد
+        // 3. جلب سجل الحضور إن وجد
         // ==========================================
         $todayLog = AttendanceLog::where('employee_id', $employee->id)
             ->where('date', $date)
@@ -190,11 +177,36 @@ class AttendanceService
         $checkOutTime = $todayLog ? $todayLog->check_out : null;
 
         // ==========================================
-        // 5. تحديد نوع البصمة (دخول أم خروج؟)
+        // 4. تحديد نوع البصمة (التوجيه حسب نظام الشركة)
         // ==========================================
-        $isCheckIn = $punchTime->lessThan($midPoint);
-        $actionData = $this->determinePunchAction($isCheckIn, $punchTime, $checkInTime, $checkOutTime);
+        $attendanceMode = env('ATTENDANCE_MODE', 'strict');
 
+        if ($attendanceMode === 'single_punch') {
+            // 🌟 نظام البصمة الواحدة: لا يوجد انصراف، وأي بصمة إضافية تُعتبر مكررة
+            if ($checkInTime) {
+                $actionData = ['status' => 'warning', 'action' => 'ignored', 'message' => 'تم تسجيل حضورك مسبقاً (نظام البصمة الواحدة).'];
+            } else {
+                $actionData = ['status' => 'success', 'action' => 'check_in', 'time' => $punchTime->toTimeString(), 'message' => 'أهلاً بك، تم تسجيل الحضور.'];
+            }
+        } else {
+            // 🌟 النظام الصارم (Strict): حساب نقطة المنتصف (Midpoint Logic)
+            $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
+            $shiftEnd = Carbon::parse($date . ' ' . $shift->end_time);
+
+            if ($shiftEnd->lessThan($shiftStart)) {
+                $shiftEnd->addDay();
+            }
+
+            $shiftDuration = $shiftStart->diffInMinutes($shiftEnd);
+            $midPoint = $shiftStart->copy()->addMinutes($shiftDuration / 2);
+
+            $isCheckIn = $punchTime->lessThan($midPoint);
+            $actionData = $this->determinePunchAction($isCheckIn, $punchTime, $checkInTime, $checkOutTime);
+        }
+
+        // ==========================================
+        // 5. التوجيه النهائي للبيانات
+        // ==========================================
         if ($actionData['status'] === 'warning') {
             return $actionData; // تجاهل البصمة المكررة
         }
@@ -221,7 +233,6 @@ class AttendanceService
             'message' => $actionData['message']
         ];
     }
-
     /**
      * تحديد نوع البصمة مع الاعتماد على العزل الزمني لسد ثغرة منتصف الليل
      */
