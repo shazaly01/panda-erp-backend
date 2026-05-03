@@ -23,6 +23,7 @@ use App\Modules\HR\Http\Controllers\PayPeriodController;
 use App\Modules\HR\Http\Controllers\WorkingScheduleController;
 use App\Modules\HR\Http\Controllers\CalendarExceptionController;
 use App\Modules\HR\Http\Controllers\ShiftOverrideController;
+use App\Modules\HR\Http\Controllers\InternetVoucherController;
 
 /*
 |--------------------------------------------------------------------------
@@ -103,6 +104,15 @@ Route::middleware('auth:sanctum')
     // المدخلات المالية المتغيرة (حوافز/خصومات)
     Route::apiResource('payroll-inputs', PayrollInputController::class);
 
+
+    // -------------------------------------------
+    // أكواد الإنترنت (Internet Vouchers)
+    // -------------------------------------------
+    Route::prefix('internet-vouchers')->group(function () {
+        Route::get('/', [InternetVoucherController::class, 'index']);
+        Route::post('/import', [InternetVoucherController::class, 'import']);
+        Route::post('/assign-manually', [InternetVoucherController::class, 'assignManually']);
+    });
 
     // ===========================================
     // 5. معالجة الرواتب (Payroll Processing)

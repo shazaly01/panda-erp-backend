@@ -217,7 +217,7 @@ class AttendanceService
             $checkOutTime = $actionData['time'];
         }
 
-        // ==========================================
+       // ==========================================
         // 6. الحفظ النهائي في قاعدة البيانات
         // ==========================================
         $this->processDailyAttendance(
@@ -227,10 +227,33 @@ class AttendanceService
             $checkOutTime
         );
 
+        // ==========================================
+        // 7. 🚀 الصرف الآلي لكود الإنترنت (الربط مع نظام IT)
+        // ==========================================
+        $voucherCode = null;
+        if ($actionData['action'] === 'check_in') {
+            try {
+                // جلب الـ ID الخاص بسجل حضور اليوم لربطه بالكود
+                $logId = AttendanceLog::where('employee_id', $employee->id)->where('date', $date)->value('id');
+
+                if ($logId) {
+                    // استدعاء خدمة الأكواد بشكل آمن
+                    $voucher = app(\App\Modules\HR\Services\InternetVoucherService::class)
+                        ->assignAutoVoucher($employee->id, $logId);
+
+                    $voucherCode = $voucher->code;
+                }
+            } catch (\Exception $e) {
+                // 🌟 كتم الخطأ برمجياً حتى لا ينهار تسجيل الحضور، وتسجيله في ملف الـ Log لمدير النظام
+                \Illuminate\Support\Facades\Log::warning('فشل صرف كود إنترنت آلي للموظف ' . $employee->id . ': ' . $e->getMessage());
+            }
+        }
+
         return [
             'status'  => 'success',
             'action'  => $actionData['action'],
-            'message' => $actionData['message']
+            'message' => $actionData['message'],
+            'voucher' => $voucherCode // 🌟 إرسال الكود للواجهة الأمامية
         ];
     }
     /**
