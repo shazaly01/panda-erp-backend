@@ -6,20 +6,26 @@ namespace App\Modules\HR\Enums;
 
 enum EmployeeStatus: string
 {
-    case Active = 'active';           // على رأس العمل
-    case OnLeave = 'on_leave';        // في إجازة
-    case Resigned = 'resigned';       // مستقيل
-    case Terminated = 'terminated';   // منهى خدماته
-    case Probation = 'probation';     // فترة تجربة
+    case InService = 'in_service';
+    case Leave = 'leave';
+    case Dismissed = 'dismissed';
+    case EndOfService = 'end_of_service';
+    case TemporarilyDismissed = 'temporarily_dismissed';
+    case Training = 'training';
+    case TemporaryTransfer = 'temporary_transfer';
+    case MonthlyTemporaryTransfer = 'monthly_temporary_transfer';
 
     public function label(): string
     {
         return match($this) {
-            self::Active => 'نشط',
-            self::OnLeave => 'في إجازة',
-            self::Resigned => 'مستقيل',
-            self::Terminated => 'منهى خدماته',
-            self::Probation => 'فترة تجربة',
+            self::InService => 'في الخدمة',
+            self::Leave => 'إجاره',
+            self::Dismissed => 'مفصول',
+            self::EndOfService => 'انتهاء خدمة',
+            self::TemporarilyDismissed => 'مفصول مؤقتا',
+            self::Training => 'تحت التدريب',
+            self::TemporaryTransfer => 'تحويل لفتره موقته',
+            self::MonthlyTemporaryTransfer => 'تحويل لفتره موقته شهري',
         };
     }
 }
