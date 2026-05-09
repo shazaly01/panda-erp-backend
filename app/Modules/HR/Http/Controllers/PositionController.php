@@ -18,7 +18,7 @@ class PositionController extends Controller
 
     public function index(): JsonResponse
     {
-        $positions = Position::latest()->paginate(20);
+        $positions = Position::latest()->paginate(50);
 
          return PositionResource::collection($positions)->response();
     }
