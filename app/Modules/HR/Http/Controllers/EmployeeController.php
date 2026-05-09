@@ -55,7 +55,7 @@ public function index(Request $request): JsonResponse
             });
         }
 
-        $employees = $query->latest('id')->paginate(20);
+        $employees = $query->latest('id')->paginate(500);
 
         return EmployeeResource::collection($employees)->response();
     }
