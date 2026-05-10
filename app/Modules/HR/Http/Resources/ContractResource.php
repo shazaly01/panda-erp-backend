@@ -32,13 +32,21 @@ class ContractResource extends JsonResource
 
             'overtime_policy' => new OvertimePolicyResource($this->whenLoaded('overtimePolicy')),
 
-            // 🚀 الإضافة الجديدة: ربط مجموعة الدفع بدلاً من دورة الراتب المباشرة
             'pay_group_id' => $this->pay_group_id,
             'pay_group' => $this->whenLoaded('payGroup', function() {
                 return [
                     'id' => $this->payGroup->id,
                     'name' => $this->payGroup->name,
                     'frequency' => $this->payGroup->frequency?->value ?? $this->payGroup->frequency,
+                ];
+            }),
+
+            // 🌟 الإضافة الجديدة: ربط قالب الجدولة (Working Schedule)
+            'working_schedule_id' => $this->working_schedule_id,
+            'working_schedule' => $this->whenLoaded('workingSchedule', function() {
+                return [
+                    'id' => $this->workingSchedule->id,
+                    'name' => $this->workingSchedule->name,
                 ];
             }),
 

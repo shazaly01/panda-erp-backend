@@ -7,6 +7,7 @@ use Illuminate\Validation\Rule;
 use App\Modules\HR\Enums\Gender;
 use App\Modules\HR\Enums\MaritalStatus;
 use App\Modules\HR\Enums\EmploymentType;
+use App\Modules\HR\Enums\EmployeeStatus; // 🌟 تمت الإضافة
 
 class StoreEmployeeRequest extends FormRequest
 {
@@ -15,6 +16,7 @@ class StoreEmployeeRequest extends FormRequest
         // نرجع true لترك المسؤولية للـ Policy المرتبط بالمتحكم
         return true;
     }
+
     public function rules(): array
     {
         return [
@@ -30,6 +32,9 @@ class StoreEmployeeRequest extends FormRequest
             'gender' => ['nullable', Rule::enum(Gender::class)],
             'marital_status' => ['nullable', Rule::enum(MaritalStatus::class)],
             'employment_type' => ['required', Rule::enum(EmploymentType::class)],
+
+            // 🌟 تمت إضافة حقل الحالة لتجنب تجاهله من دالة validated() عند الإنشاء
+            'status' => ['required', Rule::enum(EmployeeStatus::class)],
 
             'department_id' => ['nullable', 'exists:departments,id'],
             'position_id' => ['nullable', 'exists:positions,id'],

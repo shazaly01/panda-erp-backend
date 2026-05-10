@@ -22,10 +22,10 @@ class ContractController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        // 🚀 التعديل هنا: إضافة payGroup للتحميل المسبق
-        $query = Contract::with(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup']);
+        // 🚀 التعديل هنا: تمت إضافة workingSchedule للتحميل المسبق
+        $query = Contract::with(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup', 'workingSchedule']);
 
-        // 🚀 التعديل هنا: الفلترة باستخدام مجموعة الدفع بدلاً من الدورة
+        // الفلترة باستخدام مجموعة الدفع بدلاً من الدورة
         if ($request->filled('pay_group_id')) {
             $query->where('pay_group_id', $request->pay_group_id);
         }
@@ -54,13 +54,15 @@ class ContractController extends Controller
 
         return response()->json([
             'message' => 'تم إنشاء العقد وتفعيله بنجاح',
-            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup'])),
+            // 🚀 التعديل هنا: تمت إضافة workingSchedule للتحميل المسبق
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup', 'workingSchedule'])),
         ], 201);
     }
 
     public function show(Contract $contract): JsonResponse
     {
-        return response()->json(new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup'])));
+        // 🚀 التعديل هنا: تمت إضافة workingSchedule للتحميل المسبق
+        return response()->json(new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup', 'workingSchedule'])));
     }
 
     public function update(UpdateContractRequest $request, Contract $contract): JsonResponse
@@ -78,7 +80,8 @@ class ContractController extends Controller
 
         return response()->json([
             'message' => 'تم تحديث العقد بنجاح',
-            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup'])),
+            // 🚀 التعديل هنا: تمت إضافة workingSchedule للتحميل المسبق
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup', 'workingSchedule'])),
         ]);
     }
 
@@ -93,7 +96,8 @@ class ContractController extends Controller
 
         return response()->json([
             'message' => 'تم إنهاء العقد بنجاح',
-            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup']))
+            // 🚀 التعديل هنا: تمت إضافة workingSchedule للتحميل المسبق
+            'data' => new ContractResource($contract->load(['employee', 'salaryStructure', 'overtimePolicy', 'payGroup', 'workingSchedule']))
         ]);
     }
 

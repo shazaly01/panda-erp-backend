@@ -37,7 +37,8 @@ class UpdateEmployeeRequest extends FormRequest
                 'email',
                 Rule::unique('employees', 'email')->ignore($employeeId)
             ],
-// جعلناه nullable ليتوافق مع سياسة التوليد
+
+            // جعلناه nullable ليتوافق مع سياسة التوليد
             'employee_number' => [
                 'nullable',
                 'string',
