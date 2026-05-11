@@ -45,7 +45,7 @@ use App\Modules\HR\Policies\EmployeePolicy;
 use App\Modules\HR\Models\Contract;
 use App\Modules\HR\Policies\ContractPolicy;
 
-use App\Modules\HR\Models\PayrollBatch;     // <--- جديد
+use App\Modules\HR\Models\PayrollBatch;
 use App\Modules\HR\Policies\PayrollPolicy;
 
 use App\Modules\HR\Models\AttendanceLog;
@@ -55,10 +55,13 @@ use App\Modules\HR\Models\Shift;
 use App\Modules\HR\Policies\ShiftPolicy;
 
 use App\Modules\HR\Models\LeaveRequest;
-use App\Modules\HR\Policies\LeaveRequestPolicy; // أو LeaveRequestPolicy حسب التسمية لديك
+use App\Modules\HR\Policies\LeaveRequestPolicy;
 
 use App\Modules\HR\Models\Loan;
 use App\Modules\HR\Policies\LoanPolicy;
+
+// 🌟 استدعاء أمر الكونسول الخاص بتسجيل الحضور التلقائي
+use App\Modules\HR\Console\Commands\RecordAutoAttendanceCommand;
 
 class ModuleServiceProvider extends ServiceProvider
 {
@@ -91,6 +94,14 @@ class ModuleServiceProvider extends ServiceProvider
         Gate::policy(Shift::class, ShiftPolicy::class);
         Gate::policy(LeaveRequest::class, LeaveRequestPolicy::class);
         Gate::policy(Loan::class, LoanPolicy::class);
+
+        // 🌟 3. تسجيل أوامر الكونسول (Console Commands)
+        // نقوم بتسجيل الأوامر فقط إذا كان النظام يعمل عبر سطر الأوامر لتوفير الأداء
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                RecordAutoAttendanceCommand::class,
+            ]);
+        }
 
         $modulesPath = app_path('Modules');
 
