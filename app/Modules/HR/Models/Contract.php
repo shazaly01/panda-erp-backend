@@ -25,7 +25,8 @@ class Contract extends Model
         'start_date',
         'end_date',
         'is_active',
-        'attachment_path'
+        'attachment_path',
+        'attendance_mode' // 🔥 تمت الإضافة
     ];
 
     protected $casts = [
@@ -34,6 +35,7 @@ class Contract extends Model
         'end_date' => 'date',
         'schedule_start_date' => 'date',
         'is_active' => 'boolean',
+        'attendance_mode' => 'string', // 🔥 تمت الإضافة للتحقق من النوع
         'salary_frequency' => SalaryFrequency::class,
     ];
 
@@ -48,6 +50,11 @@ class Contract extends Model
             // استخدمنا بداية عام 2026 كنقطة انطلاق لجميع حسابات دورة الورديات
             if (empty($contract->schedule_start_date)) {
                 $contract->schedule_start_date = '2026-01-01';
+            }
+
+            // ضمان وجود القيمة الافتراضية
+            if (empty($contract->attendance_mode)) {
+                $contract->attendance_mode = 'manual';
             }
         });
     }
