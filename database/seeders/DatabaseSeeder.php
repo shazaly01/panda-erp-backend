@@ -27,19 +27,16 @@ class DatabaseSeeder extends Seeder
             // ب. ربط قواعد الرواتب والعمليات بالحسابات (يعتمد على الخطوة السابقة)
             \App\Modules\Accounting\Database\Seeders\AccountMappingSeeder::class,
 
+            // ✨ تعديل: تحويل hr إلى HR الكبيرة لتتوافق مع السيرفر الحقيقي ✨
+            \App\Modules\HR\Database\Seeders\HRPermissionsSeeder::class,
 
-            \App\Modules\hr\Database\Seeders\HRPermissionsSeeder::class,
+            \App\Modules\HR\Database\Seeders\SalaryRulesSeeder::class,
 
-            \App\Modules\hr\Database\Seeders\SalaryRulesSeeder::class,
+            \App\Modules\HR\Database\Seeders\SalaryStructureSeeder::class,
 
-            \App\Modules\hr\Database\Seeders\SalaryStructureSeeder::class,
+            \App\Modules\HR\Database\Seeders\ShiftSeeder::class,
 
-
-            \App\Modules\hr\Database\Seeders\ShiftSeeder::class,
-
-             \App\Modules\hr\Database\Seeders\WorkingScheduleSeeder::class,
-
-            // يمكنك إضافة seeders أخرى هنا لاحقاً
+            \App\Modules\HR\Database\Seeders\WorkingScheduleSeeder::class,
         ]);
     }
 }
