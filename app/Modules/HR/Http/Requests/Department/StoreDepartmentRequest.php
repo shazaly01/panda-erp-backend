@@ -23,6 +23,9 @@ class StoreDepartmentRequest extends FormRequest
             'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
+            // التحقق من مصفوفة المشرفين
+            'supervisor_ids' => ['nullable', 'array'],
+            'supervisor_ids.*' => ['required', 'exists:employees,id'],
         ];
     }
 }

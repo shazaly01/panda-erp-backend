@@ -21,6 +21,15 @@ class DepartmentResource extends JsonResource
             'is_active' => $this->is_active,
             // لعرض الشجرة، قد نحتاج لتحميل الأبناء
             'children' => DepartmentResource::collection($this->whenLoaded('children')),
+            // إرجاع المشرفين في حال تم تحميل العلاقة من الـ Controller لمنع الـ N+1 Query
+            'supervisors' => $this->when($this->relationLoaded('supervisors'), function () {
+                return $this->supervisors->map(function ($supervisor) {
+                    return [
+                        'id' => $supervisor->id,
+                        'full_name' => $supervisor->full_name,
+                    ];
+                });
+            }),
         ];
     }
 }

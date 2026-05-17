@@ -12,6 +12,10 @@ class AttendanceLogPolicy
 {
     use HandlesAuthorization;
 
+    /**
+     * تجاوز صلاحيات مدير الموارد البشرية على مستوى الموديول
+     * ملاحظة: تجاوز الـ Super Admin العام يجب أن يبقى في AuthServiceProvider (Gate::before)
+     */
     public function before(User $user, $ability)
     {
         if ($user->hasRole('HR Manager')) {
@@ -20,11 +24,10 @@ class AttendanceLogPolicy
     }
 
     /**
-     * عرض قائمة سجلات الحضور
+     * عرض قائمة سجلات الحضور (للـ HR أو للموظف نفسه)
      */
     public function viewAny(User $user): bool
     {
-        // إما موظف HR لمشاهدة حضور الكل، أو موظف عادي لمشاهدة حضوره فقط
         return $user->hasPermissionTo('hr.attendance.view') || !is_null($user->employee_id);
     }
 
@@ -37,7 +40,7 @@ class AttendanceLogPolicy
     }
 
     /**
-     * إنشاء سجل حضور يدوي (ممنوع على الموظف العادي - مسموح للـ HR فقط في حالات نسيان البصمة)
+     * إنشاء سجل حضور يدوي (مسموح للـ HR)
      */
     public function create(User $user): bool
     {
@@ -58,5 +61,17 @@ class AttendanceLogPolicy
     public function delete(User $user, AttendanceLog $attendanceLog): bool
     {
         return $user->hasPermissionTo('hr.attendance.manage');
+    }
+
+    // =================================================================
+    // 🌟 صلاحيات الخدمة الذاتية للمدير (Manager Self-Service) 🌟
+    // =================================================================
+
+    /**
+     * السماح للمشرف بإدارة وعرض مصفوفة حضور فريقه
+     */
+    public function manageTeam(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.team_attendance.manage');
     }
 }

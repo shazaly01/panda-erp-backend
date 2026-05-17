@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne; // <--- تمت الإضافة
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Models\User;
 use App\Modules\HR\Models\Contract; // <--- تمت الإضافة
 use App\Modules\HR\Models\Department;
@@ -112,5 +113,19 @@ class Employee extends Model
     public function primaryBankAccount()
     {
         return $this->hasOne(EmployeeBankAccount::class)->where('is_primary', true);
+    }
+
+
+    /**
+     * الأقسام التي يشرف عليها هذا الموظف (العلاقة الجديدة للجدول الوسيط)
+     */
+    public function supervisedDepartments(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Department::class,
+            'department_supervisors',
+            'employee_id',
+            'department_id'
+        )->withTimestamps();
     }
 }

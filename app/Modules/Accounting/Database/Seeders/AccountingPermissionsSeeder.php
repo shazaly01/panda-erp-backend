@@ -3,7 +3,7 @@
 namespace App\Modules\Accounting\Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
+use App\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -11,115 +11,78 @@ class AccountingPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. مسح الكاش للصلاحيات لضمان عدم وجود تضارب
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $guardName = 'api'; // أو 'web' حسب إعدادات الـ Auth لديك
+        $guardName = 'api';
 
-        // 2. قائمة الصلاحيات الكاملة
-        $permissions = [
-            // --- 1. General (عام) ---
-            'accounting.view',       // الدخول للموديول بشكل عام
-            'dashboard.view',        // رؤية الإحصائيات
+        // 2. هيكلة الصلاحيات لتتطابق تماماً مع Router الواجهة الأمامية
+        $permissionsData = [
+            'accounting' => ['view' => 'عرض عام'],
+            'dashboard' => ['view' => 'رؤية الإحصائيات'],
+            'account' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'cost_center' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'fiscal_year' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'close' => 'إغلاق'],
+            'currency' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'box' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'bank_account' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'payment' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف', 'approve' => 'اعتماد', 'post' => 'ترحيل مالي'],
+            'receipt' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف', 'approve' => 'اعتماد', 'post' => 'ترحيل مالي'],
+            'journal_entry' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف', 'post' => 'ترحيل مالي'],
+            'accounting_settings' => ['view' => 'عرض', 'update' => 'تعديل'],
 
-            // --- 2. Master Data (البيانات الأساسية) ---
+            // --- الإضافات المكتشفة من الـ Router ---
+            'account_mapping' => ['view' => 'عرض', 'manage' => 'إدارة كاملة'],
 
-            // دليل الحسابات
-            'account.view',
-            'account.create',
-            'account.update',
-            'account.delete',
-
-            // مراكز التكلفة (والفروع)
-            'cost_center.view',
-            'cost_center.create',
-            'cost_center.update',
-            'cost_center.delete',
-
-            // السنوات المالية
-            'fiscal_year.view',
-            'fiscal_year.create',
-            'fiscal_year.update',
-            'fiscal_year.close', // صلاحية خاصة لإغلاق السنة
-
-            // العملات (جديد)
-            'currency.view',
-            'currency.create',
-            'currency.update',
-            'currency.delete',
-
-            // --- 3. Treasury Management (إدارة النقدية) ---
-
-            // الخزائن (Boxes)
-            'box.view',
-            'box.create',
-            'box.update',
-            'box.delete',
-
-            // الحسابات البنكية
-            'bank_account.view',
-            'bank_account.create',
-            'bank_account.update',
-            'bank_account.delete',
-
-            // --- 4. Transactions (العمليات) ---
-
-            // سندات الصرف (Payments)
-            'payment.view',
-            'payment.create',
-            'payment.update',
-            'payment.delete',
-            'payment.approve', // [هام] الموافقة الإدارية قبل الترحيل
-            'payment.post',    // الترحيل المالي (إنشاء القيد)
-
-            // سندات القبض (Receipts)
-            'receipt.view',
-            'receipt.create',
-            'receipt.update',
-            'receipt.delete',
-            'receipt.approve', // [هام] الموافقة الإدارية
-            'receipt.post',    // الترحيل المالي
-
-            // القيود اليومية (Journal Entries)
-            'journal_entry.view',
-            'journal_entry.create',
-            'journal_entry.update',
-            'journal_entry.delete',
-            'journal_entry.post', // صلاحية الترحيل اليدوي للقيود
-
-            // --- 5. Settings & Reports (الإعدادات والتقارير) ---
-
-            // إعدادات الربط (توجيه الحسابات الافتراضي)
-            'accounting_settings.view',
-            'accounting_settings.update',
-
-            // التقارير المالية
-            'report.ledger',          // دفتر الأستاذ
-            'report.trial_balance',   // ميزان المراجعة
-            'report.income_statement',// قائمة الدخل
-            'report.balance_sheet',   // الميزانية العمومية
-            'report.daily_journal',   // دفتر اليومية
+            // --- تصحيح مسارات التقارير لتطابق الـ Router ---
+            'report' => [
+                'statement.view' => 'كشف الحساب',
+                'trial_balance.view' => 'ميزان المراجعة',
+                'income_statement.view' => 'قائمة الدخل',
+                'balance_sheet.view' => 'الميزانية العمومية',
+                'daily_journal.view' => 'دفتر اليومية'
+            ],
         ];
 
-        // 3. إنشاء الصلاحيات في قاعدة البيانات
-        foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => $guardName]);
+        $permissionsObjects = [];
+
+        // 3. إنشاء أو تحديث الصلاحيات المهيكلة
+        foreach ($permissionsData as $groupKey => $actions) {
+            foreach ($actions as $actionKey => $displayName) {
+                $permissionName = "{$groupKey}.{$actionKey}";
+
+                $permissionsObjects[] = Permission::updateOrCreate(
+                    ['name' => $permissionName, 'guard_name' => $guardName],
+                    [
+                        'module' => 'accounting',
+                        'group_name' => $groupKey,
+                        'action_name' => $actionKey,
+                        'display_name' => $displayName
+                    ]
+                );
+            }
         }
 
-        // 4. تعيين الكل للمدير (Admin)
-        $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => $guardName]);
-        $adminRole->givePermissionTo($permissions);
+        // 4. معالجة الصلاحية الشاذة view_sequences (لأنها لا تحتوي على بادئة .sequence)
+        $permissionsObjects[] = Permission::updateOrCreate(
+            ['name' => 'view_sequences', 'guard_name' => $guardName],
+            [
+                'module' => 'core',
+                'group_name' => 'sequences',
+                'action_name' => 'view',
+                'display_name' => 'عرض'
+            ]
+        );
 
-        // 5. (اختياري) إنشاء دور "محاسب" بصلاحيات محدودة للتجربة
+        // 5. تعيين الكل للمدير (Admin)
+        $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => $guardName]);
+        $adminRole->syncPermissions(Permission::where('guard_name', $guardName)->get());
+
+        // 6. إنشاء دور "محاسب"
         $accountantRole = Role::firstOrCreate(['name' => 'Accountant', 'guard_name' => $guardName]);
-        $accountantRole->givePermissionTo([
-            'accounting.view',
-            'dashboard.view',
-            'payment.view', 'payment.create', 'payment.update', // لا يملك صلاحية Post أو Approve
-            'receipt.view', 'receipt.create', 'receipt.update',
-            'journal_entry.view', 'journal_entry.create',
-            'account.view',
-            'report.ledger',
+        $accountantRole->syncPermissions([
+            'accounting.view', 'dashboard.view', 'payment.view', 'payment.create', 'payment.update',
+            'receipt.view', 'receipt.create', 'receipt.update', 'journal_entry.view', 'journal_entry.create',
+            'account.view', 'report.statement.view', 'report.trial_balance.view'
         ]);
     }
 }

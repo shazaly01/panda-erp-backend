@@ -16,8 +16,8 @@ class AttendanceLog extends Model
 
     protected $fillable = [
         'employee_id',
-        'shift_id', // 👈 سيبقى موجوداً لتوثيق الوردية التي تم العمل بها فعلياً في ذلك اليوم
-        'calendar_exception_id', // 👈 تمت الإضافة لتوثيق الطوارئ أو الأعياد
+        'shift_id',
+        'calendar_exception_id',
         'date',
         'check_in',
         'check_out',
@@ -25,10 +25,15 @@ class AttendanceLog extends Model
         'early_leave_minutes',
         'overtime_minutes',
         'status',
+        // الحقول الجنائية والتدقيق (Audit Fields)
+        'is_manual_override',
+        'approved_by',
+        'override_reason',
     ];
 
     protected $casts = [
         'date' => 'date',
+        'is_manual_override' => 'boolean',
     ];
 
     public function employee(): BelongsTo
@@ -41,9 +46,16 @@ class AttendanceLog extends Model
         return $this->belongsTo(Shift::class);
     }
 
-    // 🔥 العلاقة الجديدة
     public function calendarException(): BelongsTo
     {
         return $this->belongsTo(CalendarException::class, 'calendar_exception_id');
+    }
+
+    /**
+     * الموظف/المشرف الذي قام بتعديل السجل يدوياً
+     */
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'approved_by');
     }
 }

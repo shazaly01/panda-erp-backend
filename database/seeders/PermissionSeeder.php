@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
+use App\Models\Permission; // تم التعديل لاستخدام المودل المخصص
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -20,70 +20,76 @@ class PermissionSeeder extends Seeder
         // --- تعريف الحارس ---
         $guardName = 'api';
 
-        // --- قائمة الصلاحيات الجديدة للمشروع ---
-        $permissions = [
-            'dashboard.view',
-
-            'user.view', 'user.create', 'user.update', 'user.delete',
-            'role.view', 'role.create', 'role.update', 'role.delete',
-
-            'setting.view', 'setting.update',
-            'backup.view', 'backup.create', 'backup.delete', 'backup.download',
-
+        // --- هيكلة الصلاحيات الأساسية للمشروع بالتقسيم الجديد ---
+        $permissionsData = [
+            'dashboard' => [
+                'view' => 'رؤية الإحصائيات'
+            ],
+            'user' => [
+                'view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'
+            ],
+            'role' => [
+                'view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'
+            ],
+            'setting' => [
+                'view' => 'عرض', 'update' => 'تعديل'
+            ],
+            'backup' => [
+                'view' => 'عرض', 'create' => 'إضافة', 'delete' => 'حذف', 'download' => 'تحميل'
+            ],
         ];
 
-        // إنشاء الصلاحيات مع تحديد الحارس
-        foreach ($permissions as $permission) {
-            Permission::create([
-                'name' => $permission,
-                'guard_name' => $guardName,
-            ]);
+        // إنشاء أو تحديث الصلاحيات
+        foreach ($permissionsData as $groupKey => $actions) {
+            foreach ($actions as $actionKey => $displayName) {
+                $permissionName = "{$groupKey}.{$actionKey}";
+
+                Permission::updateOrCreate(
+                    ['name' => $permissionName, 'guard_name' => $guardName],
+                    [
+                        'module' => 'system',
+                        'group_name' => $groupKey,
+                        'action_name' => $actionKey,
+                        'display_name' => $displayName
+                    ]
+                );
+            }
         }
 
-        // --- إنشاء الأدوار الجديدة ---
+        // --- إنشاء الأدوار الجديدة (استخدام updateOrCreate لمنع التكرار) ---
 
         // 1. إنشاء دور "Super Admin"
-        // هذا الدور يحصل على كل الصلاحيات تلقائيًا عبر AuthServiceProvider (Gate::before)
-        // لذلك لا نعطيه صلاحيات هنا.
-        Role::create([
-            'name' => 'Super Admin',
-            'guard_name' => $guardName,
-        ]);
+        // هذا الدور يحصل على كل الصلاحيات تلقائيًا عبر ModuleServiceProvider (Gate::before)
+        Role::updateOrCreate(
+            ['name' => 'Super Admin', 'guard_name' => $guardName]
+        );
 
         // 2. إنشاء دور "Admin" (مدير النظام)
-        $adminRole = Role::create([
-            'name' => 'Admin',
-            'guard_name' => $guardName,
-        ]);
-        // إعطاء دور "Admin" كل الصلاحيات
-        $adminRole->givePermissionTo(Permission::where('guard_name', $guardName)->get());
-
+        $adminRole = Role::updateOrCreate(
+            ['name' => 'Admin', 'guard_name' => $guardName]
+        );
+        // إعطاء دور "Admin" كل الصلاحيات المسجلة حتى هذه اللحظة
+        $adminRole->syncPermissions(Permission::where('guard_name', $guardName)->get());
 
         // 3. إنشاء دور "Data Entry" (مدخل بيانات)
-        $dataEntryRole = Role::create([
-            'name' => 'Data Entry',
-            'guard_name' => $guardName,
-        ]);
-        // إعطاء دور "مدخل بيانات" صلاحيات العرض والإنشاء والتحديث فقط
+        $dataEntryRole = Role::updateOrCreate(
+            ['name' => 'Data Entry', 'guard_name' => $guardName]
+        );
+        // إعطاء دور "مدخل بيانات" صلاحيات العرض والإنشاء والتحديث فقط (باستخدام الحقل الجديد action_name)
         $dataEntryPermissions = Permission::where('guard_name', $guardName)
-                                      ->where(function ($query) {
-                                          $query->where('name', 'like', '%.view')
-                                                ->orWhere('name', 'like', '%.create')
-                                                ->orWhere('name', 'like', '%.update');
-                                      })->pluck('name');
-        $dataEntryRole->givePermissionTo($dataEntryPermissions);
-
+            ->whereIn('action_name', ['view', 'create', 'update'])
+            ->get();
+        $dataEntryRole->syncPermissions($dataEntryPermissions);
 
         // 4. إنشاء دور "Auditor" (مراجع / مشاهد فقط)
-        $auditorRole = Role::create([
-            'name' => 'Auditor',
-            'guard_name' => $guardName,
-        ]);
-        // إعطاء دور "مراجع" صلاحيات العرض فقط
-        $auditorPermissions = Permission::where('guard_name', 'api')
-                                      ->where('name', 'like', '%.view')
-                                       ->where('name', '!=', 'dashboard.view')
-                                      ->pluck('name');
-        $auditorRole->givePermissionTo($auditorPermissions);
+        $auditorRole = Role::updateOrCreate(
+            ['name' => 'Auditor', 'guard_name' => $guardName]
+        );
+        // إعطاء دور "مراجع" صلاحيات العرض فقط، باستثناء لوحة التحكم
+        $auditorPermissions = Permission::where('guard_name', $guardName)
+            ->where('action_name', 'view')
+            ->where('name', '!=', 'dashboard.view')
+            ->get();
+        $auditorRole->syncPermissions($auditorPermissions);
     }
 }

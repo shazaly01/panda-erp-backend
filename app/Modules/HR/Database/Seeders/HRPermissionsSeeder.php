@@ -3,123 +3,80 @@
 namespace App\Modules\HR\Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission;
+use App\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class HRPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
-        // قائمة الصلاحيات المطلوبة (شاملة التجاوزات الفردية للورديات)
-        $permissions = [
-            // 1. الهيكل التنظيمي
-            'hr.departments.view', 'hr.departments.create', 'hr.departments.update', 'hr.departments.delete',
-            'hr.positions.view', 'hr.positions.create', 'hr.positions.update', 'hr.positions.delete',
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-            // 2. الموظفين
-            'hr.employees.view',
-            'hr.employees.create',
-            'hr.employees.update',
-            'hr.employees.delete',
+        $guardName = 'api';
 
-            // 3. البيانات المالية والحساسة
-            'hr.contracts.view',
-            'hr.contracts.manage',
-            'hr.payroll.view',
-            'hr.payroll.post',
+        // 2. هيكلة الصلاحيات بالتقسيم الجديد مع إضافة المسارات المفقودة
+        $permissionsData = [
+            'departments' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'positions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'employees' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'contracts' => ['view' => 'عرض', 'manage' => 'إدارة كاملة'],
+            'payroll' => ['view' => 'عرض', 'post' => 'ترحيل مالي'],
+            'settings' => ['manage' => 'إدارة كاملة'],
+            'shifts' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'working_schedules' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'calendar_exceptions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'shift_overrides' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
+            'attendance' => ['view' => 'عرض', 'manage' => 'إدارة كاملة'],
+            'team_attendance' => ['manage' => 'إدارة الفريق'],
+            'leaves' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد', 'request' => 'تقديم طلب'],
+            'loans' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد', 'request' => 'تقديم طلب'],
+            'payroll_inputs' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد'],
 
-            // 4. إعدادات الرواتب
-            'hr.settings.manage',
-
-            // ---------------------------------------------------------
-            // 5. الجدولة والحضور (الورديات والقوالب والطوارئ والتجاوزات)
-            // ---------------------------------------------------------
-
-            // الورديات الأساسية
-            'hr.shifts.view',
-            'hr.shifts.create',
-            'hr.shifts.update',
-            'hr.shifts.delete',
-
-            // قوالب الجدولة (Working Schedules)
-            'hr.working_schedules.view',
-            'hr.working_schedules.create',
-            'hr.working_schedules.update',
-            'hr.working_schedules.delete',
-
-            // الاستثناءات التقويمية والطوارئ (Calendar Exceptions)
-            'hr.calendar_exceptions.view',
-            'hr.calendar_exceptions.create',
-            'hr.calendar_exceptions.update',
-            'hr.calendar_exceptions.delete',
-
-            // 🌟 التجاوزات الفردية وتبديل الورديات (Shift Overrides) 🌟
-            'hr.shift_overrides.view',
-            'hr.shift_overrides.create',
-            'hr.shift_overrides.update',
-            'hr.shift_overrides.delete',
-
-            // الحضور والانصراف
-            'hr.attendance.view',
-            'hr.attendance.manage',
-
-            // الإجازات
-            'hr.leaves.view',
-            'hr.leaves.manage',
-            'hr.leaves.approve',
-            'hr.leaves.request',
-
-            // السلف
-            'hr.loans.view',
-            'hr.loans.manage',
-            'hr.loans.approve',
-            'hr.loans.request',
-
-            // المكافآت والجزاءات
-            'hr.payroll_inputs.view',
-            'hr.payroll_inputs.manage',
-            'hr.payroll_inputs.approve',
+            // --- الإضافات المفقودة المكتشفة من ملف Router ---
+            'pay_groups' => ['view' => 'عرض'],
+            'pay_periods' => ['view' => 'عرض'],
+            'overtime_policies' => ['view' => 'عرض', 'manage' => 'إدارة كاملة'],
+            'internet_vouchers' => ['view' => 'عرض'],
         ];
 
-        // إنشاء الصلاحيات في قاعدة البيانات
-        foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'api']);
+        $permissionsObjects = [];
+
+        // 3. إنشاء أو تحديث الصلاحيات
+        foreach ($permissionsData as $groupKey => $actions) {
+            foreach ($actions as $actionKey => $displayName) {
+                // استثناء لكوبونات الإنترنت لأنها مسجلة بدون بادئة hr. في الواجهة الأمامية
+                if ($groupKey === 'internet_vouchers') {
+                    $permissionName = "{$groupKey}.{$actionKey}";
+                } else {
+                    $permissionName = "hr.{$groupKey}.{$actionKey}";
+                }
+
+                $permissionsObjects[] = Permission::updateOrCreate(
+                    ['name' => $permissionName, 'guard_name' => $guardName],
+                    [
+                        'module' => 'hr',
+                        'group_name' => $groupKey,
+                        'action_name' => $actionKey,
+                        'display_name' => $displayName
+                    ]
+                );
+            }
         }
 
-        // ---------------------------------------------------------
-        // توزيع الأدوار (Roles) الافتراضية
-        // ---------------------------------------------------------
+        // 4. توزيع الأدوار
+        $hrManagerRole = Role::firstOrCreate(['name' => 'HR Manager', 'guard_name' => $guardName]);
+        $hrManagerRole->syncPermissions($permissionsObjects); // المدير يأخذ جميع الصلاحيات الجديدة تلقائياً
 
-        // 1. مدير الموارد البشرية
-        $hrManagerRole = Role::firstOrCreate(['name' => 'HR Manager', 'guard_name' => 'api']);
-        $hrManagerRole->givePermissionTo($permissions);
-
-        // 2. موظف الموارد البشرية (صلاحيات تشغيلية)
-        $hrOfficerRole = Role::firstOrCreate(['name' => 'HR Officer', 'guard_name' => 'api']);
-        $hrOfficerRole->givePermissionTo([
-            'hr.departments.view', 'hr.positions.view',
-            'hr.employees.view', 'hr.employees.create', 'hr.employees.update',
-            'hr.contracts.view',
-            'hr.payroll.view',
-
-            // صلاحيات الجدولة والطوارئ
-            'hr.shifts.view',
-            'hr.working_schedules.view',
-            'hr.calendar_exceptions.view',
-
-            // 🌟 منح موظف الـ HR صلاحية إدارة التجاوزات الفردية 🌟
+        $hrOfficerRole = Role::firstOrCreate(['name' => 'HR Officer', 'guard_name' => $guardName]);
+        $hrOfficerRole->syncPermissions([
+            'hr.departments.view', 'hr.positions.view', 'hr.employees.view', 'hr.employees.create', 'hr.employees.update',
+            'hr.contracts.view', 'hr.payroll.view', 'hr.shifts.view', 'hr.working_schedules.view', 'hr.calendar_exceptions.view',
             'hr.shift_overrides.view', 'hr.shift_overrides.create', 'hr.shift_overrides.update', 'hr.shift_overrides.delete',
-
-            'hr.attendance.view', 'hr.attendance.manage',
-            'hr.leaves.view', 'hr.leaves.manage',
-            'hr.loans.view'
+            'hr.attendance.view', 'hr.attendance.manage', 'hr.leaves.view', 'hr.leaves.manage', 'hr.loans.view'
         ]);
 
-        // 3. الموظف العادي
-        $employeeRole = Role::firstOrCreate(['name' => 'Employee', 'guard_name' => 'api']);
-        $employeeRole->givePermissionTo([
-            'hr.leaves.request',
-            'hr.loans.request',
-        ]);
+        $employeeRole = Role::firstOrCreate(['name' => 'Employee', 'guard_name' => $guardName]);
+        $employeeRole->syncPermissions(['hr.leaves.request', 'hr.loans.request']);
     }
 }

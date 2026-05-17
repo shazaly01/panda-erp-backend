@@ -5,19 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Role\StoreRoleRequest;
 use App\Http\Requests\Role\UpdateRoleRequest;
-use App\Http\Resources\Api\PermissionResource;
 use App\Http\Resources\Api\RoleResource;
+use App\Services\RoleService;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\DB;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
-    public function __construct()
-    {
-        // استخدام authorizeResource لتطبيق الـ Policy تلقائيًا
-        // نحتاج إلى تحديد 'parameter' لأن Laravel تتوقع 'role' ونحن نستخدم 'role'
+    public function __construct(
+        private RoleService $roleService
+    ) {
+        // تطبيق الـ Policies تلقائياً
         $this->authorizeResource(Role::class, 'role');
     }
 
@@ -29,19 +27,8 @@ class RoleController extends Controller
 
     public function store(StoreRoleRequest $request)
     {
-        $validated = $request->validated();
-
-        DB::beginTransaction();
-        try {
-            $role = Role::create(['name' => $validated['name'], 'guard_name' => 'api']);
-            $role->syncPermissions($validated['permissions']);
-            DB::commit();
-
-            return new RoleResource($role->load('permissions'));
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Failed to create role.', 'error' => $e->getMessage()], 500);
-        }
+        $role = $this->roleService->createRole($request->validated());
+        return new RoleResource($role);
     }
 
     public function show(Role $role)
@@ -51,108 +38,31 @@ class RoleController extends Controller
 
     public function update(UpdateRoleRequest $request, Role $role)
     {
-        $validated = $request->validated();
-
-        DB::beginTransaction();
-        try {
-            $role->update(['name' => $validated['name']]);
-            $role->syncPermissions($validated['permissions']);
-            DB::commit();
-
-            return new RoleResource($role->load('permissions'));
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Failed to update role.', 'error' => $e->getMessage()], 500);
-        }
+        $role = $this->roleService->updateRole($role, $request->validated());
+        return new RoleResource($role);
     }
 
     public function destroy(Role $role)
     {
-        // 1. استدعاء الـ Policy للتحقق من الصلاحية
-        $this->authorize('delete', $role);
-
-        // --- بداية التعديل: إعادة قاعدة العمل ---
-        // 2. التحقق من قاعدة العمل (يتم تنفيذها دائمًا بعد التحقق من الصلاحية)
-        if (in_array($role->name, ['Super Admin', 'Admin', 'User'])) {
-            // استخدام abort helper function هو الأنسب هنا
-            abort(Response::HTTP_FORBIDDEN, 'Cannot delete default roles.');
+        // حماية الأدوار النظامية الأساسية
+        if (in_array($role->name, ['Super Admin', 'Admin', 'User', 'Employee', 'HR Manager'])) {
+            abort(Response::HTTP_FORBIDDEN, 'لا يمكن حذف الأدوار الافتراضية للنظام.');
         }
-        // --- نهاية التعديل ---
 
-        // 3. تنفيذ الحذف إذا تم تجاوز كل عمليات التحقق
         $role->delete();
-
         return response()->noContent();
     }
+
     /**
-     * Get all available permissions.
-     * هذه الدالة لا يتم حمايتها بـ authorizeResource، لذا نضيف الصلاحية يدويًا
+     * جلب كافة الصلاحيات مهيكلة للواجهة الأمامية
      */
-   public function getAllPermissions()
+    public function getAllPermissions()
     {
         $this->authorize('viewAny', Role::class);
 
-        // 1. قاموس الترجمة
-       $groupTranslations = [
-    'backup'       => 'النسخ الاحتياطي',
-    'accounting'   => 'المحاسبة',
-    'account'      => 'دليل الحسابات',
-    'cost_center'  => 'مراكز التكلفة',
-    'fiscal_year'  => 'السنوات المالية',
-    'currency'     => 'العملات',
-    'box'          => 'الخزائن',
-    'bank_account' => 'الحسابات البنكية',
-    'payment'      => 'سندات الصرف',
-    'receipt'      => 'سندات القبض',
-    'user'         => 'المستخدمون',
-    'role'         => 'الأدوار',
-    'dashboard'    => 'لوحة التحكم',
-    'setting'      => 'الإعدادات',
-];
+        // تفويض العمل المعقد بالكامل للـ Service
+        $data = $this->roleService->getStructuredPermissions();
 
-        $actionTranslations = [
-            'view' => 'عرض', 'create' => 'إنشاء', 'update' => 'تعديل', 'delete' => 'حذف',
-        ];
-
-        // 2. جلب كل الصلاحيات وتجميعها حسب المجموعة
-        $permissions = Permission::where('guard_name', 'api')->get()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
-        });
-
-        // 3. بناء هيكل المجموعات (groups)
-        $structuredGroups = [];
-        foreach ($permissions as $groupKey => $permissionGroup) {
-            $groupPermissions = [];
-            foreach ($permissionGroup as $p) {
-                $actionKey = explode('.', $p->name)[1];
-                // تأكد من أن الإجراء موجود في قاموس الترجمة قبل إضافته
-                if (array_key_exists($actionKey, $actionTranslations)) {
-                    $groupPermissions[] = [
-                        'id' => $p->id,
-                        'action' => $actionKey,
-                    ];
-                }
-            }
-
-            // أضف المجموعة فقط إذا كانت تحتوي على صلاحيات
-            if (!empty($groupPermissions)) {
-                $structuredGroups[] = [
-                    'key' => $groupKey,
-                    'display_name' => $groupTranslations[$groupKey] ?? $groupKey,
-                    'permissions' => $groupPermissions,
-                ];
-            }
-        }
-
-        // 4. بناء هيكل الإجراءات (actions)
-        $allActions = collect($actionTranslations)->map(function ($displayName, $key) {
-            return ['key' => $key, 'display_name' => $displayName];
-        })->values();
-
-        // 5. إرجاع الاستجابة النهائية
-        return response()->json([
-            'groups' => $structuredGroups,
-            'actions' => $allActions,
-        ]);
+        return response()->json($data);
     }
 }

@@ -13,6 +13,7 @@ use App\Modules\HR\Http\Controllers\PayrollController;
 use App\Modules\HR\Http\Controllers\LeaveRequestController;
 use App\Modules\HR\Http\Controllers\LoanController;
 use App\Modules\HR\Http\Controllers\AttendanceLogController;
+use App\Modules\HR\Http\Controllers\ManagerAttendanceController;
 use App\Modules\HR\Http\Controllers\PayrollInputController;
 use App\Modules\HR\Http\Controllers\ShiftController;
 use App\Modules\HR\Http\Controllers\OvertimePolicyController;
@@ -100,6 +101,11 @@ Route::middleware('auth:sanctum')
     // الحضور والانصراف
     Route::apiResource('attendance-logs', AttendanceLogController::class);
     Route::post('attendance-logs/scan', [AttendanceLogController::class, 'scanBarcode']);
+
+    Route::prefix('team-attendance')->name('team_attendance.')->group(function () {
+        Route::get('/', [ManagerAttendanceController::class, 'index'])->name('index');
+        Route::post('/override', [ManagerAttendanceController::class, 'override'])->name('override');
+    });
 
     // المدخلات المالية المتغيرة (حوافز/خصومات)
     Route::apiResource('payroll-inputs', PayrollInputController::class);

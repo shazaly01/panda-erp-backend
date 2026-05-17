@@ -10,7 +10,6 @@ class UpdateDepartmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // نمرر الإدارة الحالية للسياسة
         return $this->user()->can('update', $this->route('department'));
     }
 
@@ -18,13 +17,15 @@ class UpdateDepartmentRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'string', 'max:150'],
-            // نستثني الإدارة الحالية من فحص تكرار الكود
             'code' => ['nullable', 'string', 'max:50', Rule::unique('departments')->ignore($this->department)],
             'type' => ['sometimes', Rule::enum(DepartmentType::class)],
             'parent_id' => ['nullable', 'exists:departments,id'],
             'cost_center_id' => ['nullable', 'exists:cost_centers,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
+            // التحقق من مصفوفة المشرفين في التحديث
+            'supervisor_ids' => ['nullable', 'array'],
+            'supervisor_ids.*' => ['required', 'exists:employees,id'],
         ];
     }
 }

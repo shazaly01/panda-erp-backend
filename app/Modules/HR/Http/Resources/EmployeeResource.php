@@ -27,6 +27,12 @@ class EmployeeResource extends JsonResource
             'employment_type' => $this->employment_type,
             'employment_type_label' => $this->employment_type?->label(),
 
+            // 🌟 [الـ Fix]: إضافة مفاتيح الـ IDs المباشرة لتعمل القوائم المنسدلة (Dropdowns) في وضع التعديل
+            'department_id' => $this->department_id,
+            'position_id' => $this->position_id,
+            'manager_id' => $this->manager_id,
+            'user_id' => $this->user_id,
+
             'department' => new DepartmentResource($this->whenLoaded('department')),
             'position' => new PositionResource($this->whenLoaded('position')),
             'latest_shift' => $this->whenLoaded('latestShift'),
