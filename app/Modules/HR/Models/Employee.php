@@ -128,4 +128,13 @@ class Employee extends Model
             'department_id'
         )->withTimestamps();
     }
+
+
+    /**
+     * سجلات الحضور والانصراف الخاصة بالموظف
+     */
+    public function attendanceLogs(): HasMany
+    {
+        return $this->hasMany(AttendanceLog::class, 'employee_id');
+    }
 }
