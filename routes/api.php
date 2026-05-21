@@ -1,19 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-// --- استيراد الـ Controllers الجديدة ---
+// --- استيراد الـ Controllers القديمة والجديدة ---
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\CompanyController;
-use App\Http\Controllers\Api\ProjectController;
-use App\Http\Controllers\Api\PaymentController;
-use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RoleController;
-use App\Http\Controllers\Api\DashboardController;
-use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\BackupController;
+use App\Http\Controllers\Api\DocumentController; // 🔥 تم استيراد موديول الأرشفة العالمي
 
 /*
 |--------------------------------------------------------------------------
@@ -35,9 +32,10 @@ Route::post('/login', [AuthController::class, 'login']);
 // تتطلب مصادقة باستخدام Sanctum
 Route::middleware('auth:sanctum')->group(function () {
 
-require base_path('app/Modules/Accounting/Routes/api.php');
+    // مسارات الحسابات من الموديول المنفصل
+    require base_path('app/Modules/Accounting/Routes/api.php');
 
-// --- مسارات إدارة النسخ الاحتياطي ---
+    // --- مسارات إدارة النسخ الاحتياطي ---
     Route::prefix('backups')->name('backups.')->group(function () {
         // عرض القائمة (يتطلب صلاحية backup.view)
         Route::get('/', [BackupController::class, 'index'])
@@ -56,6 +54,11 @@ require base_path('app/Modules/Accounting/Routes/api.php');
             ->middleware('can:backup.delete');
     });
 
+    // --- مسارات نظام إدارة المستندات والأرشفة (DMS Routes) ---
+    // تم ربطه بـ apiResource لحقن (index, store, show, destroy) تلقائياً
+    // الصلاحيات يتم فحصها مركزياً داخل الـ Controller بواسطة authorizeResource
+    Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
+    Route::apiResource('documents', DocumentController::class);
 
     // تسجيل الخروج
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -73,7 +76,5 @@ require base_path('app/Modules/Accounting/Routes/api.php');
 
     // --- مسارات إدارة المستخدمين ---
     Route::apiResource('users', UserController::class);
-
-
 
 });

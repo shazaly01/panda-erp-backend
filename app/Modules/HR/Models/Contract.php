@@ -83,4 +83,26 @@ class Contract extends Model
     {
         return $this->belongsTo(WorkingSchedule::class, 'working_schedule_id');
     }
+
+
+
+    /**
+     * الملفات والمرفقات الرسمية المؤرشفة التابعة لعقد العمل (DMS Integration)
+     * العقد يمكن أن يحتوي على وثيقة العقد الموقعة، الملاحق، الشروط الإضافية
+     */
+    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(\App\Models\Document::class, 'documentable');
+    }
+
+    /**
+     * جلب ملف العقد الأساسي المعتمد
+     */
+    public function mainAttachment()
+    {
+        return $this->hasOne(\App\Models\Document::class, 'documentable_id')
+            ->where('documentable_type', self::class)
+            ->where('document_type', \App\Enums\DocumentType::EMPLOYEE_CONTRACT)
+            ->latestOfMany();
+    }
 }

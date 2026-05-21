@@ -137,4 +137,25 @@ class Employee extends Model
     {
         return $this->hasMany(AttendanceLog::class, 'employee_id');
     }
+
+
+
+    /**
+     * أرشيف المستندات والوثائق الخاصة بالموظف (DMS Integration)
+     */
+    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    {
+        return $this->morphMany(\App\Models\Document::class, 'documentable');
+    }
+
+    /**
+     * ميزّة إضافية عالمية: جلب الصورة الشخصية الحالية للموظف مباشرة
+     */
+    public function profilePhoto()
+    {
+        return $this->hasOne(\App\Models\Document::class, 'documentable_id')
+            ->where('documentable_type', self::class)
+            ->where('document_type', \App\Enums\DocumentType::EMPLOYEE_PHOTO)
+            ->latestOfMany();
+    }
 }

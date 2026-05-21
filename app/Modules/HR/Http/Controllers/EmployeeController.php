@@ -21,7 +21,7 @@ class EmployeeController extends Controller
 public function index(Request $request): JsonResponse
     {
         // تم تنظيف العلاقة المفقودة (latestShift) لتجنب خطأ 500
-        $query = Employee::with(['department', 'position']);
+       $query = Employee::with(['department', 'position', 'profilePhoto']);
 
         // 1. فلتر الإدارة
         if ($request->filled('department_id') && is_numeric($request->department_id)) {
@@ -81,13 +81,13 @@ public function index(Request $request): JsonResponse
     public function show(Employee $employee): JsonResponse
     {
         // تحميل العلاقات المهمة
-        $employee->load([
-            'department',
-            'position',
-            'manager',
-            'currentContract.salaryStructure',
-            // 'employeeShifts.shift' // تأكد من وجود هذه العلاقة في الموديل
-        ]);
+       $employee->load([
+    'department',
+    'position',
+    'manager',
+    'currentContract.salaryStructure',
+    'profilePhoto', // 🌟 تمت الإضافة هنا أيضاً ليظهر في شاشة تفاصيل الموظف
+]);
 
         return response()->json([
             'data' => new EmployeeResource($employee)

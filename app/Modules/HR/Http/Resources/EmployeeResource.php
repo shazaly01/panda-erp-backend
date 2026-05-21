@@ -54,6 +54,10 @@ class EmployeeResource extends JsonResource
             'phone' => $this->phone,
             'avatar' => $this->user ? $this->user->avatar_url : null,
 
+            'profile_photo' => $this->whenLoaded('profilePhoto', function () {
+                return $this->profilePhoto ? ['url' => $this->profilePhoto->url] : null;
+            }),
+
             // الوردية الحالية النشطة
             'current_shift' => $this->whenLoaded('employeeShifts', function () {
                 $activeShift = $this->employeeShifts->first(function ($shift) {
