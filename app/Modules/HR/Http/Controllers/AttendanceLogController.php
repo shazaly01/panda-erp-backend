@@ -190,12 +190,19 @@ class AttendanceLogController extends Controller
             // سنقوم بإنشاء هذه الدالة في الخطوة القادمة
             $result = $this->attendanceService->processAutoPunch($employee, $now);
 
+           // شحن علاقات الصور والمستخدم لتجنب الـ Lazy Loading
+            $employee->load(['profilePhoto', 'user']);
+
             return response()->json([
                 'status' => $result['status'],
                 'action' => $result['action'],
                 'employee_name' => $employee->full_name,
                 'time' => $now->format('h:i A'),
-                'message' => $result['message']
+                'message' => $result['message'],
+                // جلب رابط الصورة الشخصية المرفوعة، وإذا لم توجد يجلب الـ Avatar الخاص بحسابه
+                'profile_photo' => $employee->profilePhoto
+                    ? $employee->profilePhoto->url
+                    : ($employee->user ? $employee->user->avatar_url : null),
             ]);
 
         } catch (\Exception $e) {
