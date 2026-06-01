@@ -26,6 +26,8 @@ use App\Modules\HR\Http\Controllers\CalendarExceptionController;
 use App\Modules\HR\Http\Controllers\ShiftOverrideController;
 use App\Modules\HR\Http\Controllers\InternetVoucherController;
 
+use App\Modules\HR\Http\Controllers\Reports\AttendanceReportController;
+
 /*
 |--------------------------------------------------------------------------
 | HR Module API Routes
@@ -101,6 +103,7 @@ Route::middleware('auth:sanctum')
     // الحضور والانصراف
     Route::apiResource('attendance-logs', AttendanceLogController::class);
     Route::post('attendance-logs/scan', [AttendanceLogController::class, 'scanBarcode']);
+    Route::get('reports/attendance-summary', AttendanceReportController::class);
 
     Route::prefix('team-attendance')->name('team_attendance.')->group(function () {
         Route::get('/', [ManagerAttendanceController::class, 'index'])->name('index');
