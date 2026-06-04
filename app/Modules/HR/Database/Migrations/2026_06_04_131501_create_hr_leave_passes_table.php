@@ -18,7 +18,7 @@ return new class extends Migration
 
             // ربط الإذن بالموظف طالب الخروج المؤقت
             $table->foreignId('employee_id')
-                ->constrained('hr_employees')
+                ->constrained('employees')
                 ->onDelete('cascade');
 
             $table->date('date');
@@ -43,7 +43,7 @@ return new class extends Migration
             // المشرف المحاسب/الإداري المعتمد للطلب برمجياً
             $table->foreignId('approved_by')
                 ->nullable()
-                ->constrained('hr_employees')
+                ->constrained('employees')
                 ->onDelete('set null');
 
             // مستخدم الأمن (الحارس) الذي أثبت وبصم خروج الموظف فعلياً
