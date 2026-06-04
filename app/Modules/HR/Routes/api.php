@@ -27,7 +27,7 @@ use App\Modules\HR\Http\Controllers\ShiftOverrideController;
 use App\Modules\HR\Http\Controllers\InternetVoucherController;
 
 use App\Modules\HR\Http\Controllers\Reports\AttendanceReportController;
-
+use App\Modules\HR\Http\Controllers\Api\LeavePassController;
 /*
 |--------------------------------------------------------------------------
 | HR Module API Routes
@@ -109,6 +109,19 @@ Route::middleware('auth:sanctum')
         Route::get('/', [ManagerAttendanceController::class, 'index'])->name('index');
         Route::post('/override', [ManagerAttendanceController::class, 'override'])->name('override');
     });
+
+
+    Route::get('leave-passes/emergency-muster', [LeavePassController::class, 'emergencyMusterList']);
+
+    // 🛡️ [المسار المستحدث والمنسي] المسح المؤتمت والذكي لقارئ الـ QR والـ Barcode عند البوابة الخارجية للأمن
+    Route::post('leave-passes/scan-gate-code', [LeavePassController::class, 'scanGateCode']);
+
+    // حركات الاعتماد اليدوي للمشرفين والضغط البصري للحرس
+    Route::post('leave-passes/{leave_pass}/approve', [LeavePassController::class, 'approve']);
+    Route::post('leave-passes/{leave_pass}/gate-check', [LeavePassController::class, 'gateCheck']);
+
+    // العمليات القياسية (CRUD) للأذونات
+    Route::apiResource('leave-passes', LeavePassController::class);
 
     // المدخلات المالية المتغيرة (حوافز/خصومات)
     Route::apiResource('payroll-inputs', PayrollInputController::class);

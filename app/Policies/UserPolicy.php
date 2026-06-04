@@ -41,20 +41,13 @@ class UserPolicy
             return false;
         }
 
-        // لا يمكن للمستخدم تعديل مستخدم آخر يمتلك دورًا أعلى منه أو نفس دوره
-        // (هذه قاعدة عمل اختيارية لكنها جيدة للأمان)
-        // سنتركها معلقة حاليًا لتبسيط الأمور، ولكن يمكن تفعيلها
-        // if ($user->id !== $model->id && $model->hasRole('Admin') && !$user->hasRole('Super Admin')) {
-        //     return false;
-        // }
-
         return $user->can('user.update');
     }
 
     /**
      * Determine whether the user can delete the model.
      */
-  public function delete(User $user, User $model): bool
+    public function delete(User $user, User $model): bool
     {
         // القاعدة رقم 1: لا يمكن لأي شخص حذف مستخدم "Super Admin"
         if ($model->hasRole('Super Admin')) {
@@ -69,7 +62,6 @@ class UserPolicy
      */
     public function restore(User $user, User $model): bool
     {
-        // يمكننا ربطها بنفس صلاحية الحذف
         return $user->can('user.delete');
     }
 
@@ -78,7 +70,14 @@ class UserPolicy
      */
     public function forceDelete(User $user, User $model): bool
     {
-        // يمكننا ربطها بنفس صلاحية الحذف
         return $user->can('user.delete');
+    }
+
+    /**
+     * صلاحية الموافقة على الحسابات الذاتية الجديدة وتفعيلها من قبل المشرف
+     */
+    public function approve(User $user): bool
+    {
+        return $user->can('user.approve');
     }
 }

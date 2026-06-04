@@ -73,7 +73,12 @@ class HRPermissionsSeeder extends Seeder
             'hr.departments.view', 'hr.positions.view', 'hr.employees.view', 'hr.employees.create', 'hr.employees.update',
             'hr.contracts.view', 'hr.payroll.view', 'hr.shifts.view', 'hr.working_schedules.view', 'hr.calendar_exceptions.view',
             'hr.shift_overrides.view', 'hr.shift_overrides.create', 'hr.shift_overrides.update', 'hr.shift_overrides.delete',
-            'hr.attendance.view', 'hr.attendance.manage', 'hr.leaves.view', 'hr.leaves.manage', 'hr.loans.view'
+            'hr.attendance.view', 'hr.attendance.manage', 'hr.leaves.view', 'hr.leaves.manage', 'hr.loans.view',
+
+            'leave_passes.view',      // استعراض الأذونات ولوحة الطوارئ
+            'leave_passes.create',    // طلب إذن خروج مؤقت للموظف
+            'leave_passes.approve',   // اعتماد أو رفض الإذن من طرف المشرف
+            'leave_passes.gate_check' // صلاحية حارس البوابة لإثبات الخروج والعودة الفعليين
         ]);
 
         $employeeRole = Role::firstOrCreate(['name' => 'Employee', 'guard_name' => $guardName]);

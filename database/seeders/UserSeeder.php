@@ -14,52 +14,56 @@ class UserSeeder extends Seeder
     {
         // 1. إنشاء أو تحديث مستخدم Super Admin
         $superAdmin = User::updateOrCreate(
-            ['username' => 'superadmin'], // مفتاح التحقق لمنع التكرار
+            ['username' => 'superadmin'], // الفحص باسم المستخدم لأن السجلات القديمة موجودة به فعلياً
             [
-                'full_name' => 'Super Admin',
-                'email' => 'superadmin@app.com',
-                'password' => bcrypt('12345678'), // كلمة مرور موحدة لسهولة التطوير
-                'email_verified_at' => now(),
+                'full_name'         => 'Super Admin',
+                'phone'             => '0500000001', // سيتم تحديث رقم الهاتف الجديد هنا بأمان
+                'email'             => 'superadmin@app.com',
+                'password'          => '12345678',   // يتم تشفيره تلقائياً عبر الكاست في الموديل
+                'status'            => 'active',     // تفعيل الحساب فوراً
+                'phone_verified_at' => now(),        // توثيق رقم الهاتف
             ]
         );
-        // تعيين دور "Super Admin" الصحيح (تتجاهله الحزمة تلقائياً إن كان ممتلكاً له مسبقاً)
         $superAdmin->assignRole('Super Admin');
-
 
         // 2. إنشاء أو تحديث مستخدم Admin (مدير النظام)
         $adminUser = User::updateOrCreate(
             ['username' => 'admin'],
             [
-                'full_name' => 'Admin User',
-                'email' => 'admin@app.com',
-                'password' => bcrypt('12345678'),
-                'email_verified_at' => now(),
+                'full_name'         => 'Admin User',
+                'phone'             => '0500000002',
+                'email'             => 'admin@app.com',
+                'password'          => '12345678',
+                'status'            => 'active',
+                'phone_verified_at' => now(),
             ]
         );
         $adminUser->assignRole('Admin');
-
 
         // 3. إنشاء أو تحديث مستخدم Data Entry (مدخل بيانات)
         $dataEntryUser = User::updateOrCreate(
             ['username' => 'dataentry'],
             [
-                'full_name' => 'Data Entry User',
-                'email' => 'dataentry@app.com',
-                'password' => bcrypt('12345678'),
-                'email_verified_at' => now(),
+                'full_name'         => 'Data Entry User',
+                'phone'             => '0500000003',
+                'email'             => 'dataentry@app.com',
+                'password'          => '12345678',
+                'status'            => 'active',
+                'phone_verified_at' => now(),
             ]
         );
         $dataEntryUser->assignRole('Data Entry');
-
 
         // 4. إنشاء أو تحديث مستخدم Auditor (مراجع)
         $auditorUser = User::updateOrCreate(
             ['username' => 'auditor'],
             [
-                'full_name' => 'Auditor User',
-                'email' => 'auditor@app.com',
-                'password' => bcrypt('12345678'),
-                'email_verified_at' => now(),
+                'full_name'         => 'Auditor User',
+                'phone'             => '0500000004',
+                'email'             => 'auditor@app.com',
+                'password'          => '12345678',
+                'status'            => 'active',
+                'phone_verified_at' => now(),
             ]
         );
         $auditorUser->assignRole('Auditor');

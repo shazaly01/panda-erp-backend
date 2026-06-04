@@ -10,7 +10,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\BackupController;
-use App\Http\Controllers\Api\DocumentController; // 🔥 تم استيراد موديول الأرشفة العالمي
+use App\Http\Controllers\Api\DocumentController; // موديول الأرشفة العالمي
 
 /*
 |--------------------------------------------------------------------------
@@ -24,8 +24,18 @@ use App\Http\Controllers\Api\DocumentController; // 🔥 تم استيراد م�
 */
 
 // --- المسارات العامة (Public Routes) ---
-// لا تحتاج إلى مصادقة
+// تم تطبيق الحماية الأمنية (Rate Limiting) هنا لمنع استهلاك رصيد SMS (بحد أقصى 3 طلبات في الدقيقة)
 Route::post('/login', [AuthController::class, 'login']);
+
+Route::post('/send-otp', [AuthController::class, 'sendOtp'])
+    ->middleware('throttle:3,1'); // 🛡️ حماية ضد استهلاك رسائل التفعيل عند التسجيل
+
+Route::post('/register', [AuthController::class, 'register']);
+
+Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])
+    ->middleware('throttle:3,1'); // 🛡️ حماية ضد استهلاك الرسائل عند طلب استعادة كلمة المرور
+
+Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 
 // --- المسارات المحمية (Protected Routes) ---
@@ -37,26 +47,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // --- مسارات إدارة النسخ الاحتياطي ---
     Route::prefix('backups')->name('backups.')->group(function () {
-        // عرض القائمة (يتطلب صلاحية backup.view)
         Route::get('/', [BackupController::class, 'index'])
             ->middleware('can:backup.view');
 
-        // إنشاء نسخة جديدة (يتطلب صلاحية backup.create)
         Route::post('/', [BackupController::class, 'store'])
             ->middleware('can:backup.create');
 
-        // تحميل النسخة (يتطلب صلاحية backup.download)
         Route::get('/download', [BackupController::class, 'download'])
             ->middleware('can:backup.download');
 
-        // حذف النسخة (يتطلب صلاحية backup.delete)
         Route::delete('/', [BackupController::class, 'destroy'])
             ->middleware('can:backup.delete');
     });
 
     // --- مسارات نظام إدارة المستندات والأرشفة (DMS Routes) ---
-    // تم ربطه بـ apiResource لحقن (index, store, show, destroy) تلقائياً
-    // الصلاحيات يتم فحصها مركزياً داخل الـ Controller بواسطة authorizeResource
     Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
     Route::apiResource('documents', DocumentController::class);
 
@@ -70,11 +74,15 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // --- مسارات إدارة الأدوار والصلاحيات ---
-    // جلب كل الصلاحيات المتاحة في النظام (مفيد عند تعديل دور)
     Route::get('roles/permissions', [RoleController::class, 'getAllPermissions'])->name('roles.permissions');
     Route::apiResource('roles', RoleController::class);
 
     // --- مسارات إدارة المستخدمين ---
+    Route::put('users/{user}/approve', [UserController::class, 'approve'])->name('users.approve');
+
+    // [إضافة مستحدثة] مسار تعليق وتجميد الحسابات أو إعادة تنشيطها ليتطابق مع طلب واجهة الـ Axios
+    Route::put('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+
     Route::apiResource('users', UserController::class);
 
 });

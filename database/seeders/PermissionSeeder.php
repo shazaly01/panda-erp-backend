@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Permission; // تم التعديل لاستخدام المودل المخصص
+use App\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -26,7 +26,11 @@ class PermissionSeeder extends Seeder
                 'view' => 'رؤية الإحصائيات'
             ],
             'user' => [
-                'view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'
+                'view' => 'عرض',
+                'create' => 'إضافة',
+                'update' => 'تعديل',
+                'delete' => 'حذف',
+                'approve' => 'تفعيل الحسابات المعلقة' // الصلاحية الجديدة المضافة
             ],
             'role' => [
                 'view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'
@@ -59,7 +63,6 @@ class PermissionSeeder extends Seeder
         // --- إنشاء الأدوار الجديدة (استخدام updateOrCreate لمنع التكرار) ---
 
         // 1. إنشاء دور "Super Admin"
-        // هذا الدور يحصل على كل الصلاحيات تلقائيًا عبر ModuleServiceProvider (Gate::before)
         Role::updateOrCreate(
             ['name' => 'Super Admin', 'guard_name' => $guardName]
         );
@@ -75,7 +78,7 @@ class PermissionSeeder extends Seeder
         $dataEntryRole = Role::updateOrCreate(
             ['name' => 'Data Entry', 'guard_name' => $guardName]
         );
-        // إعطاء دور "مدخل بيانات" صلاحيات العرض والإنشاء والتحديث فقط (باستخدام الحقل الجديد action_name)
+        // إعطاء دور "مدخل بيانات" صلاحيات العرض والإنشاء والتحديث فقط
         $dataEntryPermissions = Permission::where('guard_name', $guardName)
             ->whereIn('action_name', ['view', 'create', 'update'])
             ->get();

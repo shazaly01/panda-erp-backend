@@ -33,6 +33,12 @@ return [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+
+    ],
+
+    'brqsms' => [
+        'api_token' => env('BRQSMS_API_TOKEN'),
+        'sender_id' => env('BRQSMS_SENDER_ID'),
     ],
 
 ];

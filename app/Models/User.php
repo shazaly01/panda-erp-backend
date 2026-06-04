@@ -6,14 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens; // <-- 1. أضف هذا السطر
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use App\Modules\HR\Models\Employee;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class User extends Authenticatable
 {
-    // 2. أضف التريت هنا
     use HasFactory, Notifiable, SoftDeletes, HasRoles, HasApiTokens;
 
     protected string $guard_name = 'api';
@@ -28,6 +27,8 @@ class User extends Authenticatable
         'username',
         'email',
         'password',
+        'phone',
+        'status',
         'default_cost_center_id',
         'default_box_id',
         'default_bank_account_id',
@@ -52,10 +53,10 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'phone_verified_at' => 'datetime',
+            'password'          => 'hashed',
         ];
     }
-
 
     /**
      * الملف الوظيفي المرتبط بهذا المستخدم
@@ -64,8 +65,6 @@ class User extends Authenticatable
     {
         return $this->hasOne(Employee::class);
     }
-
-
 
     public function defaultCostCenter()
     {
@@ -77,7 +76,6 @@ class User extends Authenticatable
         return $this->belongsTo(\App\Modules\Accounting\Models\Box::class, 'default_box_id');
     }
 
-    // 👈 العلاقة الجديدة للبنك
     public function defaultBankAccount()
     {
         return $this->belongsTo(\App\Modules\Accounting\Models\BankAccount::class, 'default_bank_account_id');
