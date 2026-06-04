@@ -12,12 +12,15 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        // جلب مفتاح الدولة المعتمد في الإعدادات لتوحيد هيكلية البيانات في قاعدة البيانات
+        $countryCode = config('app.country_code', '+218');
+
         // 1. إنشاء أو تحديث مستخدم Super Admin
         $superAdmin = User::updateOrCreate(
             ['username' => 'superadmin'], // الفحص باسم المستخدم لأن السجلات القديمة موجودة به فعلياً
             [
                 'full_name'         => 'Super Admin',
-                'phone'             => '0500000001', // سيتم تحديث رقم الهاتف الجديد هنا بأمان
+                'phone'             => $countryCode . '0500000001', // دمج المفتاح ليتطابق مع فحص الـ AuthController
                 'email'             => 'superadmin@app.com',
                 'password'          => '12345678',   // يتم تشفيره تلقائياً عبر الكاست في الموديل
                 'status'            => 'active',     // تفعيل الحساب فوراً
@@ -31,7 +34,7 @@ class UserSeeder extends Seeder
             ['username' => 'admin'],
             [
                 'full_name'         => 'Admin User',
-                'phone'             => '0500000002',
+                'phone'             => $countryCode . '0500000002',
                 'email'             => 'admin@app.com',
                 'password'          => '12345678',
                 'status'            => 'active',
@@ -45,7 +48,7 @@ class UserSeeder extends Seeder
             ['username' => 'dataentry'],
             [
                 'full_name'         => 'Data Entry User',
-                'phone'             => '0500000003',
+                'phone'             => $countryCode . '0500000003',
                 'email'             => 'dataentry@app.com',
                 'password'          => '12345678',
                 'status'            => 'active',
@@ -59,7 +62,7 @@ class UserSeeder extends Seeder
             ['username' => 'auditor'],
             [
                 'full_name'         => 'Auditor User',
-                'phone'             => '0500000004',
+                'phone'             => $countryCode . '0500000004',
                 'email'             => 'auditor@app.com',
                 'password'          => '12345678',
                 'status'            => 'active',
