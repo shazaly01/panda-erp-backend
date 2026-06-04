@@ -31,12 +31,20 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'phone'    => 'required|string',
+            'phone'    => 'required|string|regex:/^[0-9]{10}$/',
             'password' => 'required|string',
+        ], [
+            'phone.required' => 'حقل رقم الهاتف مطلوب.',
+            'phone.regex'    => 'يجب أن يتكون رقم الهاتف من 10 أرقام فقط.',
+            'password.required' => 'حقل كلمة المرور مطلوب.'
         ]);
 
-        // البحث عن المستخدم عبر رقم الهاتف مباشرة
-        $user = User::where('phone', $request->phone)->first();
+        // تنظيف ودمج مفتاح الدولة المعتمد ليتطابق مع المخزن في قاعدة البيانات
+        $cleanedPhone = str_replace(' ', '', $request->phone);
+        $fullPhone = config('app.country_code') . $cleanedPhone;
+
+        // البحث عن المستخدم عبر رقم الهاتف الكامل
+        $user = User::where('phone', $fullPhone)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'بيانات الدخول غير صحيحة'], 401);
@@ -70,8 +78,11 @@ class AuthController extends Controller
     public function sendOtp(SendOtpRequest $request)
     {
         try {
+            // جلب البيانات بعد الفحص والتحويل لضمان وجود المفتاح الدولي
+            $validated = $request->validated();
+
             $this->authService->sendOtp(
-                $request->input('phone'),
+                $validated['phone'],
                 $request->input('build_mode', 'release')
             );
 
@@ -82,7 +93,7 @@ class AuthController extends Controller
     }
 
     /**
-     * التسجيل الذاتي للمستخدم بالهاتف (ينشأ الحساب بحالة pending)
+     * التسجيل الذاتي للمخدم بالهاتف (ينشأ الحساب بحالة pending)
      */
     public function register(RegisterRequest $request)
     {
@@ -105,7 +116,10 @@ class AuthController extends Controller
     public function forgotPassword(ForgotPasswordRequest $request)
     {
         try {
-            $this->authService->sendResetPasswordOtp($request->input('phone'));
+            // جلب البيانات المفلترة والمعدلة من الـ Request المعماري
+            $validated = $request->validated();
+
+            $this->authService->sendResetPasswordOtp($validated['phone']);
 
             return response()->json([
                 'message' => 'تم إرسال رمز استعادة كلمة المرور إلى رقم هاتفك بنجاح.'

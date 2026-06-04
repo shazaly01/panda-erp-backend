@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auth;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 
 class ForgotPasswordRequest extends FormRequest
 {
@@ -15,6 +16,18 @@ class ForgotPasswordRequest extends FormRequest
     }
 
     /**
+     * تجهيز البيانات وتنظيفها قبل البدء في عملية التحقق
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('phone')) {
+            $this->merge([
+                'phone' => str_replace(' ', '', $this->phone),
+            ]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -22,7 +35,43 @@ class ForgotPasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone' => 'required|string|exists:users,phone', // التحقق عبر الهاتف مباشرة
+            'phone' => [
+                'required',
+                'string',
+                'regex:/^[0-9]{10}$/',
+                // دمج مفتاح الدولة ديناميكياً من الإعدادات قبل فحص الوجود في قاعدة البيانات
+                function ($attribute, $value, $fail) {
+                    $fullPhone = config('app.country_code') . $value;
+                    if (!DB::table('users')->where('phone', $fullPhone)->exists()) {
+                        $fail('رقم الهاتف هذا غير مسجل لدينا.');
+                    }
+                },
+            ],
+        ];
+    }
+
+    /**
+     * تعديل البيانات بعد النجاح في التحقق لتمريرها مدمجة بالرمز إلى السيرفيس
+     */
+    public function validated($key = null, $default = null)
+    {
+        $validated = parent::validated();
+
+        if (isset($validated['phone'])) {
+            $validated['phone'] = config('app.country_code') . $validated['phone'];
+        }
+
+        return $validated;
+    }
+
+    /**
+     * Custom error messages
+     */
+    public function messages(): array
+    {
+        return [
+            'phone.required' => 'حقل رقم الهاتف مطلوب.',
+            'phone.regex'    => 'يجب أن يتكون رقم الهاتف من 10 أرقام فقط.',
         ];
     }
 }

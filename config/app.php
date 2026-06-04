@@ -123,4 +123,8 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+
+
+    'country_code' => env('COUNTRY_CODE', '+218'),
+
 ];
