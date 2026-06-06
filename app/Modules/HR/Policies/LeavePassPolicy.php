@@ -13,11 +13,11 @@ class LeavePassPolicy
     use HandlesAuthorization;
 
     /**
-     * التحقق من صلاحية عرض قائمة الأذونات أو شاشة الإخلاء
+     * التحقق من صلاحية عرض قائمة الأذونات أو شاشة الإخلاء الميداني
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('leave_passes.view', 'api');
+        return $user->hasPermissionTo('hr_leave_passes.view', 'api');
     }
 
     /**
@@ -25,8 +25,8 @@ class LeavePassPolicy
      */
     public function view(User $user, HrLeavePass $leavePass): bool
     {
-        // يسمح للموظف برؤية إذنه الخاص، أو من يملك صلاحية العرض العامة
-        return $user->id === $leavePass->employee->user_id || $user->hasPermissionTo('leave_passes.view', 'api');
+        // يسمح للموظف برؤية إذنه الخاص، أو لمن يملك صلاحية العرض الإدارية العامة
+        return $user->id === $leavePass->employee->user_id || $user->hasPermissionTo('hr_leave_passes.view', 'api');
     }
 
     /**
@@ -34,16 +34,20 @@ class LeavePassPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('leave_passes.create', 'api');
+        return $user->hasPermissionTo('hr_leave_passes.create', 'api');
     }
 
     /**
-     * التحقق من صلاحية تعديل الإذن (متاح فقط طالما الطلب قيد الانتظار)
+     * التحقق من صلاحية تعديل الإذن (متاح فقط طالما الطلب قيد الانتظار أو معتمد إدارياً ولم يستغل حركياً)
      */
     public function update(User $user, HrLeavePass $leavePass): bool
     {
-        return $leavePass->status === 'pending' &&
-               ($user->id === $leavePass->employee->user_id || $user->hasPermissionTo('leave_passes.approve', 'api'));
+        $isValidStatus = in_array($leavePass->status, ['pending', 'approved'], true);
+
+        return $isValidStatus && (
+            $user->id === $leavePass->employee->user_id ||
+            $user->hasPermissionTo('hr_leave_passes.approve', 'api')
+        );
     }
 
     /**
@@ -51,7 +55,7 @@ class LeavePassPolicy
      */
     public function delete(User $user, HrLeavePass $leavePass): bool
     {
-        return $leavePass->status === 'pending' && $user->hasPermissionTo('leave_passes.approve', 'api');
+        return $leavePass->status === 'pending' && $user->hasPermissionTo('hr_leave_passes.delete', 'api');
     }
 
     /**
@@ -59,14 +63,14 @@ class LeavePassPolicy
      */
     public function approve(User $user): bool
     {
-        return $user->hasPermissionTo('leave_passes.approve', 'api');
+        return $user->hasPermissionTo('hr_leave_passes.approve', 'api');
     }
 
     /**
-     * صلاحية خاصة لأفراد حراسة البوابات الخارجية لإثبات الحركات اللحظية
+     * صلاحية خاصة لأفراد حراسة البوابات الخارجية لإثبات الحركات اللحظية يدوياً أو عبر الباركود
      */
-    public function gateCheck(User $user): bool
+    public function gateCheck(User $user, ?HrLeavePass $leavePass = null): bool
     {
-        return $user->hasPermissionTo('leave_passes.gate_check', 'api');
+        return $user->hasPermissionTo('hr_leave_passes.gate_check', 'api');
     }
 }

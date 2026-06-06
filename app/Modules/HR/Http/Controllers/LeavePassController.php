@@ -19,7 +19,7 @@ class LeavePassController extends Controller
 {
     public function __construct()
     {
-        // تطبيق حماية الـ Resource Actions تلقائياً باستثناء الحركات المخصصة
+        // تطبيق حماية الـ Resource Actions تلقائيًا للمسارات القياسية (index, store, show, update, destroy)
         $this->authorizeResource(HrLeavePass::class, 'leave_pass');
     }
 
@@ -68,7 +68,7 @@ class LeavePassController extends Controller
                 $passCode = (string) mt_rand(10000000, 99999999);
             } while (HrLeavePass::where('pass_code', $passCode)->exists());
 
-            // الدمج المعماري: الإنشاء بحالة معتمدة فوراً وتوثيق هوية المشرف
+            // الدمج المعماري: الإنشاء بحالة معتمدة فورًا وتوثيق هوية المشرف
             return HrLeavePass::create(array_merge($validated, [
                 'pass_code'   => $passCode,
                 'status'      => 'approved', // موافقة فورية مدمجة لتسهيل دورة العمل لعدم وجود حسابات للموظفين
@@ -113,6 +113,9 @@ class LeavePassController extends Controller
      */
     public function approve(ApproveLeavePassRequest $request, HrLeavePass $leavePass)
     {
+        // [إغلاق الثغرة الأمنية]: التحقق الصارم من امتلاك المشرف لصلاحية الاعتماد الإداري للأذونات
+        $this->authorize('approve', HrLeavePass::class);
+
         $validated = $request->validated();
         $approverEmployee = Employee::where('user_id', auth()->id())->first();
 
@@ -163,7 +166,6 @@ class LeavePassController extends Controller
 
     /**
      * المسح الذكي المؤتمت لأفراد الأمن عند البوابة الخارجية (قراءة الـ QR Code من شاشة هاتف الموظف أو الورقة المطبوعة)
-     * يستقبل الـ pass_code الممسوح عبر القارئ، ويتعرف على حركة الموظف تلقائياً لكسر أي تشتيت للحارس
      */
     public function scanGateCode(Request $request)
     {
@@ -209,7 +211,6 @@ class LeavePassController extends Controller
 
     /**
      * لوحة طوارئ الأمن والسلامة الصناعية (Muster Evacuation List)
-     * جلب قائمة حية فورية ومحدثة لكل الموظفين ومواقعهم الجغرافية الحالية داخل أو خارج أسوار المنشأة لمنع التخمين وحماية الأرواح
      */
     public function emergencyMusterList(Request $request)
     {
@@ -245,9 +246,9 @@ class LeavePassController extends Controller
         return response()->json([
             'generated_at' => now()->toDateTimeString(),
             'summary'      => [
-                'total_inside'      => $musterData->where('presence_status', 'Inside')->count(),
-                'total_temp_out'    => $musterData->where('presence_status', 'Temporary_Out')->count(),
-                'total_outside'     => $musterData->where('presence_status', 'Outside_Duty')->count(),
+                'total_inside'   => $musterData->where('presence_status', 'Inside')->count(),
+                'total_temp_out' => $musterData->where('presence_status', 'Temporary_Out')->count(),
+                'total_outside'  => $musterData->where('presence_status', 'Outside_Duty')->count(),
             ],
             'records'      => $musterData->values()->all()
         ]);
