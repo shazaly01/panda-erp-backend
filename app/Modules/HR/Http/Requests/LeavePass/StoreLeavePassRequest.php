@@ -22,7 +22,7 @@ class StoreLeavePassRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'employee_id'         => 'required|integer|exists:hr_employees,id',
+            'employee_id'         => 'required|integer|exists:employees,id',
             'date'                => 'required|date_format:Y-m-d',
             'reason'              => 'required|string|max:255',
             // التحقق من صيغة الوقت (ساعة:دقيقة) لمنع التشوهات في قاعدة البيانات

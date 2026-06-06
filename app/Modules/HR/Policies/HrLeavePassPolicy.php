@@ -8,7 +8,7 @@ use App\Models\User;
 use App\Modules\HR\Models\HrLeavePass;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
-class LeavePassPolicy
+class HrLeavePassPolicy
 {
     use HandlesAuthorization;
 
