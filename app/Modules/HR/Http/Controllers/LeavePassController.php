@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Modules\HR\Http\Controllers\Api;
+namespace App\Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\HR\Http\Requests\LeavePass\StoreLeavePassRequest;

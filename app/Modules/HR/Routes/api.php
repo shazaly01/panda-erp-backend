@@ -27,7 +27,7 @@ use App\Modules\HR\Http\Controllers\ShiftOverrideController;
 use App\Modules\HR\Http\Controllers\InternetVoucherController;
 
 use App\Modules\HR\Http\Controllers\Reports\AttendanceReportController;
-use App\Modules\HR\Http\Controllers\Api\LeavePassController;
+use App\Modules\HR\Http\Controllers\LeavePassController;
 /*
 |--------------------------------------------------------------------------
 | HR Module API Routes
