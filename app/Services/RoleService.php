@@ -30,33 +30,61 @@ class RoleService
 
     public function getStructuredPermissions(): array
     {
+        // جلب كافة الصلاحيات الخاصة بالـ API من قاعدة البيانات
         $permissions = Permission::where('guard_name', 'api')->get();
-        $grouped = $permissions->groupBy('group_name');
 
-        $structuredGroups = [];
-        $groupTranslations = $this->getGroupTranslations();
+        // 1. التجميع الأول: بناءً على الموديول (Module) لتوليد التبويبات الجانبية ديناميكياً
+        $modulesGrouped = $permissions->groupBy('module');
+        $structuredModules = [];
 
-        foreach ($grouped as $groupKey => $groupPermissions) {
-            if (empty($groupKey)) continue;
+        foreach ($modulesGrouped as $moduleKey => $modulePermissions) {
+            if (empty($moduleKey)) continue;
 
-            $formattedPermissions = $groupPermissions->map(function ($p) {
-                return [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'action' => $p->action_name,
-                    'action_display' => $p->display_name,
+            // جلب الاسم العربي للموديول المخزن في قاعدة البيانات مباشرة من أول عنصر في التجميعة
+            $moduleDisplayName = $modulePermissions->first()->module_display_name;
+            if (empty($moduleDisplayName)) {
+                $moduleDisplayName = $moduleKey === 'core' ? 'إدارة النظام' : $moduleKey;
+            }
+
+            // 2. التجميع الثاني: داخل الموديول الواحد، نجمع الصلاحيات حسب الشاشة (group_name)
+            $groupsGrouped = $modulePermissions->groupBy('group_name');
+            $structuredGroups = [];
+
+            foreach ($groupsGrouped as $groupKey => $groupPermissions) {
+                if (empty($groupKey)) continue;
+
+                // جلب اسم الشاشة العربي المخزن في قاعدة البيانات مباشرة والذي تم بذره عبر الـ Seeder
+                $groupDisplayName = $groupPermissions->first()->group_display_name;
+                if (empty($groupDisplayName)) {
+                    $groupDisplayName = $groupKey;
+                }
+
+                $formattedPermissions = $groupPermissions->map(function ($p) {
+                    return [
+                        'id' => $p->id,
+                        'name' => $p->name,
+                        'action' => $p->action_name,
+                        'action_display' => $p->display_name,
+                    ];
+                })->values()->toArray();
+
+                $structuredGroups[] = [
+                    'key' => $groupKey,
+                    'display_name' => $groupDisplayName,
+                    'permissions' => $formattedPermissions,
                 ];
-            })->values()->toArray();
+            }
 
-            $structuredGroups[] = [
-                'key' => $groupKey,
-                'display_name' => $groupTranslations[$groupKey] ?? $groupKey,
-                'permissions' => $formattedPermissions,
+            $structuredModules[] = [
+                'key' => $moduleKey,
+                'display_name' => $moduleDisplayName,
+                'groups' => $structuredGroups,
             ];
         }
 
+        // إرجاع المصفوفة الهيكلية الجديدة لتقوم الواجهة الأمامية برسمها ذاتياً بدون تعقيد
         return [
-            'groups' => $structuredGroups,
+            'modules' => $structuredModules,
             'actions' => $this->getActionsList(),
         ];
     }
@@ -64,16 +92,17 @@ class RoleService
     private function getActionsList(): array
     {
         $actions = [
-            'view'      => 'عرض',
-            'create'    => 'إضافة',
-            'update'    => 'تعديل',
-            'delete'    => 'حذف',
-            'manage'    => 'إدارة كاملة',
-            'approve'   => 'اعتماد',
-            'post'      => 'ترحيل مالي',
-            'request'   => 'تقديم طلب',
-            'close'     => 'إغلاق',
-            'download'  => 'تحميل',
+            'view'       => 'عرض',
+            'create'     => 'إضافة',
+            'update'     => 'تعديل',
+            'delete'     => 'حذف',
+            'manage'     => 'إدارة كاملة',
+            'approve'    => 'اعتماد',
+            'post'       => 'ترحيل مالي',
+            'request'    => 'تقديم طلب',
+            'close'      => 'إغلاق',
+            'download'   => 'تحميل',
+            'gate_check' => 'فحص البوابة'
         ];
 
         $formattedActions = [];
@@ -82,57 +111,5 @@ class RoleService
         }
 
         return $formattedActions;
-    }
-
-    private function getGroupTranslations(): array
-    {
-        return [
-            // المحاسبة
-            'accounting'          => 'نظام المحاسبة عام',
-            'dashboard'           => 'لوحة التحكم',
-            'account'             => 'دليل الحسابات',
-            'cost_center'         => 'مراكز التكلفة',
-            'fiscal_year'         => 'السنوات المالية',
-            'currency'            => 'العملات',
-            'box'                 => 'الخزائن (الصناديق)',
-            'bank_account'        => 'الحسابات البنكية',
-            'payment'             => 'سندات الصرف',
-            'receipt'             => 'سندات القبض',
-            'journal_entry'       => 'القيود اليومية',
-            'report'              => 'التقارير المالية',
-            'accounting_settings' => 'إعدادات المحاسبة',
-
-            'account_mapping'     => 'ربط وتوجيه الحسابات',
-            'sequences'           => 'التسلسلات والترقيم',
-
-            // الموارد البشرية
-            'departments'         => 'الإدارات والأقسام',
-            'positions'           => 'الوظائف والمهن',
-            'employees'           => 'ملفات الموظفين',
-            'contracts'           => 'العقود والتوظيف',
-            'payroll'             => 'الرواتب والأجور',
-            'shifts'              => 'الورديات',
-            'working_schedules'   => 'جداول العمل',
-            'calendar_exceptions' => 'العطلات والطوارئ',
-            'shift_overrides'     => 'تجاوزات الورديات',
-            'attendance'          => 'الحضور والانصراف',
-            'team_attendance'     => 'إدارة حضور الفريق',
-            'leaves'              => 'الإجازات',
-            'loans'               => 'السلف والقروض',
-            'payroll_inputs'      => 'المكافآت والجزاءات',
-            'settings'            => 'إعدادات الموارد البشرية',
-
-            // الإضافات المكتشفة
-            'pay_groups'          => 'مجموعات الدفع',
-            'pay_periods'         => 'فترات الدفع',
-            'overtime_policies'   => 'سياسات العمل الإضافي',
-            'internet_vouchers'   => 'كوبونات الإنترنت',
-
-            // إدارة النظام
-            'user'                => 'المستخدمين',
-            'role'                => 'الأدوار والصلاحيات',
-            'backup'              => 'النسخ الاحتياطي',
-            'setting'             => 'إعدادات النظام',
-        ];
     }
 }
