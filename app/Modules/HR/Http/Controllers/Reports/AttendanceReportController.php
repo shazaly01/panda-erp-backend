@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 class AttendanceReportController extends Controller
 {
     /**
-     * جلب تقرير خلاصة الحضور والانصراف للموظفين مباشرة من قاعدة البيانات مع نظام حماية الساعات الافتراضية
+     * جلب تقرير خلاصة الحضور والانصراف للموظفين بناءً على الأنماط والإعدادات القياسية
      */
     public function __invoke(Request $request): AnonymousResourceCollection
     {
@@ -35,10 +35,8 @@ class AttendanceReportController extends Controller
         // قراءة نمط الحساب الخاص بالشركة من ملف الإعدادات
         $attendanceMode = env('ATTENDANCE_MODE', 'strict');
 
-        // بناء العقل الرياضي للاستعلام بناءً على نمط الشركة
+        // بناء العقل الرياضي للاستعلام بناءً على نمط الشركة (Single Punch أو Strict)
         if ($attendanceMode === 'single_punch') {
-            // نمط البصمة الواحدة: بمجرد أن تكون الحالة حضور أو تأخير، يتم احتساب ساعات الوردية.
-            // حماية هندسية (COALESCE): إذا كانت الوردية غير موجودة أو أوقاتها فارغة، يتم احتساب 8 ساعات (480 دقيقة) تلقائياً لمنع التصفير.
             $workMinutesExpression = "
                 IFNULL(SUM(
                     CASE
@@ -58,7 +56,6 @@ class AttendanceReportController extends Controller
                 ), 0)
             ";
         } else {
-            // نمط البصمتين الصارم (Strict): احتساب الفارق الدقيق والفعلي بين حركتي الدخول والخروج
             $workMinutesExpression = "
                 IFNULL(SUM(
                     CASE
@@ -73,7 +70,7 @@ class AttendanceReportController extends Controller
             ";
         }
 
-        // تنفيذ الاستعلام التجميعي الرئيسي
+        // تنفيذ الاستعلام التجميعي الرئيسي للتقرير
         $query = DB::table('employees as e')
             ->leftJoin('hr_attendance_logs as al', function ($join) use ($startDate, $endDate) {
                 $join->on('e.id', '=', 'al.employee_id')
@@ -97,18 +94,38 @@ class AttendanceReportController extends Controller
                 DB::raw("IFNULL(SUM(al.early_leave_minutes), 0) as total_early_leave_minutes"),
                 DB::raw("IFNULL(SUM(al.overtime_minutes), 0) as total_overtime_minutes"),
 
-                // حقن التعبير الرياضي المحمي والديناميكي
                 DB::raw("{$workMinutesExpression} as total_work_minutes")
             )
             ->whereNull('e.deleted_at');
 
-        // تطبيق الفلاتر الديناميكية
+        // --- تطبيق الفلاتر الديناميكية النظيفة ---
         if ($request->filled('employee_id')) {
             $query->where('e.id', '=', (int) $request->input('employee_id'));
         }
 
+        // 🌟 الفلترة الشجرية القياسية النظيفة المعتمدة على الأقسام النشطة فقط
         if ($request->filled('department_id')) {
-            $query->where('e.department_id', '=', (int) $request->input('department_id'));
+            $departmentId = (int) $request->input('department_id');
+
+            // جلب حدود القسم النشط فقط من قاعدة البيانات
+            $dept = DB::table('departments')
+                ->where('id', $departmentId)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($dept && isset($dept->_lft, $dept->_rgt)) {
+                // جلب معرف القسم وكافة فروع الأبناء التابعة له شجرياً
+                $departmentIds = DB::table('departments')
+                    ->where('_lft', '>=', $dept->_lft)
+                    ->where('_rgt', '<=', $dept->_rgt)
+                    ->whereNull('deleted_at')
+                    ->pluck('id')
+                    ->toArray();
+
+                $query->whereIn('e.department_id', $departmentIds);
+            } else {
+                $query->where('e.department_id', '=', $departmentId);
+            }
         }
 
         if ($request->filled('position_id')) {

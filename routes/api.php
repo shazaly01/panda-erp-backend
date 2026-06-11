@@ -11,7 +11,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\BackupController;
 use App\Http\Controllers\Api\DocumentController; // موديول الأرشفة العالمي
-
+use App\Http\Controllers\Api\BrandingController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\DocumentController; // موديول الأرشفة 
 */
 
 // --- المسارات العامة (Public Routes) ---
+Route::get('/branding', [BrandingController::class, 'index']);
 // تم تطبيق الحماية الأمنية (Rate Limiting) هنا لمنع استهلاك رصيد SMS (بحد أقصى 3 طلبات في الدقيقة)
 Route::post('/login', [AuthController::class, 'login']);
 
