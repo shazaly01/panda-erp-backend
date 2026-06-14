@@ -28,11 +28,17 @@ use App\Modules\HR\Http\Controllers\InternetVoucherController;
 
 use App\Modules\HR\Http\Controllers\Reports\AttendanceReportController;
 use App\Modules\HR\Http\Controllers\LeavePassController;
+use App\Modules\HR\Http\Controllers\VisitorController;
 /*
 |--------------------------------------------------------------------------
 | HR Module API Routes
 |--------------------------------------------------------------------------
 */
+
+Route::post('hr/visitors/public-register', [VisitorController::class, 'publicStore']);
+Route::get('hr/visitors/search-hosts', [VisitorController::class, 'searchHosts']);
+
+Route::get('hr/visitors/check-status/{token}', [\App\Modules\HR\Http\Controllers\VisitorController::class, 'checkStatus']);
 
 Route::middleware('auth:sanctum')
     ->prefix('hr') // 🌟 القفل والمفتاح: هذه البادئة تجعل الروابط تطابق طلبات الـ Vue Service
@@ -157,4 +163,16 @@ Route::middleware('auth:sanctum')
             ->middleware('can:hr.payroll.post');
     });
 
+
+
+    // ===========================================
+    // 6. إدارة الزوار وبوابات الأمن (Visitor Management)
+    // ===========================================
+    Route::apiResource('visitors', VisitorController::class);
+    Route::post('visitors/gate/check-in', [VisitorController::class, 'checkIn']);
+    Route::post('visitors/gate/check-out', [VisitorController::class, 'checkOut']);
+
 });
+
+
+

@@ -1,0 +1,498 @@
+============ [ APP FOLDER ] ============
+├── [DIR] Console
+│   ├── [DIR] Commands
+│   │   ├── ImportInternetVouchers.php
+├── [DIR] Enums
+│   ├── DocumentType.php
+├── [DIR] Http
+│   ├── [DIR] Controllers
+│   │   ├── [DIR] Api
+│   │   │   ├── AuthController.php
+│   │   │   ├── BackupController.php
+│   │   │   ├── BrandingController.php
+│   │   │   ├── CompanyController.php
+│   │   │   ├── DashboardController.php
+│   │   │   ├── DocumentController.php
+│   │   │   ├── PaymentController.php
+│   │   │   ├── ProjectController.php
+│   │   │   ├── ReportController.php
+│   │   │   ├── RoleController.php
+│   │   │   ├── UserController.php
+│   │   ├── Controller.php
+│   ├── [DIR] Requests
+│   │   ├── [DIR] Auth
+│   │   │   ├── ForgotPasswordRequest.php
+│   │   │   ├── RegisterRequest.php
+│   │   │   ├── ResetPasswordRequest.php
+│   │   │   ├── SendOtpRequest.php
+│   │   ├── [DIR] Company
+│   │   ├── [DIR] Document
+│   │   │   ├── StoreDocumentRequest.php
+│   │   ├── [DIR] Payment
+│   │   ├── [DIR] Project
+│   │   ├── [DIR] Role
+│   │   │   ├── StoreRoleRequest.php
+│   │   │   ├── UpdateRoleRequest.php
+│   │   ├── [DIR] User
+│   │   │   ├── StoreUserRequest.php
+│   │   │   ├── UpdateUserRequest.php
+│   ├── [DIR] Resources
+│   │   ├── [DIR] Api
+│   │   │   ├── BrandingResource.php
+│   │   │   ├── CompanyResource.php
+│   │   │   ├── DashboardStatsResource.php
+│   │   │   ├── DocumentResource.php
+│   │   │   ├── PaymentResource.php
+│   │   │   ├── PermissionResource.php
+│   │   │   ├── ProjectResource.php
+│   │   │   ├── RoleResource.php
+│   │   │   ├── UserResource.php
+├── [DIR] Models
+│   ├── Company.php
+│   ├── Document.php
+│   ├── Payment.php
+│   ├── Permission.php
+│   ├── Project.php
+│   ├── User.php
+├── [DIR] Modules
+│   ├── [DIR] Accounting
+│   │   ├── [DIR] DTO
+│   │   │   ├── JournalEntryDetailDto.php
+│   │   │   ├── JournalEntryDto.php
+│   │   ├── [DIR] Database
+│   │   │   ├── [DIR] Factories
+│   │   │   │   ├── AccountFactory.php
+│   │   │   │   ├── BankAccountFactory.php
+│   │   │   │   ├── BoxFactory.php
+│   │   │   │   ├── CostCenterFactory.php
+│   │   │   │   ├── CurrencyFactory.php
+│   │   │   │   ├── FiscalYearFactory.php
+│   │   │   │   ├── JournalEntryFactory.php
+│   │   │   │   ├── VoucherDetailFactory.php
+│   │   │   │   ├── VoucherFactory.php
+│   │   │   ├── [DIR] Migrations
+│   │   │   │   ├── 2025_12_25_053841_create_currencies_table.php
+│   │   │   │   ├── 2025_12_25_053842_create_accounts_table.php
+│   │   │   │   ├── 2025_12_25_060210_create_cost_centers_table.php
+│   │   │   │   ├── 2025_12_25_061320_create_journal_entries_table.php
+│   │   │   │   ├── 2025_12_25_061325_create_journal_entry_details_table.php
+│   │   │   │   ├── 2025_12_25_071425_create_fiscal_years_table.php
+│   │   │   │   ├── 2025_12_25_072800_create_account_mappings_table.php
+│   │   │   │   ├── 2026_01_26_074441_create_boxes_table.php
+│   │   │   │   ├── 2026_01_26_074449_create_bank_accounts_table.php
+│   │   │   │   ├── 2026_01_26_145802_add_branch_columns_to_cost_centers_table.php
+│   │   │   │   ├── 2026_01_26_152726_create_vouchers_table.php
+│   │   │   │   ├── 2026_04_02_201824_remove_type_from_cost_centers_table.php
+│   │   │   │   ├── 2026_04_03_055442_add_payee_name_to_vouchers_table.php
+│   │   │   │   ├── 2026_04_04_071452_add_source_id_to_journal_entries_table.php
+│   │   │   │   ├── 2026_04_15_092218_add_party_to_voucher_details_table.php
+│   │   │   ├── [DIR] Seeders
+│   │   │   │   ├── AccountMappingSeeder.php
+│   │   │   │   ├── AccountingPermissionsSeeder.php
+│   │   │   │   ├── ChartOfAccountsSeeder.php
+│   │   ├── [DIR] Enums
+│   │   │   ├── AccountNature.php
+│   │   │   ├── AccountType.php
+│   │   │   ├── CostCenterType.php
+│   │   │   ├── EntrySource.php
+│   │   │   ├── EntryStatus.php
+│   │   │   ├── FiscalYearStatus.php
+│   │   │   ├── VoucherStatus.php
+│   │   │   ├── VoucherType.php
+│   │   ├── [DIR] Http
+│   │   │   ├── [DIR] Controllers
+│   │   │   │   ├── AccountController.php
+│   │   │   │   ├── AccountMappingController.php
+│   │   │   │   ├── BankAccountController.php
+│   │   │   │   ├── BoxController.php
+│   │   │   │   ├── CostCenterController.php
+│   │   │   │   ├── CurrencyController.php
+│   │   │   │   ├── FiscalYearController.php
+│   │   │   │   ├── JournalEntryController.php
+│   │   │   │   ├── ReportController.php
+│   │   │   │   ├── VoucherController.php
+│   │   │   ├── [DIR] Requests
+│   │   │   │   ├── StoreAccountRequest.php
+│   │   │   │   ├── StoreBankAccountRequest.php
+│   │   │   │   ├── StoreBoxRequest.php
+│   │   │   │   ├── StoreCostCenterRequest.php
+│   │   │   │   ├── StoreCurrencyRequest.php
+│   │   │   │   ├── StoreFiscalYearRequest.php
+│   │   │   │   ├── StoreJournalEntryRequest.php
+│   │   │   │   ├── StoreVoucherRequest.php
+│   │   │   │   ├── UpdateAccountMappingRequest.php
+│   │   │   │   ├── UpdateAccountRequest.php
+│   │   │   │   ├── UpdateBankAccountRequest.php
+│   │   │   │   ├── UpdateBoxRequest.php
+│   │   │   │   ├── UpdateCostCenterRequest.php
+│   │   │   │   ├── UpdateCurrencyRequest.php
+│   │   │   │   ├── UpdateFiscalYearRequest.php
+│   │   │   │   ├── UpdateJournalEntryRequest.php
+│   │   │   │   ├── UpdateVoucherRequest.php
+│   │   │   ├── [DIR] Resources
+│   │   │   │   ├── AccountMappingResource.php
+│   │   │   │   ├── AccountResource.php
+│   │   │   │   ├── BankAccountResource.php
+│   │   │   │   ├── BoxResource.php
+│   │   │   │   ├── CostCenterResource.php
+│   │   │   │   ├── CurrencyResource.php
+│   │   │   │   ├── FiscalYearResource.php
+│   │   │   │   ├── JournalEntryDetailResource.php
+│   │   │   │   ├── JournalEntryResource.php
+│   │   │   │   ├── VoucherDetailResource.php
+│   │   │   │   ├── VoucherResource.php
+│   │   ├── [DIR] Models
+│   │   │   ├── Account.php
+│   │   │   ├── AccountMapping.php
+│   │   │   ├── BankAccount.php
+│   │   │   ├── Box.php
+│   │   │   ├── CostCenter.php
+│   │   │   ├── Currency.php
+│   │   │   ├── FiscalYear.php
+│   │   │   ├── JournalEntry.php
+│   │   │   ├── JournalEntryDetail.php
+│   │   │   ├── Voucher.php
+│   │   │   ├── VoucherDetail.php
+│   │   ├── [DIR] Policies
+│   │   │   ├── AccountPolicy.php
+│   │   │   ├── BankAccountPolicy.php
+│   │   │   ├── BoxPolicy.php
+│   │   │   ├── CostCenterPolicy.php
+│   │   │   ├── CurrencyPolicy.php
+│   │   │   ├── FiscalYearPolicy.php
+│   │   │   ├── JournalEntryPolicy.php
+│   │   │   ├── VoucherPolicy.php
+│   │   ├── [DIR] Routes
+│   │   │   ├── api.php
+│   │   ├── [DIR] Rules
+│   │   │   ├── PeriodIsOpenRule.php
+│   │   ├── [DIR] Services
+│   │   │   ├── AccountMappingService.php
+│   │   │   ├── AccountService.php
+│   │   │   ├── CostCenterService.php
+│   │   │   ├── FiscalYearService.php
+│   │   │   ├── JournalEntryService.php
+│   │   │   ├── [DIR] Reporting
+│   │   │   │   ├── AccountStatementService.php
+│   │   │   │   ├── AccountingReportingService.php
+│   │   │   │   ├── BalanceSheetService.php
+│   │   │   │   ├── IncomeStatementService.php
+│   │   │   │   ├── TrialBalanceService.php
+│   │   │   ├── TreasuryService.php
+│   │   │   ├── VoucherService.php
+│   ├── [DIR] Core
+│   │   ├── [DIR] Database
+│   │   │   ├── [DIR] Migrations
+│   │   │   │   ├── 2025_12_25_070545_create_sequences_table.php
+│   │   ├── [DIR] Http
+│   │   │   ├── [DIR] Controllers
+│   │   │   │   ├── SequenceController.php
+│   │   │   ├── [DIR] Requests
+│   │   │   │   ├── UpdateSequenceRequest.php
+│   │   │   ├── [DIR] Resources
+│   │   │   │   ├── SequenceResource.php
+│   │   ├── [DIR] Models
+│   │   │   ├── Sequence.php
+│   │   ├── [DIR] Policies
+│   │   │   ├── SequencePolicy.php
+│   │   ├── [DIR] Services
+│   │   │   ├── SequenceService.php
+│   │   ├── [DIR] routes
+│   │   │   ├── api.php
+│   ├── [DIR] HR
+│   │   ├── [DIR] Console
+│   │   │   ├── [DIR] Commands
+│   │   │   │   ├── RecordAutoAttendanceCommand.php
+│   │   ├── [DIR] Database
+│   │   │   ├── [DIR] Factories
+│   │   │   │   ├── EmployeeFactory.php
+│   │   │   ├── [DIR] Migrations
+│   │   │   │   ├── 2025_12_26_125100_create_departments_table.php
+│   │   │   │   ├── 2025_12_26_125154_create_positions_table.php
+│   │   │   │   ├── 2025_12_26_125315_create_employees_table.php
+│   │   │   │   ├── 2025_12_26_130158_create_salary_rules_table.php
+│   │   │   │   ├── 2025_12_26_130607_create_salary_structures_table.php
+│   │   │   │   ├── 2025_12_26_131140_create_contracts_table.php
+│   │   │   │   ├── 2025_12_26_204137_create_payroll_batches_table.php
+│   │   │   │   ├── 2025_12_26_204143_create_salary_slips_table.php
+│   │   │   │   ├── 2025_12_26_204153_create_salary_slip_details_table.php
+│   │   │   │   ├── 2026_04_05_061745_add_erp_integration_fields_to_hr_tables.php
+│   │   │   │   ├── 2026_04_05_101156_create_hr_shifts_table.php
+│   │   │   │   ├── 2026_04_05_101157_create_hr_attendance_logs_table.php
+│   │   │   │   ├── 2026_04_05_101157_create_hr_leave_types_table.php
+│   │   │   │   ├── 2026_04_05_101158_create_hr_leave_balances_table.php
+│   │   │   │   ├── 2026_04_05_101202_create_hr_leave_requests_table.php
+│   │   │   │   ├── 2026_04_05_101313_create_hr_public_holidays_table.php
+│   │   │   │   ├── 2026_04_05_101314_create_hr_employee_shifts_table.php
+│   │   │   │   ├── 2026_04_05_101318_create_hr_biometric_punches_table.php
+│   │   │   │   ├── 2026_04_05_101529_create_hr_loans_table.php
+│   │   │   │   ├── 2026_04_05_101531_create_hr_loan_installments_table.php
+│   │   │   │   ├── 2026_04_05_101532_create_hr_payroll_inputs_table.php
+│   │   │   │   ├── 2026_04_05_101535_create_hr_custodies_table.php
+│   │   │   │   ├── 2026_04_13_190706_create_payslips_table.php
+│   │   │   │   ├── 2026_04_14_044743_create_employee_bank_accounts_table.php
+│   │   │   │   ├── 2026_04_14_110014_add_barcode_to_employees_table.php
+│   │   │   │   ├── 2026_04_14_114352_change_employee_number_type_in_employees_table.php
+│   │   │   │   ├── 2026_04_15_100154_add_salary_frequency_to_contracts_table.php
+│   │   │   │   ├── 2026_04_15_191535_create_hr_overtime_policies_table.php
+│   │   │   │   ├── 2026_04_15_191543_add_overtime_policy_id_to_contracts_table.php
+│   │   │   │   ├── 2026_04_17_045243_create_hr_pay_groups_table.php
+│   │   │   │   ├── 2026_04_17_045340_create_hr_pay_periods_table.php
+│   │   │   │   ├── 2026_04_17_045430_restructure_contracts_for_pay_groups.php
+│   │   │   │   ├── 2026_04_17_045530_restructure_payroll_batches_for_periods.php
+│   │   │   │   ├── 2026_04_29_170441_create_hr_working_schedules_table.php
+│   │   │   │   ├── 2026_04_29_170453_create_hr_working_schedule_lines_table.php
+│   │   │   │   ├── 2026_04_29_170504_create_hr_calendar_exceptions_table.php
+│   │   │   │   ├── 2026_04_29_170514_add_schedule_fields_to_hr_contracts_table.php
+│   │   │   │   ├── 2026_04_29_170526_add_exception_id_to_hr_attendance_logs_table.php
+│   │   │   │   ├── 2026_04_29_170535_drop_hr_employee_shifts_table.php
+│   │   │   │   ├── 2026_05_01_204404_create_hr_shift_overrides_table.php
+│   │   │   │   ├── 2026_05_03_133052_create_hr_internet_vouchers_table.php
+│   │   │   │   ├── 2026_05_07_065351_add_full_english_name_to_employees_table.php
+│   │   │   │   ├── 2026_05_11_172117_add_attendance_mode_to_contracts_table.php
+│   │   │   │   ├── 2026_05_14_181508_add_audit_fields_to_hr_attendance_logs_table.php
+│   │   │   │   ├── 2026_05_17_142646_create_department_supervisors_table.php
+│   │   │   │   ├── 2026_06_04_131501_create_hr_leave_passes_table.php
+│   │   │   ├── [DIR] Seeders
+│   │   │   │   ├── HRPermissionsSeeder.php
+│   │   │   │   ├── SalaryRulesSeeder.php
+│   │   │   │   ├── SalaryStructureSeeder.php
+│   │   │   │   ├── ShiftSeeder.php
+│   │   │   │   ├── WorkingScheduleSeeder.php
+│   │   ├── [DIR] Enums
+│   │   │   ├── DepartmentType.php
+│   │   │   ├── EmployeeStatus.php
+│   │   │   ├── EmploymentType.php
+│   │   │   ├── Gender.php
+│   │   │   ├── MaritalStatus.php
+│   │   │   ├── PayrollRunType.php
+│   │   │   ├── SalaryFrequency.php
+│   │   │   ├── SalaryRuleCategory.php
+│   │   │   ├── SalaryRuleType.php
+│   │   ├── [DIR] Http
+│   │   │   ├── [DIR] Controllers
+│   │   │   │   ├── AttendanceLogController.php
+│   │   │   │   ├── CalendarExceptionController.php
+│   │   │   │   ├── ContractController.php
+│   │   │   │   ├── DepartmentController.php
+│   │   │   │   ├── EmployeeController.php
+│   │   │   │   ├── InternetVoucherController.php
+│   │   │   │   ├── LeavePassController.php
+│   │   │   │   ├── LeaveRequestController.php
+│   │   │   │   ├── LoanController.php
+│   │   │   │   ├── ManagerAttendanceController.php
+│   │   │   │   ├── OvertimePolicyController.php
+│   │   │   │   ├── PayGroupController.php
+│   │   │   │   ├── PayPeriodController.php
+│   │   │   │   ├── PayrollController.php
+│   │   │   │   ├── PayrollInputController.php
+│   │   │   │   ├── PositionController.php
+│   │   │   │   ├── [DIR] Reports
+│   │   │   │   │   ├── AttendanceReportController.php
+│   │   │   │   ├── SalaryRuleController.php
+│   │   │   │   ├── SalaryStructureController.php
+│   │   │   │   ├── ShiftController.php
+│   │   │   │   ├── ShiftOverrideController.php
+│   │   │   │   ├── WorkingScheduleController.php
+│   │   │   ├── [DIR] Requests
+│   │   │   │   ├── [DIR] Attendance
+│   │   │   │   │   ├── StoreAttendanceLogRequest.php
+│   │   │   │   │   ├── UpdateAttendanceLogRequest.php
+│   │   │   │   ├── [DIR] Contract
+│   │   │   │   │   ├── StoreContractRequest.php
+│   │   │   │   │   ├── UpdateContractRequest.php
+│   │   │   │   ├── [DIR] Department
+│   │   │   │   │   ├── StoreDepartmentRequest.php
+│   │   │   │   │   ├── UpdateDepartmentRequest.php
+│   │   │   │   ├── [DIR] Employee
+│   │   │   │   │   ├── StoreEmployeeRequest.php
+│   │   │   │   │   ├── UpdateEmployeeRequest.php
+│   │   │   │   ├── [DIR] InternetVoucher
+│   │   │   │   │   ├── AssignInternetVoucherRequest.php
+│   │   │   │   │   ├── ImportInternetVoucherRequest.php
+│   │   │   │   ├── [DIR] Leave
+│   │   │   │   │   ├── StoreLeaveRequest.php
+│   │   │   │   │   ├── UpdateLeaveRequest.php
+│   │   │   │   ├── [DIR] LeavePass
+│   │   │   │   │   ├── ApproveLeavePassRequest.php
+│   │   │   │   │   ├── GateCheckLeavePassRequest.php
+│   │   │   │   │   ├── StoreLeavePassRequest.php
+│   │   │   │   │   ├── UpdateLeavePassRequest.php
+│   │   │   │   ├── [DIR] Loan
+│   │   │   │   │   ├── StoreLoanRequest.php
+│   │   │   │   │   ├── UpdateLoanRequest.php
+│   │   │   │   ├── [DIR] OvertimePolicy
+│   │   │   │   │   ├── StoreOvertimePolicyRequest.php
+│   │   │   │   │   ├── UpdateOvertimePolicyRequest.php
+│   │   │   │   ├── [DIR] PayGroup
+│   │   │   │   │   ├── StorePayGroupRequest.php
+│   │   │   │   │   ├── UpdatePayGroupRequest.php
+│   │   │   │   ├── [DIR] PayPeriod
+│   │   │   │   │   ├── GeneratePayPeriodsRequest.php
+│   │   │   │   │   ├── StorePayPeriodRequest.php
+│   │   │   │   │   ├── UpdatePayPeriodRequest.php
+│   │   │   │   ├── [DIR] Payroll
+│   │   │   │   │   ├── PostPayrollBatchRequest.php
+│   │   │   │   │   ├── PreviewPayrollRequest.php
+│   │   │   │   │   ├── StorePayrollInputRequest.php
+│   │   │   │   │   ├── UpdatePayrollInputRequest.php
+│   │   │   │   ├── [DIR] Position
+│   │   │   │   │   ├── StorePositionRequest.php
+│   │   │   │   │   ├── UpdatePositionRequest.php
+│   │   │   │   ├── [DIR] SalaryRule
+│   │   │   │   │   ├── SalaryRuleRequest.php
+│   │   │   │   ├── [DIR] SalaryStructure
+│   │   │   │   │   ├── SalaryStructureRequest.php
+│   │   │   │   ├── [DIR] Schedules
+│   │   │   │   │   ├── CalendarExceptionRequest.php
+│   │   │   │   │   ├── ShiftOverrideRequest.php
+│   │   │   │   │   ├── WorkingScheduleRequest.php
+│   │   │   │   ├── [DIR] Shift
+│   │   │   │   │   ├── AssignEmployeeShiftRequest.php
+│   │   │   │   │   ├── StoreShiftRequest.php
+│   │   │   │   │   ├── UpdateShiftRequest.php
+│   │   │   ├── [DIR] Resources
+│   │   │   │   ├── AttendanceLogResource.php
+│   │   │   │   ├── CalendarExceptionResource.php
+│   │   │   │   ├── ContractResource.php
+│   │   │   │   ├── DepartmentResource.php
+│   │   │   │   ├── EmployeeResource.php
+│   │   │   │   ├── EmployeeShiftResource.php
+│   │   │   │   ├── InternetVoucherResource.php
+│   │   │   │   ├── LeavePassResource.php
+│   │   │   │   ├── LeaveRequestResource.php
+│   │   │   │   ├── LoanResource.php
+│   │   │   │   ├── OvertimePolicyResource.php
+│   │   │   │   ├── PayGroupResource.php
+│   │   │   │   ├── PayPeriodResource.php
+│   │   │   │   ├── PayrollInputResource.php
+│   │   │   │   ├── PositionResource.php
+│   │   │   │   ├── [DIR] Reports
+│   │   │   │   │   ├── EmployeeAttendanceReportResource.php
+│   │   │   │   ├── SalaryRuleResource.php
+│   │   │   │   ├── SalaryStructureResource.php
+│   │   │   │   ├── ShiftOverrideResource.php
+│   │   │   │   ├── ShiftResource.php
+│   │   │   │   ├── WorkingScheduleLineResource.php
+│   │   │   │   ├── WorkingScheduleResource.php
+│   │   ├── [DIR] Models
+│   │   │   ├── AttendanceLog.php
+│   │   │   ├── BiometricPunch.php
+│   │   │   ├── CalendarException.php
+│   │   │   ├── Contract.php
+│   │   │   ├── Custody.php
+│   │   │   ├── Department.php
+│   │   │   ├── Employee.php
+│   │   │   ├── EmployeeBankAccount.php
+│   │   │   ├── EmployeeShift.php
+│   │   │   ├── HrLeavePass.php
+│   │   │   ├── InternetVoucher.php
+│   │   │   ├── LeaveBalance.php
+│   │   │   ├── LeaveRequest.php
+│   │   │   ├── LeaveType.php
+│   │   │   ├── Loan.php
+│   │   │   ├── LoanInstallment.php
+│   │   │   ├── OvertimePolicy.php
+│   │   │   ├── PayGroup.php
+│   │   │   ├── PayPeriod.php
+│   │   │   ├── PayrollBatch.php
+│   │   │   ├── PayrollInput.php
+│   │   │   ├── Payslip.php
+│   │   │   ├── Position.php
+│   │   │   ├── PublicHoliday.php
+│   │   │   ├── SalaryRule.php
+│   │   │   ├── SalaryStructure.php
+│   │   │   ├── Shift.php
+│   │   │   ├── ShiftOverride.php
+│   │   │   ├── WorkingSchedule.php
+│   │   │   ├── WorkingScheduleLine.php
+│   │   ├── [DIR] Policies
+│   │   │   ├── AttendanceLogPolicy.php
+│   │   │   ├── CalendarExceptionPolicy.php
+│   │   │   ├── ContractPolicy.php
+│   │   │   ├── DepartmentPolicy.php
+│   │   │   ├── EmployeePolicy.php
+│   │   │   ├── HrLeavePassPolicy.php
+│   │   │   ├── InternetVoucherPolicy.php
+│   │   │   ├── LeaveRequestPolicy.php
+│   │   │   ├── LoanPolicy.php
+│   │   │   ├── OvertimePolicyPolicy.php
+│   │   │   ├── PayGroupPolicy.php
+│   │   │   ├── PayPeriodPolicy.php
+│   │   │   ├── PayrollInputPolicy.php
+│   │   │   ├── PayrollPolicy.php
+│   │   │   ├── PositionPolicy.php
+│   │   │   ├── SalaryRulePolicy.php
+│   │   │   ├── SalaryStructurePolicy.php
+│   │   │   ├── ShiftOverridePolicy.php
+│   │   │   ├── ShiftPolicy.php
+│   │   │   ├── WorkingSchedulePolicy.php
+│   │   ├── [DIR] Routes
+│   │   │   ├── api.php
+│   │   ├── [DIR] Services
+│   │   │   ├── AttendanceService.php
+│   │   │   ├── InternetVoucherService.php
+│   │   │   ├── LeaveService.php
+│   │   │   ├── LoanService.php
+│   │   │   ├── ManagerAttendanceService.php
+│   │   │   ├── PayPeriodGeneratorService.php
+│   │   │   ├── PayrollInputService.php
+│   │   │   ├── PayrollPostingService.php
+│   │   │   ├── PayrollService.php
+│   │   │   ├── ScheduleResolutionService.php
+│   │   │   ├── ShiftService.php
+│   │   │   ├── TimeEvaluationService.php
+│   │   │   ├── WorkingScheduleService.php
+├── [DIR] Policies
+│   ├── CompanyPolicy.php
+│   ├── DocumentPolicy.php
+│   ├── PaymentPolicy.php
+│   ├── ProjectPolicy.php
+│   ├── RolePolicy.php
+│   ├── UserPolicy.php
+├── [DIR] Providers
+│   ├── AppServiceProvider.php
+│   ├── AuthServiceProvider.php
+│   ├── ModuleServiceProvider.php
+├── [DIR] Services
+│   ├── AuthService.php
+│   ├── DocumentService.php
+│   ├── RoleService.php
+
+============ [ DATABASE FOLDER ] ============
+├── .gitignore
+├── database.sqlite
+├── [DIR] factories
+│   ├── CompanyFactory.php
+│   ├── DocumentFactory.php
+│   ├── PaymentFactory.php
+│   ├── ProjectFactory.php
+│   ├── UserFactory.php
+├── [DIR] migrations
+│   ├── 0001_01_01_000000_create_users_table.php
+│   ├── 0001_01_01_000001_create_cache_table.php
+│   ├── 0001_01_01_000002_create_jobs_table.php
+│   ├── 2025_10_30_080741_create_personal_access_tokens_table.php
+│   ├── 2025_10_30_084235_create_permission_tables.php
+│   ├── 2026_04_04_135239_add_default_settings_to_users_table.php
+│   ├── 2026_05_17_112258_add_structural_columns_to_permissions_table.php
+│   ├── 2026_05_21_142713_create_documents_table.php
+│   ├── 2026_06_04_094142_add_phone_and_status_to_users_table.php
+│   ├── 2026_06_04_102612_modify_users_for_phone_authentication.php
+│   ├── 2026_06_07_152329_add_module_display_name_to_permissions_table.php
+│   ├── 2026_06_07_155942_add_display_names_to_permissions_table.php
+├── [DIR] seeders
+│   ├── CoreConfigurationSeeder.php
+│   ├── DatabaseSeeder.php
+│   ├── OfflineEmployeesBatch1Seeder.php
+│   ├── OfflineEmployeesBatch2Seeder.php
+│   ├── OfflineEmployeesBatch3Seeder.php
+│   ├── OfflineEmployeesBatch4Seeder.php
+│   ├── PermissionSeeder.php
+│   ├── UserSeeder.php
+
+============ [ ROUTES FOLDER ] ============
+├── api.php
+├── console.php
+├── web.php
+

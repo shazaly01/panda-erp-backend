@@ -98,7 +98,18 @@ class HRPermissionsSeeder extends Seeder
             'hr_leave_passes' => [
                 'title' => 'أذونات الخروج المؤقتة للموظفين',
                 'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف', 'approve' => 'اعتماد إداري', 'gate_check' => 'فحص حراسة البوابة']
-            ]
+            ],
+            'hr_visitors' => [
+                'title' => 'إدارة سجلات الزوار',
+                'actions' => [
+                    'view' => 'عرض',
+                    'create' => 'إضافة (تسجيل مسبق)',
+                    'update' => 'تعديل',
+                    'delete' => 'حذف',
+                    'check_in' => 'تسجيل دخول من البوابة',
+                    'check_out' => 'تسجيل خروج من البوابة'
+                ]
+            ],
         ];
 
         $permissionsObjects = [];
@@ -108,7 +119,8 @@ class HRPermissionsSeeder extends Seeder
             foreach ($groupData['actions'] as $actionKey => $displayName) {
 
                 // استثناء الحالات التي تملك مسمى موديول مدمج مسبقاً لحمايتها من تكرار البادئة
-                if ($groupKey === 'internet_vouchers' || $groupKey === 'hr_leave_passes') {
+                // استثناء الحالات التي تملك مسمى موديول مدمج مسبقاً لحمايتها من تكرار البادئة
+                if ($groupKey === 'internet_vouchers' || $groupKey === 'hr_leave_passes' || $groupKey === 'hr_visitors') {
                     $permissionName = "{$groupKey}.{$actionKey}";
                 } else {
                     $permissionName = "hr.{$groupKey}.{$actionKey}";
@@ -159,7 +171,13 @@ class HRPermissionsSeeder extends Seeder
             'hr_leave_passes.update',
             'hr_leave_passes.delete',
             'hr_leave_passes.approve',
-            'hr_leave_passes.gate_check'
+            'hr_leave_passes.gate_check',
+            'hr_visitors.view',
+            'hr_visitors.create',
+            'hr_visitors.update',
+            'hr_visitors.delete',
+            'hr_visitors.check_in',
+            'hr_visitors.check_out',
         ]);
 
         // 3. دور الموظف العادي (Employee)
