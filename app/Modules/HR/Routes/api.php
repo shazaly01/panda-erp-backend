@@ -29,6 +29,9 @@ use App\Modules\HR\Http\Controllers\InternetVoucherController;
 use App\Modules\HR\Http\Controllers\Reports\AttendanceReportController;
 use App\Modules\HR\Http\Controllers\LeavePassController;
 use App\Modules\HR\Http\Controllers\VisitorController;
+use App\Modules\HR\Http\Controllers\PublicInternshipController;
+use App\Modules\HR\Http\Controllers\InternshipDashboardController;
+
 /*
 |--------------------------------------------------------------------------
 | HR Module API Routes
@@ -39,6 +42,9 @@ Route::post('hr/visitors/public-register', [VisitorController::class, 'publicSto
 Route::get('hr/visitors/search-hosts', [VisitorController::class, 'searchHosts']);
 
 Route::get('hr/visitors/check-status/{token}', [\App\Modules\HR\Http\Controllers\VisitorController::class, 'checkStatus']);
+Route::post('hr/internship/apply', [PublicInternshipController::class, 'store'])->middleware('throttle:5,1');
+Route::post('hr/internship/track', [PublicInternshipController::class, 'track'])->middleware('throttle:10,1');
+Route::post('hr/internship/update/{id}', [PublicInternshipController::class, 'update'])->middleware('throttle:5,1');
 
 Route::middleware('auth:sanctum')
     ->prefix('hr') // 🌟 القفل والمفتاح: هذه البادئة تجعل الروابط تطابق طلبات الـ Vue Service
@@ -57,6 +63,15 @@ Route::middleware('auth:sanctum')
     Route::get('employees/{id}/financial-statement', [EmployeeController::class, 'getFinancialStatement']);
 
     Route::apiResource('employees', EmployeeController::class);
+
+    // -------------------------------------------
+    // إدارة المتدربين والتحويلات (Internship Management)
+    // -------------------------------------------
+    Route::get('internship-applications', [InternshipDashboardController::class, 'index']);
+    Route::get('internship-applications/active-interns', [InternshipDashboardController::class, 'activeInterns']);
+    Route::post('internship-applications/{id}/approve', [InternshipDashboardController::class, 'approve']);
+    Route::post('internship-applications/{id}/reject', [InternshipDashboardController::class, 'reject']);
+    Route::post('internship-applications/{id}/convert', [InternshipDashboardController::class, 'convert']);
 
     // ملاحظة: تم تفعيل الـ update للعقود كما طلبتم سابقاً
     Route::post('contracts/{contract}/terminate', [ContractController::class, 'terminate']);

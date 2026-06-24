@@ -16,10 +16,12 @@ use App\Models\User;
 use App\Modules\HR\Models\Contract;
 use App\Modules\HR\Models\Department;
 use App\Modules\HR\Models\Position;
+use App\Modules\HR\Models\EmployeeShift; // استيراد موديل الورديات لتأمين العلاقات
 use App\Modules\HR\Enums\EmployeeStatus;
 use App\Modules\HR\Enums\EmploymentType;
 use App\Modules\HR\Enums\Gender;
 use App\Modules\HR\Enums\MaritalStatus;
+use Illuminate\Database\Eloquent\Builder;
 
 class Employee extends Model
 {
@@ -29,7 +31,9 @@ class Employee extends Model
         'full_name', 'date_of_birth', 'gender', 'marital_status',
         'national_id', 'email', 'phone', 'address',
         'employee_number', 'barcode', 'join_date', 'status', 'employment_type',
-        'department_id', 'position_id', 'manager_id', 'user_id'
+        'department_id', 'position_id', 'manager_id', 'user_id',
+        'internship_start_date', 'internship_end_date', 'internship_status',
+        'academic_institution', 'academic_major', 'required_training_hours', 'internship_notes'
     ];
 
     protected $casts = [
@@ -39,7 +43,38 @@ class Employee extends Model
         'employment_type' => EmploymentType::class,
         'gender' => Gender::class,
         'marital_status' => MaritalStatus::class,
+        'internship_start_date' => 'date',
+        'internship_end_date' => 'date',
     ];
+
+    /**
+     * تفعيل الحماية المعمارية عبر الـ Global Scope
+     * لعزل المتدربين تلقائياً عن كافة شاشات ومحركات النظام القديم (كالرواتب والإجازات)
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('exclude_interns', function (Builder $query) {
+            $query->where('employment_type', '!=', EmploymentType::Intern->value);
+        });
+    }
+
+    // --- آليات كسر العزل الآمنة المستدعاة في الـ الخدمة والمتحكم الجديد ---
+
+    /**
+     * جلب الموظفين مع المتدربين (لتعويض الدالة المكسورة في الخدمة)
+     */
+    public static function withInterns(): Builder
+    {
+        return static::withoutGlobalScope('exclude_interns');
+    }
+
+    /**
+     * جلب المتدربين فقط وعزل الموظفين الرسميين (معدلة لتلائم الـ Global Scope)
+     */
+    public static function scopeOnlyInterns(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('exclude_interns')->where('employment_type', EmploymentType::Intern->value);
+    }
 
     // --- العلاقات الأساسية للمنظومة ---
 
@@ -116,7 +151,25 @@ class Employee extends Model
             ->latestOfMany();
     }
 
-    // --- العلاقات والدوال المستحدثة لنظام أذونات الأمن والسلامة (HSE) ---
+    // --- العلاقات المستحدثة لحل انهيار الـ EmployeeResource ---
+
+    /**
+     * سجل ورديات الموظف/المتدرب التاريخية
+     */
+    public function employeeShifts(): HasMany
+    {
+        return $this->hasMany(EmployeeShift::class, 'employee_id');
+    }
+
+    /**
+     * الوردية الأخيرة النشطة
+     */
+    public function latestShift(): HasOne
+    {
+        return $this->hasOne(EmployeeShift::class, 'employee_id')->latestOfMany();
+    }
+
+    // --- العلاقات والدوال الخاصة بنظام أذونات الأمن والسلامة (HSE) ---
 
     /**
      * جميع أذونات الخروج المؤقت الخاصة بالموظف
@@ -127,15 +180,13 @@ class Employee extends Model
     }
 
     /**
-     * محرك الحالات اللحظي لفحص وتحديد التواجد الفعلي للموظف الآن داخل أو خارج أسوار المنشأة
-     * يخدم شاشة حصر الطوارئ (Muster Evacuation List) لمنع التخمين وحماية الأرواح
-     * @return string (Inside | Temporary_Out | Outside_Duty)
+     * محرك الحالات اللحظي لفحص وتحديد التواجد الفعلي داخل أو خارج أسوار المنشأة
      */
     public function getCurrentPresenceStatusAttribute(): string
     {
         $today = now()->toDateString();
 
-        // 1. فحص ما إذا كان الموظف قد سجل بصمة حضور اليوم داخل المؤسسة أصلاً
+        // 1. فحص ما إذا كان الموظف قد سجل بصمة حضور اليوم
         $hasAttendedToday = $this->attendanceLogs()
             ->where('date', $today)
             ->whereNotNull('check_in')
@@ -143,10 +194,10 @@ class Employee extends Model
             ->exists();
 
         if (!$hasAttendedToday) {
-            return 'Outside_Duty'; // خارج الدوام الرسمي اليوم أو انصرف نهائياً
+            return 'Outside_Duty';
         }
 
-        // 2. فحص ما إذا كان خارج أسوار المؤسسة حالياً بموجب إذن خروج فعال أثبته الأمن عند البوابة
+        // 2. فحص ما إذا كان خارج أسوار المؤسسة بموجب إذن خروج فعال
         $isCurrentlyOutOnPass = $this->leavePasses()
             ->where('date', $today)
             ->where('status', 'out')
@@ -155,10 +206,10 @@ class Employee extends Model
             ->exists();
 
         if ($isCurrentlyOutOnPass) {
-            return 'Temporary_Out'; // خارج المنشأة مؤقتاً بأمان (بموجب إذن رسمي)
+            return 'Temporary_Out';
         }
 
-        return 'Inside'; // متواجد حالياً داخل المبنى كلياً (يجب إخلاؤه فوراً في حالات الطوارئ)
+        return 'Inside';
     }
 
     protected static function newFactory()

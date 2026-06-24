@@ -76,6 +76,9 @@ class ModuleServiceProvider extends ServiceProvider
         Gate::policy(\App\Modules\HR\Models\LeaveRequest::class, \App\Modules\HR\Policies\LeaveRequestPolicy::class);
         Gate::policy(\App\Modules\HR\Models\Loan::class, \App\Modules\HR\Policies\LoanPolicy::class);
         Gate::policy(\App\Modules\HR\Models\HrLeavePass::class, \App\Modules\HR\Policies\HrLeavePassPolicy::class);
+
+        // 🛡️ حقن السياسة الجديدة لطلبات التدريب لتفعيل الـ Gates في لوحة تحكم الـ HR بنجاح
+        Gate::policy(\App\Modules\HR\Models\InternshipApplication::class, \App\Modules\HR\Policies\InternshipApplicationPolicy::class);
     }
 
     /**

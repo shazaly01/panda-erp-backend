@@ -7,6 +7,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ContractResource extends JsonResource
 {
+    /**
+     * تحويل كائن العقد إلى مصفوفة JSON آمنة ومعزولة هندسياً.
+     */
     public function toArray(Request $request): array
     {
         return [
@@ -14,40 +17,41 @@ class ContractResource extends JsonResource
             'employee_id' => $this->employee_id,
 
             'employee' => $this->whenLoaded('employee', function() {
-                return [
+                return $this->employee ? [
                     'id' => $this->employee->id,
                     'full_name' => $this->employee->full_name,
                     'employee_number' => $this->employee->employee_number,
-                ];
+                ] : null;
             }),
 
             'basic_salary' => $this->basic_salary,
 
             'salary_structure' => $this->whenLoaded('salaryStructure', function() {
-                return [
+                return $this->salaryStructure ? [
                     'id' => $this->salaryStructure->id,
                     'name' => $this->salaryStructure->name
-                ];
+                ] : null;
             }),
 
-            'overtime_policy' => new OvertimePolicyResource($this->whenLoaded('overtimePolicy')),
+            'overtime_policy' => $this->whenLoaded('overtimePolicy', function() {
+                return $this->overtimePolicy ? new OvertimePolicyResource($this->overtimePolicy) : null;
+            }),
 
             'pay_group_id' => $this->pay_group_id,
             'pay_group' => $this->whenLoaded('payGroup', function() {
-                return [
+                return $this->payGroup ? [
                     'id' => $this->payGroup->id,
                     'name' => $this->payGroup->name,
                     'frequency' => $this->payGroup->frequency?->value ?? $this->payGroup->frequency,
-                ];
+                ] : null;
             }),
 
-            // 🌟 الإضافة الجديدة: ربط قالب الجدولة (Working Schedule)
             'working_schedule_id' => $this->working_schedule_id,
             'working_schedule' => $this->whenLoaded('workingSchedule', function() {
-                return [
+                return $this->workingSchedule ? [
                     'id' => $this->workingSchedule->id,
                     'name' => $this->workingSchedule->name,
-                ];
+                ] : null;
             }),
 
             'start_date' => $this->start_date?->format('Y-m-d'),

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\HR\Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -17,7 +19,6 @@ class HRPermissionsSeeder extends Seeder
         $moduleKey = 'hr';
         $moduleDisplayName = 'الموارد البشرية';
 
-        // إعادة هيكلة المصفوفة لتشمل اسم الشاشة بالعربية (title) بجانب مصفوفة الأفعال (actions)
         $permissionsData = [
             'departments' => [
                 'title' => 'الإدارات والأقسام',
@@ -28,8 +29,12 @@ class HRPermissionsSeeder extends Seeder
                 'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
             ],
             'employees' => [
-                'title' => 'ملفات الموظفين',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
+                'title' => 'ملفات الموظفين والمتدربين',
+                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف', 'convert' => 'تثبيت متدرب كموظف دائم']
+            ],
+            'internship_applications' => [
+                'title' => 'طلبات التدريب الخارجية المعلقة',
+                'actions' => ['view' => 'عرض الطلبات', 'approve' => 'اعتماد وقبول المتدرب', 'reject' => 'رفض الطلب', 'delete' => 'حذف الطلب']
             ],
             'contracts' => [
                 'title' => 'العقود والتوظيف',
@@ -114,12 +119,9 @@ class HRPermissionsSeeder extends Seeder
 
         $permissionsObjects = [];
 
-        // إنشاء أو تحديث الصلاحيات وحفظ التراجم والموديولات في قاعدة البيانات مباشرة
         foreach ($permissionsData as $groupKey => $groupData) {
             foreach ($groupData['actions'] as $actionKey => $displayName) {
 
-                // استثناء الحالات التي تملك مسمى موديول مدمج مسبقاً لحمايتها من تكرار البادئة
-                // استثناء الحالات التي تملك مسمى موديول مدمج مسبقاً لحمايتها من تكرار البادئة
                 if ($groupKey === 'internet_vouchers' || $groupKey === 'hr_leave_passes' || $groupKey === 'hr_visitors') {
                     $permissionName = "{$groupKey}.{$actionKey}";
                 } else {
@@ -132,7 +134,7 @@ class HRPermissionsSeeder extends Seeder
                         'module' => $moduleKey,
                         'module_display_name' => $moduleDisplayName,
                         'group_name' => $groupKey,
-                        'group_display_name' => $groupData['title'], // 🌟 الحفظ المباشر لاسم الشاشة بالعربية
+                        'group_display_name' => $groupData['title'],
                         'action_name' => $actionKey,
                         'display_name' => $displayName
                     ]
@@ -140,7 +142,7 @@ class HRPermissionsSeeder extends Seeder
             }
         }
 
-        // 1. دور مدير الموارد البشرية (HR Manager) - يمتلك كافة صلاحيات القسم
+        // 1. دور مدير الموارد البشرية (HR Manager) - يمتلك كافة صلاحيات القسم تلقائياً
         $hrManagerRole = Role::firstOrCreate(['name' => 'HR Manager', 'guard_name' => $guardName]);
         $hrManagerRole->syncPermissions($permissionsObjects);
 
@@ -152,6 +154,11 @@ class HRPermissionsSeeder extends Seeder
             'hr.employees.view',
             'hr.employees.create',
             'hr.employees.update',
+            'hr.employees.convert',
+            'hr.internship_applications.view',
+            'hr.internship_applications.approve',
+            'hr.internship_applications.reject',
+            'hr.internship_applications.delete',
             'hr.contracts.view',
             'hr.payroll.view',
             'hr.shifts.view',
