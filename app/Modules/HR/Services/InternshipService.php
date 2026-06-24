@@ -159,19 +159,24 @@ class InternshipService
                 : 0;
 
             // استدعاء الـ ->value للـ Enum لمنع انهيار استعلام الـ DB المباشر
-            DB::table('documents')->insert([
-                'documentable_type' => Employee::class,
-                'documentable_id' => $employee->id,
-                'document_type' => \App\Enums\DocumentType::EMPLOYEE_PHOTO instanceof \BackedEnum
-                    ? \App\Enums\DocumentType::EMPLOYEE_PHOTO->value
-                    : (\App\Enums\DocumentType::EMPLOYEE_PHOTO ?? 'employee_photo'),
-                'file_path' => $application->photo_path,
-                'file_name' => basename($application->photo_path),
-                'file_type' => 'image/' . pathinfo($application->photo_path, PATHINFO_EXTENSION),
-                'file_size' => $realFileSize, // الحجم الحقيقي الفعلي للملف
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+           // جلب الامتداد ديناميكياً لتخزينه في الحقل المخصص له
+$extension = pathinfo($application->photo_path, PATHINFO_EXTENSION);
+
+DB::table('documents')->insert([
+    'documentable_type' => Employee::class,
+    'documentable_id' => $employee->id,
+    'document_type' => \App\Enums\DocumentType::EMPLOYEE_PHOTO instanceof \BackedEnum
+        ? \App\Enums\DocumentType::EMPLOYEE_PHOTO->value
+        : (\App\Enums\DocumentType::EMPLOYEE_PHOTO ?? 'employee_photo'),
+    'file_path' => $application->photo_path,
+    'name' => basename($application->photo_path), // تم التعديل من file_name إلى name
+    'mime_type' => 'image/' . $extension, // تم التعديل من file_type إلى mime_type
+    'extension' => $extension, // إضافة الحقل المفقود في قاعدة البيانات
+    'disk' => 'public', // تحديد القرص public بناءً على نوع المستند لمنع نزول القيمة الافتراضية private
+    'file_size' => $realFileSize,
+    'created_at' => now(),
+    'updated_at' => now(),
+]);
 
             // تحديث حالة الطلب الخارجي وحقن الباركود المولد ليعمل فورياً مع شاشة المتابعة الخارجية
             $application->update([
