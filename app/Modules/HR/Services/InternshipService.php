@@ -147,7 +147,7 @@ class InternshipService
                 'start_date' => $application->internship_start_date,
                 'end_date' => $application->internship_end_date,
                 'is_active' => true,
-                'attendance_mode' => 'barcode',
+                'attendance_mode' => 'manual', // 🔥 تم التعديل إلى manual لأن الباركود يقع ضمن النمط اليدوي لإثبات الحضور
                 'salary_structure_id' => null,
                 'overtime_policy_id' => null,
                 'pay_group_id' => null,
@@ -229,7 +229,7 @@ class InternshipService
                 'basic_salary' => $conversionData['basic_salary'],
                 'start_date' => Carbon::today()->toDateString(),
                 'is_active' => true,
-                'attendance_mode' => 'barcode',
+                'attendance_mode' => 'manual', // 🔥 تم التعديل إلى manual لتتوافق مع خيارات الـ ENUM في قاعدة البيانات
             ]);
 
             // حل معضلة الحساب الرقمي وفصل فوضى الـ IDs المشتركة عن الموظفين الحقيقيين:
