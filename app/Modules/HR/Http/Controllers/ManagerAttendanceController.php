@@ -21,16 +21,19 @@ class ManagerAttendanceController extends Controller
     }
 
     /**
-     * عرض مصفوفة الحضور اليومية للفريق (من بصم ومن غاب)
+     * عرض مصفوفة الحضور اليومية للفريق مع الفلاتر المتقدمة
      */
     public function index(Request $request): JsonResponse
     {
         // 1. التحقق من الصلاحية عبر Policy كما في القاعدة المعمارية
         $this->authorize('manageTeam', AttendanceLog::class);
 
-        // 2. التحقق من صحة المدخلات
+        // 2. التحقق من صحة المدخلات والفلاتر الجديدة
         $request->validate([
-            'date' => ['nullable', 'date']
+            'date' => ['nullable', 'date'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'position_id' => ['nullable', 'integer', 'exists:positions,id'],
+            'status' => ['nullable', 'string', 'in:present,absent,late'],
         ]);
 
         $user = Auth::user();
@@ -42,12 +45,18 @@ class ManagerAttendanceController extends Controller
             ], 403);
         }
 
-        // 4. إذا لم يرسل تاريخ، نعرض تاريخ اليوم افتراضياً
-        $date = $request->input('date', now()->toDateString());
+        // 4. بناء مصفوفة الفلاتر لتمريرها بالكامل للخدمة
+        $filters = [
+            'date' => $request->input('date', now()->toDateString()),
+            'search' => $request->input('search'),
+            'position_id' => $request->input('position_id'),
+            'status' => $request->input('status'),
+        ];
+
         $managerId = $user->employee->id;
 
-        // 5. استدعاء الخدمة لجلب المصفوفة
-        $matrix = $this->managerAttendanceService->getTeamDailyMatrix($managerId, $date);
+        // 5. استدعاء الخدمة المحدثة لجلب المصفوفة المفلترة
+        $matrix = $this->managerAttendanceService->getTeamDailyMatrix($managerId, $filters);
 
         return response()->json([
             'data' => $matrix
