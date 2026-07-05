@@ -72,6 +72,9 @@ class EmployeeResource extends JsonResource
             'phone' => $this->phone,
             'avatar' => $this->user ? $this->user->avatar_url : null,
 
+            // 🛡️ طبقة التوافق المعماري: توحيد العقد البرمجي لعرض الصورة في مودال المتدربين المشترك
+            'photo_url' => $this->relationLoaded('profilePhoto') && $this->profilePhoto ? $this->profilePhoto->url : null,
+
             'profile_photo' => $this->whenLoaded('profilePhoto', function () {
                 return $this->profilePhoto ? ['url' => $this->profilePhoto->url] : null;
             }),

@@ -29,19 +29,19 @@ class InternshipDashboardController extends Controller
     /**
      * استعراض كافة طلبات التدريب الخارجية المعلقة
      */
-   public function index(\Illuminate\Http\Request $request): AnonymousResourceCollection
-{
-    Gate::authorize('viewAny', InternshipApplication::class);
+    public function index(\Illuminate\Http\Request $request): AnonymousResourceCollection
+    {
+        Gate::authorize('viewAny', InternshipApplication::class);
 
-    // اقرأ الحالة المرسلة من الواجهة الأمامية، وإذا لم ترسل اجعل الافتراضي pending
-    $status = $request->query('status', 'pending');
+        // اقرأ الحالة المرسلة من الواجهة الأمامية، وإذا لم ترسل اجعل الافتراضي pending
+        $status = $request->query('status', 'pending');
 
-    $applications = InternshipApplication::where('status', $status)
-        ->latest()
-        ->paginate(15);
+        $applications = InternshipApplication::where('status', $status)
+            ->latest()
+            ->paginate(15);
 
-    return InternshipApplicationResource::collection($applications);
-}
+        return InternshipApplicationResource::collection($applications);
+    }
 
     /**
      * استعراض قائمة المتدربين الحاليين النشطين في المؤسسة (باستخدام الـ Scope العازل الآمن)
@@ -51,7 +51,7 @@ class InternshipDashboardController extends Controller
         Gate::authorize('viewAny', Employee::class);
 
         $interns = Employee::onlyInterns()
-            ->with(['department', 'position', 'manager'])
+            ->with(['department', 'position', 'manager', 'profilePhoto'])
             ->latest()
             ->paginate(15);
 
