@@ -28,8 +28,8 @@ class AttendanceLogController extends Controller
         $this->authorizeResource(AttendanceLog::class, 'attendance_log');
     }
 
-    /**
-     * عرض سجلات الحضور
+   /**
+     * عرض سجلات الحضور التفصيلية المفلترة بالكامل
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -38,17 +38,36 @@ class AttendanceLogController extends Controller
         $user = Auth::user();
         $query = AttendanceLog::with(['employee', 'shift']);
 
-        // فلترة للبحث (اختياري حسب الحاجة)
+        // 1. فلترة البحث المباشر بمعرف الموظف (إن وجد)
         if ($request->filled('employee_id')) {
             $query->where('employee_id', $request->employee_id);
         }
 
-        if ($request->filled('date')) {
+        // 🌟 2. فلترة النطاق الزمني (بين تاريخين) لحل مشكلة عدم عمل فلاتر الجدول التفصيلي
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('date', [$request->start_date, $request->end_date]);
+        } elseif ($request->filled('date')) {
+            // توافقية رجعية في حال أرسل جزء آخر من النظام حقل تاريخ منفرد
             $query->where('date', $request->date);
         }
 
+        // 🌟 3. فلترة البحث الذكي بنص (اسم الموظف الكامل أو الرقم الوظيفي)
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->whereHas('employee', function ($q) use ($searchTerm) {
+                $q->where('full_name', 'like', '%' . $searchTerm . '%')
+                  ->orWhere('employee_number', 'like', '%' . $searchTerm . '%');
+            });
+        }
+
+        // 🌟 4. فلترة القسم الإداري الخاص بالموظف
+        if ($request->filled('department_id')) {
+            $query->whereHas('employee', function ($q) use ($request) {
+                $q->where('department_id', $request->department_id);
+            });
+        }
+
         // منطق الخدمة الذاتية (ESS): إذا لم يكن مديراً، يرى سجلاته فقط
-        // ملاحظة: نتحقق من الصلاحية 'hr.attendance.manage' بدلاً من view لضمان الفصل
         if (!$user->can('hr.attendance.manage') && $user->employee_id) {
             $query->where('employee_id', $user->employee_id);
         }
