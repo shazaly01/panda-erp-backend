@@ -50,15 +50,13 @@ class StorePublicApplicationRequest extends FormRequest
             'academic_institution' => ['required', 'string', 'max:255'],
             'academic_major' => ['required', 'string', 'max:255'],
             'required_training_hours' => ['nullable', 'integer', 'min:1', 'max:999'],
-            'internship_start_date' => ['required', 'date'],
-            'internship_end_date' => ['required', 'date', 'after:internship_start_date'],
             'photo' => [
                 'required',
                 'image',
                 'mimes:jpeg,png,jpg',
                 'max:3072' // الحد الأقصى 3 ميجابايت لحماية مساحة خادم Contabo
             ],
-            'notes' => ['nullable', 'string', 'max:2000'], // سد ثغرة الحقل الساقط والـ Mass Assignment وحماية قاعدة البيانات
+            'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -75,9 +73,6 @@ class StorePublicApplicationRequest extends FormRequest
             'national_id.unique' => 'رقم الهوية/الإقامة هذا مسجل به طلب تدريب قائم بالفعل.',
             'academic_institution.required' => 'اسم الجامعة أو المؤسسة الأكاديمية مطلوب.',
             'academic_major.required' => 'التخصص الدراسي مطلوب.',
-            'internship_start_date.required' => 'تاريخ بدء التدريب مطلوب.',
-            'internship_end_date.required' => 'تاريخ انتهاء التدريب مطلوب.',
-            'internship_end_date.after' => 'تاريخ انتهاء التدريب يجب أن يكون بعد تاريخ البدء.',
             'photo.required' => 'التقاط الصورة الشخصية عبر الكاميرا أمر إلزامي لاتمام الطلب.',
             'photo.image' => 'الملف المرسل يجب أن يكون صورة حقيقية فقط.',
             'photo.mimes' => 'صيغة الصورة يجب أن تكون حصراً: jpeg, png, jpg.',

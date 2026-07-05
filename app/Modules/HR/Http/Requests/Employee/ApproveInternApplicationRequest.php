@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(declare_types=1);
 
 namespace App\Modules\HR\Http\Requests\Employee;
 
@@ -26,6 +26,8 @@ class ApproveInternApplicationRequest extends FormRequest
             'working_schedule_id' => ['required', 'exists:hr_working_schedules,id'],
             'basic_salary' => ['required', 'numeric', 'min:0'],
             'manager_id' => ['nullable', 'exists:employees,id'],
+            'internship_start_date' => ['required', 'date'],
+            'internship_end_date' => ['required', 'date', 'after:internship_start_date'],
         ];
     }
 
@@ -41,6 +43,11 @@ class ApproveInternApplicationRequest extends FormRequest
             'basic_salary.required' => 'حقل المكافأة المالية المقطوعة مطلوب (أدخل 0 إذا كان التدريب تطوعياً/غير مدفوع).',
             'basic_salary.numeric' => 'المكافأة المالية يجب أن تكون قيمة رقمية صحيحة.',
             'manager_id.exists' => 'المشرف المباشر المحدد غير موجود بسجلات الموظفين حالياً.',
+            'internship_start_date.required' => 'تاريخ بدء التدريب مطلوب، ويجب على المشرف تحديده في شاشة القبول.',
+            'internship_start_date.date' => 'حقل تاريخ بدء التدريب يجب أن يحتوي على تاريخ صحيح.',
+            'internship_end_date.required' => 'تاريخ انتهاء التدريب مطلوب، ويجب على المشرف تحديده في شاشة القبول.',
+            'internship_end_date.date' => 'حقل تاريخ انتهاء التدريب يجب أن يحتوي على تاريخ صحيح.',
+            'internship_end_date.after' => 'تاريخ انتهاء التدريب يجب أن يكون بعد تاريخ البدء المعتمد.',
         ];
     }
 }

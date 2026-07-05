@@ -29,8 +29,6 @@ class UpdatePublicApplicationRequest extends FormRequest
             'academic_institution' => ['required', 'string', 'max:255'],
             'academic_major' => ['required', 'string', 'max:255'],
             'required_training_hours' => ['nullable', 'integer', 'min:1', 'max:999'],
-            'internship_start_date' => ['required', 'date'],
-            'internship_end_date' => ['required', 'date', 'after:internship_start_date'],
             'photo' => [
                 'nullable',
                 'image',
@@ -52,9 +50,6 @@ class UpdatePublicApplicationRequest extends FormRequest
             'phone.required' => 'رقم الهاتف مطلوب.',
             'academic_institution.required' => 'اسم الجامعة أو المؤسسة الأكاديمية مطلوب.',
             'academic_major.required' => 'التخصص الدراسي مطلوب.',
-            'internship_start_date.required' => 'تاريخ بدء التدريب مطلوب.',
-            'internship_end_date.required' => 'تاريخ انتهاء التدريب مطلوب.',
-            'internship_end_date.after' => 'تاريخ انتهاء التدريب يجب أن يكون بعد تاريخ البدء.',
             'photo.image' => 'الملف المرسل يجب أن يكون صورة حقيقية فقط.',
             'photo.mimes' => 'صيغة الصورة يجب أن تكون حصراً: jpeg, png, jpg.',
             'photo.max' => 'حجم الصورة الشخصية كبير جداً، الحد الأقصى هو 3 ميجابايت.',

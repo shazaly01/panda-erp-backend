@@ -16,7 +16,7 @@ use Carbon\Carbon;
 
 class InternshipService
 {
-    /**
+   /**
      * 1. معالجة وحفظ طلب التدريب القادم من الرابط الخارجي وتوليد كود المتابعة (5 أرقام) آلياً
      */
     public function storePublicApplication(array $data, UploadedFile $photo): InternshipApplication
@@ -35,8 +35,8 @@ class InternshipService
             'academic_institution' => $data['academic_institution'],
             'academic_major' => $data['academic_major'],
             'required_training_hours' => isset($data['required_training_hours']) ? (int) $data['required_training_hours'] : null,
-            'internship_start_date' => $data['internship_start_date'],
-            'internship_end_date' => $data['internship_end_date'],
+            'internship_start_date' => $data['internship_start_date'] ?? null, // 🔥 تم التعديل لتقبل فارغ
+            'internship_end_date' => $data['internship_end_date'] ?? null,     // 🔥 تم التعديل لتقبل فارغ
             'photo_path' => $photoPath,
             'tracking_code' => $trackingCode,
             'status' => 'pending',
@@ -54,7 +54,7 @@ class InternshipService
             ->firstOrFail();
     }
 
-    /**
+   /**
      * 3. تحديث بيانات الطلب الخارجي بواسطة المتدرب نفسه بشرط أن يكون معلقاً (Pending)
      */
     public function updatePublicApplication(int $id, array $data, ?UploadedFile $photo = null): InternshipApplication
@@ -80,8 +80,8 @@ class InternshipService
             'academic_institution' => $data['academic_institution'],
             'academic_major' => $data['academic_major'],
             'required_training_hours' => isset($data['required_training_hours']) ? (int) $data['required_training_hours'] : null,
-            'internship_start_date' => $data['internship_start_date'],
-            'internship_end_date' => $data['internship_end_date'],
+            'internship_start_date' => $data['internship_start_date'] ?? null, // 🔥 تم التعديل لتقبل فارغ
+            'internship_end_date' => $data['internship_end_date'] ?? null,     // 🔥 تم التعديل لتقبل فارغ
             'photo_path' => $application->photo_path,
             'notes' => $data['notes'] ?? null,
         ]);
@@ -89,8 +89,8 @@ class InternshipService
         return $application;
     }
 
-    /**
-     * 4. اعتماد طلب التدريب وتحويله إلى متدرب رسمي مع حفظ نسخة من الباركود في جدول الطلبات لكسر العزل الآمن للواجهة
+/**
+     * 4. اعتماد طلب التدريب وتحويله إلى متدرب رسمي مع حفظ نسخة من الباركود والتواريخ الجديدة
      */
     public function approveApplication(int $applicationId, array $approvalData): Employee
     {
@@ -123,15 +123,15 @@ class InternshipService
                 'national_id' => $application->national_id,
                 'employee_number' => $employeeNumber,
                 'barcode' => $barcode,
-                'join_date' => $application->internship_start_date,
+                'join_date' => $approvalData['internship_start_date'], // 🔥 تم التعديل ليأخذ من مدخلات المشرف
                 'status' => EmployeeStatus::Training->value,
                 'employment_type' => EmploymentType::Intern->value,
                 'department_id' => $approvalData['department_id'] ?? null,
                 'manager_id' => $approvalData['manager_id'] ?? null,
 
                 // الحقول التاريخية الأكاديمية للمتدربين
-                'internship_start_date' => $application->internship_start_date,
-                'internship_end_date' => $application->internship_end_date,
+                'internship_start_date' => $approvalData['internship_start_date'], // 🔥 تم التعديل ليأخذ من مدخلات المشرف
+                'internship_end_date' => $approvalData['internship_end_date'],     // 🔥 تم التعديل ليأخذ من مدخلات المشرف
                 'internship_status' => 'active',
                 'academic_institution' => $application->academic_institution,
                 'academic_major' => $application->academic_major,
@@ -144,44 +144,44 @@ class InternshipService
                 'employee_id' => $employee->id,
                 'working_schedule_id' => $approvalData['working_schedule_id'],
                 'basic_salary' => $approvalData['basic_salary'],
-                'start_date' => $application->internship_start_date,
-                'end_date' => $application->internship_end_date,
+                'start_date' => $approvalData['internship_start_date'], // 🔥 تم التعديل ليأخذ من مدخلات المشرف
+                'end_date' => $approvalData['internship_end_date'],     // 🔥 تم التعديل ليأخذ من مدخلات المشرف
                 'is_active' => true,
-                'attendance_mode' => 'manual', // 🔥 تم التعديل إلى manual لأن الباركود يقع ضمن النمط اليدوي لإثبات الحضور
+                'attendance_mode' => 'manual',
                 'salary_structure_id' => null,
                 'overtime_policy_id' => null,
                 'pay_group_id' => null,
             ]);
 
-            // إصلاح جذري لثغرة التقارير التخزينية: قراءة حجم ملف الصورة الفعلي من السيرفر بدلاً من تسجيله بصفر
+            // إصلاح جذري لثغرة التقارير التخزينية: قراءة حجم ملف الصورة الفعلي من السيرفر
             $realFileSize = Storage::disk('public')->exists($application->photo_path)
                 ? Storage::disk('public')->size($application->photo_path)
                 : 0;
 
-            // استدعاء الـ ->value للـ Enum لمنع انهيار استعلام الـ DB المباشر
-           // جلب الامتداد ديناميكياً لتخزينه في الحقل المخصص له
-$extension = pathinfo($application->photo_path, PATHINFO_EXTENSION);
+            $extension = pathinfo($application->photo_path, PATHINFO_EXTENSION);
 
-DB::table('documents')->insert([
-    'documentable_type' => Employee::class,
-    'documentable_id' => $employee->id,
-    'document_type' => \App\Enums\DocumentType::EMPLOYEE_PHOTO instanceof \BackedEnum
-        ? \App\Enums\DocumentType::EMPLOYEE_PHOTO->value
-        : (\App\Enums\DocumentType::EMPLOYEE_PHOTO ?? 'employee_photo'),
-    'file_path' => $application->photo_path,
-    'name' => basename($application->photo_path), // تم التعديل من file_name إلى name
-    'mime_type' => 'image/' . $extension, // تم التعديل من file_type إلى mime_type
-    'extension' => $extension, // إضافة الحقل المفقود في قاعدة البيانات
-    'disk' => 'public', // تحديد القرص public بناءً على نوع المستند لمنع نزول القيمة الافتراضية private
-    'file_size' => $realFileSize,
-    'created_at' => now(),
-    'updated_at' => now(),
-]);
+            DB::table('documents')->insert([
+                'documentable_type' => Employee::class,
+                'documentable_id' => $employee->id,
+                'document_type' => \App\Enums\DocumentType::EMPLOYEE_PHOTO instanceof \BackedEnum
+                    ? \App\Enums\DocumentType::EMPLOYEE_PHOTO->value
+                    : (\App\Enums\DocumentType::EMPLOYEE_PHOTO ?? 'employee_photo'),
+                'file_path' => $application->photo_path,
+                'name' => basename($application->photo_path),
+                'mime_type' => 'image/' . $extension,
+                'extension' => $extension,
+                'disk' => 'public',
+                'file_size' => $realFileSize,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-            // تحديث حالة الطلب الخارجي وحقن الباركود المولد ليعمل فورياً مع شاشة المتابعة الخارجية
+            // تحديث حالة الطلب الخارجي وحقن الباركود المولد والتواريخ المقررة بواسطة المشرف
             $application->update([
                 'status' => 'approved',
-                'approved_barcode' => $barcode
+                'approved_barcode' => $barcode,
+                'internship_start_date' => $approvalData['internship_start_date'], // 🔥 حفظ تاريخ البدء المعتمد في الطلب
+                'internship_end_date' => $approvalData['internship_end_date']       // 🔥 حفظ تاريخ الانتهاء المعتمد في الطلب
             ]);
 
             return $employee;
