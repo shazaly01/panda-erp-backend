@@ -18,14 +18,20 @@ class AttendanceLogResource extends JsonResource
             'employee_id' => $this->employee_id,
 
             'employee_name' => $this->whenLoaded('employee', fn() => $this->employee->full_name),
+
+            // 🌟 حقن نوع العمالة ديناميكياً ليتوافق مع الـ Enums أو النصوص الخام لحماية الـ UI من الـ undefined
+            'employment_type' => $this->whenLoaded('employee', fn() => $this->employee->employment_type?->value ?? $this->employee->employment_type),
+
             'profile_photo' => $this->whenLoaded('employee', function () {
-    return $this->employee->relationLoaded('profilePhoto') && $this->employee->profilePhoto
-        ? ['url' => $this->employee->profilePhoto->url]
-        : null;
-}),
-'avatar' => $this->whenLoaded('employee', function () {
-    return $this->employee->user ? $this->employee->user->avatar_url : null;
-}),
+                return $this->employee->relationLoaded('profilePhoto') && $this->employee->profilePhoto
+                    ? ['url' => $this->employee->profilePhoto->url]
+                    : null;
+            }),
+
+            'avatar' => $this->whenLoaded('employee', function () {
+                return $this->employee->user ? $this->employee->user->avatar_url : null;
+            }),
+
             'shift_name'    => $this->whenLoaded('shift', fn() => $this->shift->name),
 
             'date' => $this->date->format('Y-m-d'),

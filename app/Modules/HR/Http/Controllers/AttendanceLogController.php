@@ -30,20 +30,37 @@ class AttendanceLogController extends Controller
 
    /**
      * عرض سجلات الحضور التفصيلية المفلترة بالكامل
+     * يدعم حصر وفرز (الموظفين، المتدربين، أو كلاهما معاً) لحساب الأعداد الفعلية
      */
     public function index(Request $request): AnonymousResourceCollection
     {
         // تم الفحص تلقائياً عبر AttendanceLogPolicy@viewAny
 
         $user = Auth::user();
-        $query = AttendanceLog::with(['employee', 'shift']);
 
-        // 1. فلترة البحث المباشر بمعرف الموظف (إن وجد)
+        // 🌟 إصلاح جوهري: كسر العزل داخل الـ Eager Loading لضمان شحن بيانات المتدربين والموظفين معاً في الاستعلام الرئيسي
+        $query = AttendanceLog::with([
+            'employee' => function ($q) {
+                $q->withoutGlobalScope('exclude_interns');
+            },
+            'shift'
+        ]);
+
+        // 🌟 1. فلترة نوع العمل (employment_type) لحصر الحضور ومعرفة العدد الفعلي للفئة
+        // الخيارات المتوقعة من الواجهة الأمامية: 'full_time' (موظفين)، 'intern' (متدربين)، أو 'all' (الكل)
+        if ($request->filled('employment_type') && $request->employment_type !== 'all') {
+            $query->whereHas('employee', function ($q) use ($request) {
+                $q->withoutGlobalScope('exclude_interns')
+                  ->where('employment_type', $request->employment_type);
+            });
+        }
+
+        // 2. فلترة البحث المباشر بمعرف الموظف (إن وجد)
         if ($request->filled('employee_id')) {
             $query->where('employee_id', $request->employee_id);
         }
 
-        // 🌟 2. فلترة النطاق الزمني (بين تاريخين) لحل مشكلة عدم عمل فلاتر الجدول التفصيلي
+        // 3. فلترة النطاق الزمني (بين تاريخين) لحل مشكلة عدم عمل فلاتر الجدول التفصيلي
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('date', [$request->start_date, $request->end_date]);
         } elseif ($request->filled('date')) {
@@ -51,19 +68,22 @@ class AttendanceLogController extends Controller
             $query->where('date', $request->date);
         }
 
-        // 🌟 3. فلترة البحث الذكي بنص (اسم الموظف الكامل أو الرقم الوظيفي)
+        // 4. فلترة البحث الذكي بنص (اسم الموظف الكامل أو الرقم الوظيفي) ليشمل الجميع بالسجلات
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->whereHas('employee', function ($q) use ($searchTerm) {
-                $q->where('full_name', 'like', '%' . $searchTerm . '%')
-                  ->orWhere('employee_number', 'like', '%' . $searchTerm . '%');
+                $q->withoutGlobalScope('exclude_interns')
+                  ->where(function ($subQ) use ($searchTerm) {
+                      $subQ->where('full_name', 'like', '%' . $searchTerm . '%')
+                           ->orWhere('employee_number', 'like', '%' . $searchTerm . '%');
+                  });
             });
         }
 
-        // 🌟 4. فلترة القسم الإداري الخاص بالموظف
+        // 5. فلترة القسم الإداري الخاص بالموظف أو المتدرب
         if ($request->filled('department_id')) {
             $query->whereHas('employee', function ($q) use ($request) {
-                $q->where('department_id', $request->department_id);
+                $q->withoutGlobalScope('exclude_interns')->where('department_id', $request->department_id);
             });
         }
 
@@ -72,18 +92,21 @@ class AttendanceLogController extends Controller
             $query->where('employee_id', $user->employee_id);
         }
 
+        // يعيد البيانات مجمعة ومقسمة لصفحات، حيث يحتوي كائن الـ meta تلقائياً على الـ total الفعلي بعد الفلترة
         return AttendanceLogResource::collection($query->orderByDesc('date')->paginate(30));
     }
 
     /**
-     * إدخال سجل حضور يدوي
+     * إدخال سجل حضور يدوي (يدعم الموظفين والمتدربين)
      */
     public function store(StoreAttendanceLogRequest $request): JsonResponse
     {
         // تم الفحص تلقائياً عبر AttendanceLogPolicy@create
 
         $data = $request->validated();
-        $employee = Employee::findOrFail($data['employee_id']);
+
+        // استخدام withInterns لضمان قبول تسجيل حضور يدوي للمتدربين من شاشتهم الإدارية
+        $employee = Employee::withInterns()->findOrFail($data['employee_id']);
 
         try {
             $log = $this->attendanceService->processDailyAttendance(
@@ -163,16 +186,9 @@ class AttendanceLogController extends Controller
         return response()->json(['message' => 'تم حذف سجل الحضور بنجاح.'], 200);
     }
 
-
-
-
-
    /**
-     * تسجيل الدخول السريع عبر الباركود (Kiosk Mode)
-     * تستقبل رقم الموظف أو الباركود القديم وتقرر تلقائياً (حضور أم انصراف)
-     */
-    /**
-     * تسجيل الدخول السريع عبر الباركود (Kiosk Mode)
+     * تسجيل الدخول السريع عبر الباركود والـ QR Code (Kiosk Mode)
+     * مع الفحص التلقائي لصلاحية باركود المتدربين بناءً على تاريخ نهاية التدريب
      */
     public function scanBarcode(Request $request): JsonResponse
     {
@@ -183,10 +199,13 @@ class AttendanceLogController extends Controller
         $scannedCode = $request->employee_number;
         $now = now();
 
-        // 1. البحث عن الموظف
-        $employee = Employee::where('employee_number', $scannedCode)
-                    ->orWhere('barcode', $scannedCode)
-                    ->first();
+        // 1. البحث عن الموظف أو المتدرب عبر كسر العزل الآمن للـ Global Scope لحل ثغرة الـ 404
+        $employee = Employee::withInterns()
+            ->where(function ($query) use ($scannedCode) {
+                $query->where('employee_number', $scannedCode)
+                      ->orWhere('barcode', $scannedCode);
+            })
+            ->first();
 
         if (!$employee) {
             return response()->json([
@@ -195,21 +214,30 @@ class AttendanceLogController extends Controller
             ], 404);
         }
 
-        // 2. تسجيل الضربة الخام (بدون أي ذكاء هنا)
+        // 2. 🛡️ التحقق تلقائياً من صلاحية باركود المتدرب بناءً على تاريخ انتهاء التدريب
+        if ($employee->employment_type->value === \App\Modules\HR\Enums\EmploymentType::Intern->value) {
+            if ($employee->internship_end_date && $employee->internship_end_date->isPast()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'عذراً، هذا الباركود منتهي الصلاحية لانتهاء فترة التدريب المحددة تلقائياً.'
+                ], 403);
+            }
+        }
+
+        // 3. تسجيل الضربة الخام في جدول البصمات البيومترية بعد اجتياز فحص الصلاحية
         \App\Modules\HR\Models\BiometricPunch::create([
             'employee_id' => $employee->id,
             'punch_time' => $now,
-            'punch_type' => 'auto', // متوافق مع قاعدة البيانات
+            'punch_type' => 'auto',
             'device_id' => 'barcode_scanner',
             'is_processed' => true,
         ]);
 
-        // 3. تفويض معالجة البيانات لمحرك الحضور (الخدمة)
+        // 4. تفويض معالجة البيانات بالكامل لمحرك الحضور (الخدمة)
         try {
-            // سنقوم بإنشاء هذه الدالة في الخطوة القادمة
             $result = $this->attendanceService->processAutoPunch($employee, $now);
 
-           // شحن علاقات الصور والمستخدم لتجنب الـ Lazy Loading
+            // شحن علاقات الصور والمستخدم لتجنب الـ Lazy Loading وتحسين الأداء
             $employee->load(['profilePhoto', 'user']);
 
             return response()->json([

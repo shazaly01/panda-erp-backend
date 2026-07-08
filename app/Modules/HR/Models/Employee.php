@@ -16,12 +16,13 @@ use App\Models\User;
 use App\Modules\HR\Models\Contract;
 use App\Modules\HR\Models\Department;
 use App\Modules\HR\Models\Position;
-use App\Modules\HR\Models\EmployeeShift; // استيراد موديل الورديات لتأمين العلاقات
+use App\Modules\HR\Models\EmployeeShift;
 use App\Modules\HR\Enums\EmployeeStatus;
 use App\Modules\HR\Enums\EmploymentType;
 use App\Modules\HR\Enums\Gender;
 use App\Modules\HR\Enums\MaritalStatus;
 use Illuminate\Database\Eloquent\Builder;
+use Carbon\Carbon;
 
 class Employee extends Model
 {
@@ -74,6 +75,18 @@ class Employee extends Model
     public static function scopeOnlyInterns(Builder $query): Builder
     {
         return $query->withoutGlobalScope('exclude_interns')->where('employment_type', EmploymentType::Intern->value);
+    }
+
+    /**
+     * جلب المتدربين المنتهية فترتهم التدريبية ولم يتم تثبيتهم بعد
+     * (تاريخ انتهاء التدريب أصغر من تاريخ اليوم وحالة التدريب ما زالت نشطة)
+     */
+    public static function scopeOnlyCompletedInterns(Builder $query): Builder
+    {
+        return $query->withoutGlobalScope('exclude_interns')
+            ->where('employment_type', EmploymentType::Intern->value)
+            ->where('internship_end_date', '<', Carbon::today())
+            ->where('internship_status', 'active');
     }
 
     // --- العلاقات الأساسية للمنظومة ---

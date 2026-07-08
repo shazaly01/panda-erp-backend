@@ -273,4 +273,133 @@ class InternshipService
             return $employee;
         });
     }
+
+
+
+    // =========================================================================
+    // 8. محركات الفلترة والبحث المتقدم لـ (الطلبات، المتدربين النشطين، والمنتهية فترتهم)
+    // =========================================================================
+
+    /**
+     * جلب طلبات التدريب (معلقة / مرفوضة) مع تطبيق فلاتر البحث والتاريخ
+     */
+    public function getApplicationsWithFilters(string $status, array $filters): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = \App\Modules\HR\Models\InternshipApplication::where('status', $status);
+
+        if (!empty($filters['search'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('full_name', 'like', '%' . $filters['search'] . '%')
+                  ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
+        if (!empty($filters['institution'])) {
+            $query->where('academic_institution', 'like', '%' . $filters['institution'] . '%');
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('created_at', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        return $query->latest()->paginate(15);
+    }
+
+    /**
+     * جلب المتدربين النشطين مع تطبيق فلاتر البحث ونطاق تاريخ بدء التدريب
+     */
+    public function getActiveInternsWithFilters(array $filters): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = Employee::onlyInterns()
+            ->with(['department', 'position', 'manager', 'profilePhoto']);
+
+        if (!empty($filters['search'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('full_name', 'like', '%' . $filters['search'] . '%')
+                  ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
+        if (!empty($filters['institution'])) {
+            $query->where('academic_institution', 'like', '%' . $filters['institution'] . '%');
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('internship_start_date', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('internship_start_date', '<=', $filters['date_to']);
+        }
+
+        return $query->latest()->paginate(15);
+    }
+
+
+    /**
+     * 9. تمديد فترة التدريب وتعديل تواريخ البدء والانتهاء للمتدرب مع مزامنة العقد المالي والزمني
+     */
+    public function updateInternshipDates(int $employeeId, array $data): \App\Modules\HR\Models\Employee
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($employeeId, $data) {
+            // جلب سجل المتدرب عبر آلية كسر العزل الآمنة شاملة المتدربين
+            $employee = Employee::withInterns()->findOrFail($employeeId);
+
+            $endDate = Carbon::parse($data['internship_end_date']);
+
+            // إذا كان تاريخ الانتهاء الجديد ممتداً لليوم أو للمستقبل، تعود حالة التدريب نشطة تلقائياً
+            $internshipStatus = $endDate->greaterThanOrEqualTo(Carbon::today()) ? 'active' : $employee->internship_status;
+
+            // تحديث تواريخ التدريب الأساسية في سجل الموظف
+            $employee->update([
+                'internship_start_date' => $data['internship_start_date'],
+                'internship_end_date' => $data['internship_end_date'],
+                'internship_status' => $internshipStatus,
+            ]);
+
+            // مزامنة وتحديث تواريخ العقد المالي والزمني النشط فورياً لتأمين استقرار نظام الحضور والانصراف
+            Contract::where('employee_id', $employee->id)
+                ->where('is_active', true)
+                ->update([
+                    'start_date' => $data['internship_start_date'],
+                    'end_date' => $data['internship_end_date'],
+                ]);
+
+            return $employee;
+    });
+    }
+
+    /**
+     * جلب المتدربين المنتهية فترتهم مع تطبيق فلاتر البحث ونطاق تاريخ انتهاء التدريب
+     */
+    public function getCompletedInternsWithFilters(array $filters): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = Employee::onlyCompletedInterns()
+            ->with(['department', 'position', 'manager', 'profilePhoto']);
+
+        if (!empty($filters['search'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('full_name', 'like', '%' . $filters['search'] . '%')
+                  ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
+            });
+        }
+
+        if (!empty($filters['institution'])) {
+            $query->where('academic_institution', 'like', '%' . $filters['institution'] . '%');
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('internship_end_date', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('internship_end_date', '<=', $filters['date_to']);
+        }
+
+        return $query->latest()->paginate(15);
+    }
 }

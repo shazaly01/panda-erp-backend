@@ -14,6 +14,7 @@ use App\Modules\HR\Http\Resources\InternshipApplicationResource;
 use App\Modules\HR\Http\Resources\EmployeeResource;
 use App\Modules\HR\Services\InternshipService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
 
@@ -27,35 +28,71 @@ class InternshipDashboardController extends Controller
     }
 
     /**
-     * استعراض كافة طلبات التدريب الخارجية المعلقة
+     * استعراض كافة طلبات التدريب الخارجية المعلقة والمرفوضة مع الفلترة المتقدمة والتاريخ
      */
-    public function index(\Illuminate\Http\Request $request): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
         Gate::authorize('viewAny', InternshipApplication::class);
 
-        // اقرأ الحالة المرسلة من الواجهة الأمامية، وإذا لم ترسل اجعل الافتراضي pending
         $status = $request->query('status', 'pending');
 
-        $applications = InternshipApplication::where('status', $status)
-            ->latest()
-            ->paginate(15);
+        $applications = $this->internshipService->getApplicationsWithFilters($status, $request->all());
 
         return InternshipApplicationResource::collection($applications);
     }
 
     /**
-     * استعراض قائمة المتدربين الحاليين النشطين في المؤسسة (باستخدام الـ Scope العازل الآمن)
+     * استعراض قائمة المتدربين الحاليين النشطين في المؤسسة مع دعم البحث والتواريخ
      */
-    public function activeInterns(): AnonymousResourceCollection
+    public function activeInterns(Request $request): AnonymousResourceCollection
     {
         Gate::authorize('viewAny', Employee::class);
 
-        $interns = Employee::onlyInterns()
-            ->with(['department', 'position', 'manager', 'profilePhoto'])
-            ->latest()
-            ->paginate(15);
+        $interns = $this->internshipService->getActiveInternsWithFilters($request->all());
 
         return EmployeeResource::collection($interns);
+    }
+
+    /**
+     * استعراض قائمة المتدربين المنتهية فترتهم التدريبية ولم يتم تثبيتهم بعد
+     */
+    public function completedInterns(Request $request): AnonymousResourceCollection
+    {
+        Gate::authorize('viewAny', Employee::class);
+
+        $interns = $this->internshipService->getCompletedInternsWithFilters($request->all());
+
+        return EmployeeResource::collection($interns);
+    }
+
+    /**
+     * تمديد فترة التدريب وتعديل تواريخ البدء والانتهاء للمتدربين الحاليين أو المنتهية فترتهم
+     */
+    public function updateDates(Request $request, int $id): JsonResponse
+    {
+        // 1. جلب كائن المتدرب أولاً عبر آلية كسر العزل الآمنة لتمريره إلى الـ Policy ومنع خطأ الـ Arguments
+        $employeeInstance = Employee::withInterns()->findOrFail($id);
+
+        // 2. التحقق من الصلاحيات الإدارية بتمرير الكائن الحقيقي
+        Gate::authorize('update', $employeeInstance);
+
+        // 3. التحقق الصارم من صحة التواريخ المدخلة بواسطة المشرف
+        $validated = $request->validate([
+            'internship_start_date' => 'required|date',
+            'internship_end_date' => 'required|date|after_or_equal:internship_start_date',
+        ], [
+            'internship_start_date.required' => 'تاريخ بدء التدريب مطلوب.',
+            'internship_end_date.required' => 'تاريخ انتهاء التدريب مطلوب.',
+            'internship_end_date.after_or_equal' => 'تاريخ انتهاء التدريب يجب أن يكون مساوياً أو بعد تاريخ البدء.',
+        ]);
+
+        // 4. استدعاء الخدمة لتحديث السجلات ومزامنة العقود بصورة معزولة وآمنة
+        $employee = $this->internshipService->updateInternshipDates($id, $validated);
+
+        return response()->json([
+            'message' => 'تم تحديث وتمديد فترات التدريب الأكاديمي بنجاح، ومزامنة العقد المالي التابع له.',
+            'data' => new EmployeeResource($employee->load(['department', 'position', 'currentContract']))
+        ], 200);
     }
 
     /**
