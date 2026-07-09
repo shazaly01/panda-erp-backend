@@ -213,11 +213,17 @@ class AttendanceService
 
         if ($actionData['action'] === 'check_in') {
             $checkInTime = $actionData['time'];
+
+            // 🌟 التعديل الجوهري: إذا كان النظام بصمة واحدة، نقوم بحقن نهاية الوردية ديناميكياً كـ check_out
+            // دالة processDailyAttendance ستتكفل برفع اليوم تلقائياً بحساباتها إن كانت الوردية ليلية متقاطعة
+            if ($attendanceMode === 'single_punch') {
+                $checkOutTime = $shift->end_time;
+            }
         } else {
             $checkOutTime = $actionData['time'];
         }
 
-       // ==========================================
+        // ==========================================
         // 6. الحفظ النهائي في قاعدة البيانات
         // ==========================================
         $this->processDailyAttendance(
@@ -256,6 +262,8 @@ class AttendanceService
             'voucher' => $voucherCode // 🌟 إرسال الكود للواجهة الأمامية
         ];
     }
+
+
     /**
      * تحديد نوع البصمة مع الاعتماد على العزل الزمني لسد ثغرة منتصف الليل
      */
