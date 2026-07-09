@@ -18,4 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
-    })->create();
+    })
+    ->withCommands([
+        \App\Modules\HR\Console\Commands\FixPastAttendanceLogsCommand::class,
+    ])
+    ->create();
