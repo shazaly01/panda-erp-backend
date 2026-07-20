@@ -77,7 +77,9 @@ Route::middleware('auth:sanctum')
 
     // ملاحظة: تم تفعيل الـ update للعقود كما طلبتم سابقاً
     Route::post('contracts/{contract}/terminate', [ContractController::class, 'terminate']);
+    Route::get('contracts/available-employees', [ContractController::class, 'availableEmployees']);
     Route::apiResource('contracts', ContractController::class);
+
 
     // ===========================================
     // 3. إعدادات الرواتب (Payroll Settings)

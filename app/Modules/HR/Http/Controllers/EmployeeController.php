@@ -18,10 +18,9 @@ class EmployeeController extends Controller
         $this->authorizeResource(Employee::class, 'employee');
     }
 
-public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        // تم تنظيف العلاقة المفقودة (latestShift) لتجنب خطأ 500
-       $query = Employee::with(['department', 'position', 'profilePhoto']);
+        $query = Employee::with(['department', 'position', 'profilePhoto']);
 
         // 1. فلتر الإدارة
         if ($request->filled('department_id') && is_numeric($request->department_id)) {
@@ -48,7 +47,12 @@ public function index(Request $request): JsonResponse
             });
         }
 
-        // 5. 🌟 فلتر استبعاد الموظفين الذين لديهم عقد عمل نشط (تُستخدم في شاشة إنشاء العقود)
+        // 5. 🌟 فلتر الموظفين الذين ليس لديهم عقود نهائياً (بدون أي سجّل في جدول العقود)
+        if ($request->boolean('without_contract')) {
+            $query->whereDoesntHave('contracts');
+        }
+
+        // 6. 🌟 فلتر استبعاد الموظفين الذين لديهم عقد عمل نشط (تُستخدم في شاشة إنشاء العقود)
         if ($request->boolean('without_active_contract')) {
             $query->whereDoesntHave('contracts', function ($q) {
                 $q->where('is_active', true);
@@ -64,9 +68,7 @@ public function index(Request $request): JsonResponse
     {
         $validatedData = $request->validated();
 
-        // 🌟 المنطق الذكي للترقيم المتوافق مع الـ Enterprise ERP
         if (empty($validatedData['employee_number'])) {
-            // استخدام الكود العالمي (hr_employee) كما تم تعريفه في CoreConfigurationSeeder
             $validatedData['employee_number'] = $sequenceService->generateNumber('hr_employee');
         }
 
@@ -80,14 +82,13 @@ public function index(Request $request): JsonResponse
 
     public function show(Employee $employee): JsonResponse
     {
-        // تحميل العلاقات المهمة
-       $employee->load([
-    'department',
-    'position',
-    'manager',
-    'currentContract.salaryStructure',
-    'profilePhoto', // 🌟 تمت الإضافة هنا أيضاً ليظهر في شاشة تفاصيل الموظف
-]);
+        $employee->load([
+            'department',
+            'position',
+            'manager',
+            'currentContract.salaryStructure',
+            'profilePhoto',
+        ]);
 
         return response()->json([
             'data' => new EmployeeResource($employee)
@@ -106,14 +107,13 @@ public function index(Request $request): JsonResponse
 
     public function destroy(Employee $employee): JsonResponse
     {
-        // حماية النظام: لا يمكن حذف موظف لديه عقد عمل نشط
         if ($employee->currentContract()->exists()) {
             return response()->json([
                 'message' => 'لا يمكن حذف الموظف لوجود عقد عمل نشط. يرجى إنهاء العقد أولاً.'
             ], 422);
         }
 
-        $employee->delete(); // Soft Delete
+        $employee->delete();
 
         return response()->json([
             'message' => 'تم أرشفة الموظف بنجاح'
@@ -122,21 +122,17 @@ public function index(Request $request): JsonResponse
 
     /**
      * كشف الحساب المالي للموظف (Sub-Ledger Statement)
-     * يجلب كل الاستحقاقات (دائن) والمدفوعات (مدين) من القيود المحاسبية
      */
     public function getFinancialStatement($id): JsonResponse
     {
-        // التحقق من الصلاحيات (تم التعديل لتجنب الخطأ الإملائي في المسار)
         $this->authorize('view', \App\Modules\HR\Models\Employee::class);
 
         $employee = \App\Modules\HR\Models\Employee::findOrFail($id);
 
-        // بناء استعلام يربط تفاصيل القيد برأس القيد لجلب التاريخ والحالة
         $transactions = \Illuminate\Support\Facades\DB::table('journal_entry_details')
             ->join('journal_entries', 'journal_entry_details.journal_entry_id', '=', 'journal_entries.id')
-            ->where('journal_entries.status', 'posted') // القيود المعتمدة فقط
+            ->where('journal_entries.status', 'posted')
             ->where('journal_entry_details.party_type', 'employee')
-            // 🌟 التصحيح المعماري: البحث يجب أن يكون باستخدام الـ ID الخاص بالموظف وليس رقم الموظف التسلسلي
             ->where('journal_entry_details.party_id', (string)$employee->id)
             ->select(
                 'journal_entries.date',
@@ -146,17 +142,14 @@ public function index(Request $request): JsonResponse
                 'journal_entry_details.debit',
                 'journal_entry_details.credit'
             )
-            ->orderBy('journal_entries.date', 'asc') // ترتيب زمني تصاعدي (من الأقدم للأحدث)
+            ->orderBy('journal_entries.date', 'asc')
             ->orderBy('journal_entries.id', 'asc')
             ->get();
 
         $runningBalance = 0;
         $statement = [];
 
-        // حساب الرصيد التراكمي (Running Balance)
         foreach ($transactions as $transaction) {
-            // حساب الرواتب المستحقة هو حساب التزام (Liability)
-            // الرصيد يزيد بالدائن (له) ويقل بالمدين (عليه)
             $runningBalance += $transaction->credit;
             $runningBalance -= $transaction->debit;
 
@@ -164,9 +157,9 @@ public function index(Request $request): JsonResponse
                 'date'         => $transaction->date,
                 'entry_number' => $transaction->entry_number,
                 'description'  => $transaction->detail_description ?: $transaction->entry_description,
-                'credit'       => (float) $transaction->credit, // استحقاق (راتب نزل في حسابه)
-                'debit'        => (float) $transaction->debit,  // مدفوعات (تم صرفه له/سلف)
-                'balance'      => (float) $runningBalance,      // المتبقي الذي تطلبه به الشركة
+                'credit'       => (float) $transaction->credit,
+                'debit'        => (float) $transaction->debit,
+                'balance'      => (float) $runningBalance,
             ];
         }
 

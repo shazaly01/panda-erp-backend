@@ -41,26 +41,29 @@ class AttendanceService
         $overtimeMinutes = 0;
 
         // --- المعالجة إذا كان اليوم استثناء (طوارئ) أو يوم راحة (عطلة/ويكند) ---
-        if ($resolution['treat_as_overtime'] || $resolution['is_off_day']) {
-            if ($checkInTime && $checkOutTime) {
-                // كل الدوام يعتبر إضافي لأنه يعمل في يوم راحة أو طوارئ
-                $in = Carbon::parse($date . ' ' . $checkInTime);
-                $out = Carbon::parse($date . ' ' . $checkOutTime);
+        // --- المعالجة إذا كان اليوم استثناء (طوارئ) أو يوم راحة (عطلة/ويكند) ---
+if ($resolution['treat_as_overtime'] || $resolution['is_off_day']) {
+    if ($checkInTime && $checkOutTime) {
+        // كل الدوام يعتبر إضافي لأنه يعمل في يوم راحة أو طوارئ
+        $in = Carbon::parse($date . ' ' . $checkInTime);
+        $out = Carbon::parse($date . ' ' . $checkOutTime);
 
-                if ($out->lessThan($in)) {
-                    $out->addDay(); // الدوام امتد لليوم التالي
-                }
-
-                $overtimeMinutes = $in->diffInMinutes($out);
-            } elseif (!$checkInTime && !$checkOutTime) {
-                // الموظف لم يداوم، وهذا حقه لأنه يوم راحة أو طوارئ أو إجازة معتمدة
-                if ($resolution['type'] === 'leave_day') {
-                    $status = 'on_leave';
-                } else {
-                    $status = $resolution['is_off_day'] ? 'off_day' : 'exception_day';
-                }
-            }
+        if ($out->lessThan($in)) {
+            $out->addDay(); // الدوام امتد لليوم التالي
         }
+
+        $overtimeMinutes = $in->diffInMinutes($out);
+        $status = 'present'; // 👈 إضافة صريحة لتأكيد حالة الحضور
+    } elseif ($checkInTime && !$checkOutTime) {
+        $status = 'present'; // 👈 حالة الموظف الذي بصم دخولاً ولم يبصم خروجاً بعد
+    } elseif (!$checkInTime && !$checkOutTime) {
+        if ($resolution['type'] === 'leave_day') {
+            $status = 'on_leave';
+        } else {
+            $status = $resolution['is_off_day'] ? 'off_day' : 'exception_day';
+        }
+    }
+}
         // --- المعالجة إذا كان يوم عمل عادي بوردية محددة ---
         elseif ($shift) {
             $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
@@ -122,7 +125,7 @@ class AttendanceService
     }
 
 /**
-     * معالجة البصمات التلقائية (مثل الباركود) بناءً على سياسة الحضور (صارم أم بصمة واحدة)
+     * معالجة البصمات التلقائية (مثل الباركود) بناءً على سياسة الحضور (صارم، بصمة واحدة، أو توليد تلقائي حسب الوردية)
      */
     public function processAutoPunch(Employee $employee, Carbon $punchTime): array
     {
@@ -181,15 +184,44 @@ class AttendanceService
         // ==========================================
         $attendanceMode = env('ATTENDANCE_MODE', 'strict');
 
-        if ($attendanceMode === 'single_punch') {
-            // 🌟 نظام البصمة الواحدة: لا يوجد انصراف، وأي بصمة إضافية تُعتبر مكررة
+        if ($attendanceMode === 'auto_shift_pair') {
+            // 🌟 1. الوضع الجديد: التوليد التلقائي بناءً على ساعات الوردية الحقيقية (12 ساعة، 8 ساعات... إلخ)
+            if ($checkInTime) {
+                $actionData = [
+                    'status'  => 'warning',
+                    'action'  => 'ignored',
+                    'message' => 'تم تسجيل حضورك وانصرافك لهذا اليوم مسبقاً.'
+                ];
+            } else {
+                // احتساب طول الوردية بالدقائق بناءً على جدول الموظف لليوم
+                $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
+                $shiftEnd   = Carbon::parse($date . ' ' . $shift->end_time);
+
+                if ($shiftEnd->lessThan($shiftStart)) {
+                    $shiftEnd->addDay();
+                }
+
+                $shiftDurationMinutes = $shiftStart->diffInMinutes($shiftEnd);
+
+                // تعيين الدخول والانصراف آلياً بناءً على ساعات الوردية الفعلية
+                $checkInTime  = $punchTime->toTimeString();
+                $checkOutTime = $punchTime->copy()->addMinutes($shiftDurationMinutes)->toTimeString();
+
+                $actionData = [
+                    'status'  => 'success',
+                    'action'  => 'check_in', // نحددها check_in حتى يتم صرف كود الإنترنت آلياً في الخطوة 7
+                    'message' => 'أهلاً بك، تم تسجيل الحضور والانصراف تلقائياً بناءً على ورديتك (' . round($shiftDurationMinutes / 60, 1) . ' ساعة).'
+                ];
+            }
+        } elseif ($attendanceMode === 'single_punch') {
+            // 🌟 2. نظام البصمة الواحدة: لا يوجد انصراف، وأي بصمة إضافية تُعتبر مكررة
             if ($checkInTime) {
                 $actionData = ['status' => 'warning', 'action' => 'ignored', 'message' => 'تم تسجيل حضورك مسبقاً (نظام البصمة الواحدة).'];
             } else {
                 $actionData = ['status' => 'success', 'action' => 'check_in', 'time' => $punchTime->toTimeString(), 'message' => 'أهلاً بك، تم تسجيل الحضور.'];
             }
         } else {
-            // 🌟 النظام الصارم (Strict): حساب نقطة المنتصف (Midpoint Logic)
+            // 🌟 3. النظام الصارم (Strict): حساب نقطة المنتصف (Midpoint Logic)
             $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
             $shiftEnd = Carbon::parse($date . ' ' . $shift->end_time);
 
@@ -211,16 +243,13 @@ class AttendanceService
             return $actionData; // تجاهل البصمة المكررة
         }
 
-        if ($actionData['action'] === 'check_in') {
-            $checkInTime = $actionData['time'];
-
-            // 🌟 التعديل الجوهري: إذا كان النظام بصمة واحدة، نقوم بحقن نهاية الوردية ديناميكياً كـ check_out
-            // دالة processDailyAttendance ستتكفل برفع اليوم تلقائياً بحساباتها إن كانت الوردية ليلية متقاطعة
-            if ($attendanceMode === 'single_punch') {
-                $checkOutTime = $shift->end_time;
+        // في غير وضع auto_shift_pair، نأخذ الوقت من actionData['time']
+        if ($attendanceMode !== 'auto_shift_pair') {
+            if ($actionData['action'] === 'check_in') {
+                $checkInTime = $actionData['time'];
+            } else {
+                $checkOutTime = $actionData['time'];
             }
-        } else {
-            $checkOutTime = $actionData['time'];
         }
 
         // ==========================================
@@ -262,7 +291,6 @@ class AttendanceService
             'voucher' => $voucherCode // 🌟 إرسال الكود للواجهة الأمامية
         ];
     }
-
 
     /**
      * تحديد نوع البصمة مع الاعتماد على العزل الزمني لسد ثغرة منتصف الليل
