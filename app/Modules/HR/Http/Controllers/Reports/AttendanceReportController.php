@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 class AttendanceReportController extends Controller
 {
     /**
-     * جلب تقرير خلاصة الحضور والانصراف للموظفين بناءً على الأنماط والإعدادات القياسية
+     * جلب تقرير خلاصة الحضور والانصراف للموظفين بناءً على البيانات الفعلية والسجلات المخزنة
      */
     public function __invoke(Request $request): AnonymousResourceCollection
     {
@@ -32,49 +32,34 @@ class AttendanceReportController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        // قراءة نمط الحساب الخاص بالشركة من ملف الإعدادات
-        $attendanceMode = env('ATTENDANCE_MODE', 'strict');
+        // ضبط حدود الوقت لضمان شمول اليوم الأخير بالكامل واستغلال الـ Index المباشر
+        $startBoundary = $startDate . ' 00:00:00';
+        $endBoundary = $endDate . ' 23:59:59';
 
-        // بناء العقل الرياضي للاستعلام بناءً على نمط الشركة (Single Punch أو Strict)
-        if ($attendanceMode === 'single_punch') {
-            $workMinutesExpression = "
-                IFNULL(SUM(
-                    CASE
-                        WHEN al.status IN ('present', 'late') THEN
-                            COALESCE(
-                                CASE
-                                    WHEN s.start_time IS NOT NULL AND s.end_time IS NOT NULL THEN
-                                        CASE
-                                            WHEN s.end_time >= s.start_time THEN TIMESTAMPDIFF(MINUTE, s.start_time, s.end_time)
-                                            ELSE (TIMESTAMPDIFF(MINUTE, s.start_time, '23:59:59') + TIMESTAMPDIFF(MINUTE, '00:00:00', s.end_time) + 1)
-                                        END
-                                END,
-                                480
-                            )
-                        ELSE 0
-                    END
-                ), 0)
-            ";
-        } else {
-            $workMinutesExpression = "
-                IFNULL(SUM(
-                    CASE
-                        WHEN al.check_in IS NOT NULL AND al.check_out IS NOT NULL THEN
+        // تعبير رياضي موحد ودقيق لحساب دقائق العمل من نوع TIME بدون مشاكل NULL
+        $workMinutesExpression = "
+            IFNULL(SUM(
+                CASE
+                    WHEN al.check_in IS NOT NULL AND al.check_out IS NOT NULL THEN
+                        ROUND(MOD(TIME_TO_SEC(TIMEDIFF(al.check_out, al.check_in)) + 86400, 86400) / 60)
+                    WHEN al.check_in IS NOT NULL AND al.check_out IS NULL AND al.status IN ('present', 'late') THEN
+                        COALESCE(
                             CASE
-                                WHEN al.check_out >= al.check_in THEN TIMESTAMPDIFF(MINUTE, al.check_in, al.check_out)
-                                ELSE (TIMESTAMPDIFF(MINUTE, al.check_in, '23:59:59') + TIMESTAMPDIFF(MINUTE, '00:00:00', al.check_out) + 1)
-                            END
-                        ELSE 0
-                    END
-                ), 0)
-            ";
-        }
+                                WHEN s.start_time IS NOT NULL AND s.end_time IS NOT NULL THEN
+                                    ROUND(MOD(TIME_TO_SEC(TIMEDIFF(s.end_time, s.start_time)) + 86400, 86400) / 60)
+                            END,
+                            480
+                        )
+                    ELSE 0
+                END
+            ), 0)
+        ";
 
         // تنفيذ الاستعلام التجميعي الرئيسي للتقرير
         $query = DB::table('employees as e')
-            ->leftJoin('hr_attendance_logs as al', function ($join) use ($startDate, $endDate) {
+            ->leftJoin('hr_attendance_logs as al', function ($join) use ($startBoundary, $endBoundary) {
                 $join->on('e.id', '=', 'al.employee_id')
-                    ->whereBetween('al.date', [$startDate, $endDate])
+                    ->whereBetween('al.date', [$startBoundary, $endBoundary])
                     ->whereNull('al.deleted_at');
             })
             ->leftJoin('departments as d', 'e.department_id', '=', 'd.id')
@@ -98,23 +83,20 @@ class AttendanceReportController extends Controller
             )
             ->whereNull('e.deleted_at');
 
-        // --- تطبيق الفلاتر الديناميكية النظيفة ---
+        // --- تطبيق الفلاتر الديناميكية ---
         if ($request->filled('employee_id')) {
             $query->where('e.id', '=', (int) $request->input('employee_id'));
         }
 
-        // 🌟 الفلترة الشجرية القياسية النظيفة المعتمدة على الأقسام النشطة فقط
         if ($request->filled('department_id')) {
             $departmentId = (int) $request->input('department_id');
 
-            // جلب حدود القسم النشط فقط من قاعدة البيانات
             $dept = DB::table('departments')
                 ->where('id', $departmentId)
                 ->whereNull('deleted_at')
                 ->first();
 
             if ($dept && isset($dept->_lft, $dept->_rgt)) {
-                // جلب معرف القسم وكافة فروع الأبناء التابعة له شجرياً
                 $departmentIds = DB::table('departments')
                     ->where('_lft', '>=', $dept->_lft)
                     ->where('_rgt', '<=', $dept->_rgt)

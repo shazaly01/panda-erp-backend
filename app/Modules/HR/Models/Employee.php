@@ -89,6 +89,18 @@ class Employee extends Model
             ->where('internship_status', 'active');
     }
 
+
+public function activeContract(): HasOne
+{
+    return $this->hasOne(Contract::class)
+        ->where('is_active', true)
+        ->where('start_date', '<=', now()->toDateString())
+        ->where(function ($query) {
+            $query->whereNull('end_date')
+                  ->orWhere('end_date', '>=', now()->toDateString());
+        })
+        ->latestOfMany('start_date');
+}
     // --- العلاقات الأساسية للمنظومة ---
 
     public function department(): BelongsTo
