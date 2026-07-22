@@ -306,14 +306,32 @@ class InternshipService
             $query->whereDate('created_at', '<=', $filters['date_to']);
         }
 
-        return $query->latest()->paginate(15);
+        return $query->oldest()->paginate(15);
     }
+
+    /**
+ * المحرك الأوتوماتيكي للمزامنة اللحظية (On-Demand Lazy Sync)
+ */
+public function syncExpiredInternships(): void
+{
+    Employee::withoutGlobalScope('exclude_interns')
+        ->where('employment_type', EmploymentType::Intern->value)
+        ->where('internship_status', 'active')
+        ->whereNotNull('internship_end_date')
+        ->where('internship_end_date', '<', Carbon::today()->toDateString())
+        ->update([
+            'internship_status' => 'completed',
+        ]);
+}
 
     /**
      * جلب المتدربين النشطين مع تطبيق فلاتر البحث ونطاق تاريخ بدء التدريب
      */
     public function getActiveInternsWithFilters(array $filters): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
+
+    $this->syncExpiredInternships();
+
         $query = Employee::onlyInterns()
             ->with(['department', 'position', 'manager', 'profilePhoto']);
 
@@ -336,7 +354,7 @@ class InternshipService
             $query->whereDate('internship_start_date', '<=', $filters['date_to']);
         }
 
-        return $query->latest()->paginate(15);
+        return $query->oldest()->paginate(15);
     }
 
 
@@ -378,6 +396,8 @@ class InternshipService
      */
     public function getCompletedInternsWithFilters(array $filters): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
+        $this->syncExpiredInternships();
+
         $query = Employee::onlyCompletedInterns()
             ->with(['department', 'position', 'manager', 'profilePhoto']);
 
@@ -400,6 +420,6 @@ class InternshipService
             $query->whereDate('internship_end_date', '<=', $filters['date_to']);
         }
 
-        return $query->latest()->paginate(15);
+        return $query->oldest()->paginate(15);
     }
 }

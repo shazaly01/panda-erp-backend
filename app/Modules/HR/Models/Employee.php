@@ -72,21 +72,21 @@ class Employee extends Model
     /**
      * جلب المتدربين فقط وعزل الموظفين الرسميين (معدلة لتلائم الـ Global Scope)
      */
-    public static function scopeOnlyInterns(Builder $query): Builder
+   public function scopeOnlyInterns(Builder $query): Builder
     {
-        return $query->withoutGlobalScope('exclude_interns')->where('employment_type', EmploymentType::Intern->value);
+        return $query->withoutGlobalScope('exclude_interns')
+            ->where('employment_type', EmploymentType::Intern->value)
+            ->where('internship_status', 'active');
     }
-
     /**
      * جلب المتدربين المنتهية فترتهم التدريبية ولم يتم تثبيتهم بعد
      * (تاريخ انتهاء التدريب أصغر من تاريخ اليوم وحالة التدريب ما زالت نشطة)
      */
-    public static function scopeOnlyCompletedInterns(Builder $query): Builder
+    public function scopeOnlyCompletedInterns(Builder $query): Builder
     {
         return $query->withoutGlobalScope('exclude_interns')
             ->where('employment_type', EmploymentType::Intern->value)
-            ->where('internship_end_date', '<', Carbon::today())
-            ->where('internship_status', 'active');
+            ->where('internship_status', 'completed');
     }
 
 
