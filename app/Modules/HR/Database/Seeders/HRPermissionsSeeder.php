@@ -33,8 +33,17 @@ class HRPermissionsSeeder extends Seeder
                 'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف', 'convert' => 'تثبيت متدرب كموظف دائم']
             ],
             'internship_applications' => [
-                'title' => 'طلبات التدريب الخارجية المعلقة',
-                'actions' => ['view' => 'عرض الطلبات', 'approve' => 'اعتماد وقبول المتدرب', 'reject' => 'رفض الطلب', 'delete' => 'حذف الطلب']
+                'title' => 'إدارة برنامج وطلبات التدريب',
+                'actions' => [
+                    'view_pending' => 'عرض طلبات التقديم المعلقة',
+                    'view_active' => 'عرض المتدربين النشطين',
+                    'view_completed' => 'عرض المتدربين المنتهية فترتهم',
+                    'view_rejected' => 'عرض الطلبات المرفوضة',
+                    'toggle_status' => 'فتح وقفل استقبال طلبات التدريب',
+                    'approve' => 'اعتماد وقبول المتدرب',
+                    'reject' => 'رفض الطلب',
+                    'delete' => 'حذف الطلب',
+                ]
             ],
             'contracts' => [
                 'title' => 'العقود والتوظيف',
@@ -155,7 +164,11 @@ class HRPermissionsSeeder extends Seeder
             'hr.employees.create',
             'hr.employees.update',
             'hr.employees.convert',
-            'hr.internship_applications.view',
+            'hr.internship_applications.view_pending',
+            'hr.internship_applications.view_active',
+            'hr.internship_applications.view_completed',
+            'hr.internship_applications.view_rejected',
+            'hr.internship_applications.toggle_status',
             'hr.internship_applications.approve',
             'hr.internship_applications.reject',
             'hr.internship_applications.delete',

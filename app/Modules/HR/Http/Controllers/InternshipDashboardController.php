@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Cache;
 
 class InternshipDashboardController extends Controller
 {
@@ -25,6 +26,39 @@ class InternshipDashboardController extends Controller
     public function __construct(InternshipService $internshipService)
     {
         $this->internshipService = $internshipService;
+    }
+
+    /**
+     * جلب حالة استقبال طلبات التدريب الخارجية الحالية
+     */
+    public function getRegistrationStatus(): JsonResponse
+    {
+        Gate::authorize('viewAny', InternshipApplication::class);
+
+        $isOpen = (bool) Cache::get('hr_internship_applications_open', true);
+
+        return response()->json([
+            'is_open' => $isOpen,
+            'message' => $isOpen ? 'استقبال الطلبات مفتوح' : 'استقبال الطلبات مغلق'
+        ], 200);
+    }
+
+    /**
+     * تبديل حالة استقبال طلبات التدريب الخارجية (فتح / قفل)
+     */
+    public function toggleRegistrationStatus(): JsonResponse
+    {
+        Gate::authorize('viewAny', InternshipApplication::class);
+
+        $currentStatus = (bool) Cache::get('hr_internship_applications_open', true);
+        $newStatus = !$currentStatus;
+
+        Cache::forever('hr_internship_applications_open', $newStatus);
+
+        return response()->json([
+            'is_open' => $newStatus,
+            'message' => $newStatus ? 'تم فتح استقبال الطلبات بنجاح.' : 'تم قفل استقبال الطلبات بنجاح.'
+        ], 200);
     }
 
     /**

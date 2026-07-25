@@ -6,15 +6,29 @@ namespace App\Modules\HR\Http\Requests\Employee;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class StorePublicApplicationRequest extends FormRequest
 {
     /**
-     * السماح لجميع المتقدمين الخارجيين بالوصول للرابط بدون تسجيل دخول
+     * التحقق مما إذا كان المتقدم مسموحاً له بإرسال الطلب (هل التقديم مفتوح؟)
      */
     public function authorize(): bool
     {
-        return true;
+        // نقرأ من الكاش المفتاح "hr_internship_applications_open"
+        // إذا لم يكن المفتاح موجوداً بعد، نعتبر القيمة الافتراضية true (مفتوح)
+        return (bool) Cache::get('hr_internship_applications_open', true);
+    }
+
+    /**
+     * إرجاع استجابة مخصصة باللغة العربية عند محاولة التقديم والطلب مغلق
+     */
+    protected function failedAuthorization()
+    {
+        throw new HttpResponseException(response()->json([
+            'message' => 'عذراً، استقبال طلبات التدريب مغلق حالياً.'
+        ], 403));
     }
 
     /**

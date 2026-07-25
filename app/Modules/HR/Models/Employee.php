@@ -31,7 +31,7 @@ class Employee extends Model
     protected $fillable = [
         'full_name', 'date_of_birth', 'gender', 'marital_status',
         'national_id', 'email', 'phone', 'address',
-        'employee_number', 'barcode', 'join_date', 'status', 'employment_type',
+        'employee_number', 'barcode', 'tracking_code', 'join_date', 'status', 'employment_type',
         'department_id', 'position_id', 'manager_id', 'user_id',
         'internship_start_date', 'internship_end_date', 'internship_status',
         'academic_institution', 'academic_major', 'required_training_hours', 'internship_notes'
@@ -72,12 +72,13 @@ class Employee extends Model
     /**
      * جلب المتدربين فقط وعزل الموظفين الرسميين (معدلة لتلائم الـ Global Scope)
      */
-   public function scopeOnlyInterns(Builder $query): Builder
+    public function scopeOnlyInterns(Builder $query): Builder
     {
         return $query->withoutGlobalScope('exclude_interns')
             ->where('employment_type', EmploymentType::Intern->value)
             ->where('internship_status', 'active');
     }
+
     /**
      * جلب المتدربين المنتهية فترتهم التدريبية ولم يتم تثبيتهم بعد
      * (تاريخ انتهاء التدريب أصغر من تاريخ اليوم وحالة التدريب ما زالت نشطة)
@@ -89,18 +90,18 @@ class Employee extends Model
             ->where('internship_status', 'completed');
     }
 
+    public function activeContract(): HasOne
+    {
+        return $this->hasOne(Contract::class)
+            ->where('is_active', true)
+            ->where('start_date', '<=', now()->toDateString())
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                      ->orWhere('end_date', '>=', now()->toDateString());
+            })
+            ->latestOfMany('start_date');
+    }
 
-public function activeContract(): HasOne
-{
-    return $this->hasOne(Contract::class)
-        ->where('is_active', true)
-        ->where('start_date', '<=', now()->toDateString())
-        ->where(function ($query) {
-            $query->whereNull('end_date')
-                  ->orWhere('end_date', '>=', now()->toDateString());
-        })
-        ->latestOfMany('start_date');
-}
     // --- العلاقات الأساسية للمنظومة ---
 
     public function department(): BelongsTo

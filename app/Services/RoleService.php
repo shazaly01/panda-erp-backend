@@ -92,17 +92,26 @@ class RoleService
     private function getActionsList(): array
     {
         $actions = [
-            'view'       => 'عرض',
-            'create'     => 'إضافة',
-            'update'     => 'تعديل',
-            'delete'     => 'حذف',
-            'manage'     => 'إدارة كاملة',
-            'approve'    => 'اعتماد',
-            'post'       => 'ترحيل مالي',
-            'request'    => 'تقديم طلب',
-            'close'      => 'إغلاق',
-            'download'   => 'تحميل',
-            'gate_check' => 'فحص البوابة'
+            'view'           => 'عرض',
+            'create'         => 'إضافة',
+            'update'         => 'تعديل',
+            'delete'         => 'حذف',
+            'manage'         => 'إدارة كاملة',
+            'approve'        => 'اعتماد',
+            'reject'         => 'رفض',
+            'post'           => 'ترحيل مالي',
+            'request'        => 'تقديم طلب',
+            'close'          => 'إغلاق',
+            'download'       => 'تحميل',
+            'gate_check'     => 'فحص البوابة',
+            'convert'        => 'تثبيت كـ موظف',
+            'view_pending'   => 'عرض المعلقة',
+            'view_active'    => 'عرض النشطة',
+            'view_completed' => 'عرض المكتملة',
+            'view_rejected'  => 'عرض المرفوضة',
+            'toggle_status'  => 'تغيير حالة التقديم',
+            'check_in'       => 'تسجيل دخول زائر',
+            'check_out'      => 'تسجيل خروج زائر',
         ];
 
         $formattedActions = [];

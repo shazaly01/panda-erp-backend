@@ -28,7 +28,7 @@ class AttendanceLogController extends Controller
         $this->authorizeResource(AttendanceLog::class, 'attendance_log');
     }
 
-   /**
+    /**
      * عرض سجلات الحضور التفصيلية المفلترة بالكامل
      * يدعم حصر وفرز (الموظفين، المتدربين، أو كلاهما معاً) لحساب الأعداد الفعلية
      */
@@ -84,6 +84,17 @@ class AttendanceLogController extends Controller
         if ($request->filled('department_id')) {
             $query->whereHas('employee', function ($q) use ($request) {
                 $q->withoutGlobalScope('exclude_interns')->where('department_id', $request->department_id);
+            });
+        }
+
+        // 🌟 6. فلترة طريقة / مجموعة الدفع (pay_group_id) المربوطة بالعقد النشط للموظف
+        if ($request->filled('pay_group_id')) {
+            $query->whereHas('employee', function ($q) use ($request) {
+                $q->withoutGlobalScope('exclude_interns')
+                  ->whereHas('contracts', function ($contractQ) use ($request) {
+                      $contractQ->where('pay_group_id', $request->pay_group_id)
+                                ->where('is_active', true);
+                  });
             });
         }
 
@@ -186,7 +197,7 @@ class AttendanceLogController extends Controller
         return response()->json(['message' => 'تم حذف سجل الحضور بنجاح.'], 200);
     }
 
-   /**
+    /**
      * تسجيل الدخول السريع عبر الباركود والـ QR Code (Kiosk Mode)
      * مع الفحص التلقائي لصلاحية باركود المتدربين بناءً على تاريخ نهاية التدريب
      */

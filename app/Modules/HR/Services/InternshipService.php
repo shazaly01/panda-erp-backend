@@ -123,6 +123,7 @@ class InternshipService
                 'national_id' => $application->national_id,
                 'employee_number' => $employeeNumber,
                 'barcode' => $barcode,
+                'tracking_code' => $application->tracking_code,
                 'join_date' => $approvalData['internship_start_date'], // 🔥 تم التعديل ليأخذ من مدخلات المشرف
                 'status' => EmployeeStatus::Training->value,
                 'employment_type' => EmploymentType::Intern->value,

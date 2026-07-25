@@ -70,6 +70,9 @@ Route::middleware('auth:sanctum')
     Route::get('internship-applications', [InternshipDashboardController::class, 'index']);
     Route::get('internship-applications/active-interns', [InternshipDashboardController::class, 'activeInterns']);
     Route::get('internship-applications/completed-interns', [InternshipDashboardController::class, 'completedInterns']);
+    // جلب حالة التقديم الحالية (مفتوح / مغلق)
+    Route::get('internship-applications/registration-status', [InternshipDashboardController::class, 'getRegistrationStatus']);
+    Route::post('internship-applications/toggle-registration-status', [InternshipDashboardController::class, 'toggleRegistrationStatus']);
     Route::put('internship-applications/{id}/update-dates', [InternshipDashboardController::class, 'updateDates']);
     Route::post('internship-applications/{id}/approve', [InternshipDashboardController::class, 'approve']);
     Route::post('internship-applications/{id}/reject', [InternshipDashboardController::class, 'reject']);

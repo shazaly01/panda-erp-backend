@@ -24,6 +24,7 @@ class AttendanceReportController extends Controller
             'employee_id'     => ['nullable', 'integer'],
             'department_id'   => ['nullable', 'integer'],
             'position_id'     => ['nullable', 'integer'],
+            'pay_group_id'    => ['nullable', 'integer'],
             'employment_type' => ['nullable', 'string'],
             'present_only'    => ['nullable', 'boolean'],
             'search'          => ['nullable', 'string'],
@@ -64,6 +65,12 @@ class AttendanceReportController extends Controller
             })
             ->leftJoin('departments as d', 'e.department_id', '=', 'd.id')
             ->leftJoin('hr_shifts as s', 'al.shift_id', '=', 's.id')
+            // 🌟 الربط مع عقد الموظف النشط لجلب طريقة الدفع
+            ->leftJoin('contracts as c', function ($join) {
+                $join->on('e.id', '=', 'c.employee_id')
+                    ->where('c.is_active', '=', true)
+                    ->whereNull('c.deleted_at');
+            })
             ->select(
                 'e.id as employee_id',
                 'e.employee_number',
@@ -112,6 +119,11 @@ class AttendanceReportController extends Controller
 
         if ($request->filled('position_id')) {
             $query->where('e.position_id', '=', (int) $request->input('position_id'));
+        }
+
+        // 🌟 تطبيق التصفية بحقل pay_group_id الخاص بجدول العقود
+        if ($request->filled('pay_group_id')) {
+            $query->where('c.pay_group_id', '=', (int) $request->input('pay_group_id'));
         }
 
         if ($request->filled('employment_type')) {

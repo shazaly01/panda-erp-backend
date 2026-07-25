@@ -10,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class EmployeeResource extends JsonResource
 {
     /**
-     * تحويل الموديل شامل الحقول الأكاديمية والمستحدثة للمتدربين
+     * تحويل الموديل شامل الحقول الأكاديمية والمستحدثة للمتدربين وكود المتابعة
      */
     public function toArray(Request $request): array
     {
@@ -19,6 +19,7 @@ class EmployeeResource extends JsonResource
             'full_name' => $this->full_name,
             'employee_number' => $this->employee_number,
             'barcode' => $this->barcode,
+            'tracking_code' => $this->tracking_code,
             'national_id' => $this->national_id,
 
             // البيانات الديموغرافية
