@@ -182,7 +182,8 @@ if ($resolution['treat_as_overtime'] || $resolution['is_off_day']) {
         // ==========================================
         // 4. تحديد نوع البصمة (التوجيه حسب نظام الشركة)
         // ==========================================
-        $attendanceMode = env('ATTENDANCE_MODE', 'strict');
+       $attendanceMode = $employee->currentContract?->attendance_mode
+    ?? config('hr.attendance_mode', 'strict');
 
         if ($attendanceMode === 'auto_shift_pair') {
             // 🌟 1. الوضع الجديد: التوليد التلقائي بناءً على ساعات الوردية الحقيقية (12 ساعة، 8 ساعات... إلخ)
@@ -204,8 +205,8 @@ if ($resolution['treat_as_overtime'] || $resolution['is_off_day']) {
                 $shiftDurationMinutes = $shiftStart->diffInMinutes($shiftEnd);
 
                 // تعيين الدخول والانصراف آلياً بناءً على ساعات الوردية الفعلية
-                $checkInTime  = $punchTime->toTimeString();
-                $checkOutTime = $punchTime->copy()->addMinutes($shiftDurationMinutes)->toTimeString();
+               $checkInTime  = $shift->start_time;
+$checkOutTime = $shift->end_time;
 
                 $actionData = [
                     'status'  => 'success',
