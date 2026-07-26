@@ -48,7 +48,7 @@ class InternshipDashboardController extends Controller
      */
     public function toggleRegistrationStatus(): JsonResponse
     {
-        Gate::authorize('viewAny', InternshipApplication::class);
+        Gate::authorize('toggleStatus', InternshipApplication::class);
 
         $currentStatus = (bool) Cache::get('hr_internship_applications_open', true);
         $newStatus = !$currentStatus;
@@ -66,9 +66,13 @@ class InternshipDashboardController extends Controller
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        Gate::authorize('viewAny', InternshipApplication::class);
-
         $status = $request->query('status', 'pending');
+
+        if ($status === 'rejected') {
+            Gate::authorize('viewRejected', InternshipApplication::class);
+        } else {
+            Gate::authorize('viewPending', InternshipApplication::class);
+        }
 
         $applications = $this->internshipService->getApplicationsWithFilters($status, $request->all());
 
@@ -80,7 +84,7 @@ class InternshipDashboardController extends Controller
      */
     public function activeInterns(Request $request): AnonymousResourceCollection
     {
-        Gate::authorize('viewAny', Employee::class);
+        Gate::authorize('viewActive', InternshipApplication::class);
 
         $interns = $this->internshipService->getActiveInternsWithFilters($request->all());
 
@@ -92,7 +96,7 @@ class InternshipDashboardController extends Controller
      */
     public function completedInterns(Request $request): AnonymousResourceCollection
     {
-        Gate::authorize('viewAny', Employee::class);
+        Gate::authorize('viewCompleted', InternshipApplication::class);
 
         $interns = $this->internshipService->getCompletedInternsWithFilters($request->all());
 

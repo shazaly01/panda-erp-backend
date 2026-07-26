@@ -13,34 +13,87 @@ class InternshipApplicationPolicy
     use HandlesAuthorization;
 
     /**
-     * صلاحية استعراض كافة طلبات التدريب الخارجية المعلقة (فتح الشاشة)
+     * التحقق الشامل من امتلاك المستخدم لحيّز صلاحيات التدريب
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasPermissionTo('hr.internship_applications.view');
+        return $user->hasAnyPermission([
+            'hr.internship_applications.view_pending',
+            'hr.internship_applications.view_active',
+            'hr.internship_applications.view_completed',
+            'hr.internship_applications.view_rejected',
+        ]);
     }
 
     /**
-     * صلاحية عرض تفاصيل طلب تدريب معين داخل الشاشة
+     * صلاحية استعراض طلبات التقديم المعلقة
+     */
+    public function viewPending(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.internship_applications.view_pending');
+    }
+
+    /**
+     * صلاحية استعراض قائمة المتدربين النشطين
+     */
+    public function viewActive(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.internship_applications.view_active');
+    }
+
+    /**
+     * صلاحية استعراض قائمة المتدربين المنتهية فترتهم التدريبية
+     */
+    public function viewCompleted(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.internship_applications.view_completed');
+    }
+
+    /**
+     * صلاحية استعراض قائمة الطلبات المرفوضة
+     */
+    public function viewRejected(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.internship_applications.view_rejected');
+    }
+
+    /**
+     * صلاحية عرض تفاصيل طلب تدريب معين
      */
     public function view(User $user, InternshipApplication $application): bool
     {
-        return $user->hasPermissionTo('hr.internship_applications.view');
+        return $this->viewAny($user);
     }
 
     /**
-     * صلاحية اعتماد وقبول طلب التدريب وتحويله لمتدرب (ربط فوري بصلاحية الشاشة الموحدة)
+     * صلاحية فتح وقفل استقبال طلبات التدريب
+     */
+    public function toggleStatus(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.internship_applications.toggle_status');
+    }
+
+    /**
+     * صلاحية اعتماد وقبول طلب التدريب
      */
     public function approve(User $user, InternshipApplication $application): bool
     {
-        return $user->hasPermissionTo('hr.internship_applications.view');
+        return $user->hasPermissionTo('hr.internship_applications.approve');
     }
 
     /**
-     * صلاحية رفض طلب التدريب المقدم (ربط فوري بصلاحية الشاشة الموحدة)
+     * صلاحية رفض طلب التدريب
      */
     public function reject(User $user, InternshipApplication $application): bool
     {
-        return $user->hasPermissionTo('hr.internship_applications.view');
+        return $user->hasPermissionTo('hr.internship_applications.reject');
+    }
+
+    /**
+     * صلاحية حذف طلب التدريب
+     */
+    public function delete(User $user, InternshipApplication $application): bool
+    {
+        return $user->hasPermissionTo('hr.internship_applications.delete');
     }
 }

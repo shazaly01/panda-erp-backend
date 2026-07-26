@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\HR\Policies;
 
 use App\Models\User;
@@ -14,12 +16,10 @@ class EmployeePolicy
 
     public function view(User $user, Employee $employee): bool
     {
-        // 1. المستخدم هو نفس الموظف
         if ($user->id === $employee->user_id) {
             return true;
         }
 
-        // 2. أو لديه صلاحية مدير
         return $user->can('hr.employees.view');
     }
 
@@ -36,5 +36,13 @@ class EmployeePolicy
     public function delete(User $user, Employee $employee): bool
     {
         return $user->can('hr.employees.delete');
+    }
+
+    /**
+     * صلاحية تثبيت المتدرب كموظف دائم
+     */
+    public function convert(User $user, Employee $employee): bool
+    {
+        return $user->can('hr.employees.convert');
     }
 }
