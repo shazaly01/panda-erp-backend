@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Permission;
@@ -38,12 +40,18 @@ class RoleService
         $structuredModules = [];
 
         foreach ($modulesGrouped as $moduleKey => $modulePermissions) {
-            if (empty($moduleKey)) continue;
+            if (empty($moduleKey)) {
+                continue;
+            }
 
             // جلب الاسم العربي للموديول المخزن في قاعدة البيانات مباشرة من أول عنصر في التجميعة
             $moduleDisplayName = $modulePermissions->first()->module_display_name;
             if (empty($moduleDisplayName)) {
-                $moduleDisplayName = $moduleKey === 'core' ? 'إدارة النظام' : $moduleKey;
+                $moduleDisplayName = match ($moduleKey) {
+                    'core', 'system' => 'إدارة النظام',
+                    'grant_requests' => 'طلبات المنح والدعم',
+                    default => $moduleKey,
+                };
             }
 
             // 2. التجميع الثاني: داخل الموديول الواحد، نجمع الصلاحيات حسب الشاشة (group_name)
@@ -51,12 +59,17 @@ class RoleService
             $structuredGroups = [];
 
             foreach ($groupsGrouped as $groupKey => $groupPermissions) {
-                if (empty($groupKey)) continue;
+                if (empty($groupKey)) {
+                    continue;
+                }
 
                 // جلب اسم الشاشة العربي المخزن في قاعدة البيانات مباشرة والذي تم بذره عبر الـ Seeder
                 $groupDisplayName = $groupPermissions->first()->group_display_name;
                 if (empty($groupDisplayName)) {
-                    $groupDisplayName = $groupKey;
+                    $groupDisplayName = match ($groupKey) {
+                        'grant_request' => 'طلبات الدعم والمنح',
+                        default => $groupKey,
+                    };
                 }
 
                 $formattedPermissions = $groupPermissions->map(function ($p) {
@@ -92,26 +105,37 @@ class RoleService
     private function getActionsList(): array
     {
         $actions = [
-            'view'           => 'عرض',
-            'create'         => 'إضافة',
-            'update'         => 'تعديل',
-            'delete'         => 'حذف',
-            'manage'         => 'إدارة كاملة',
-            'approve'        => 'اعتماد',
-            'reject'         => 'رفض',
-            'post'           => 'ترحيل مالي',
-            'request'        => 'تقديم طلب',
-            'close'          => 'إغلاق',
-            'download'       => 'تحميل',
-            'gate_check'     => 'فحص البوابة',
-            'convert'        => 'تثبيت كـ موظف',
-            'view_pending'   => 'عرض المعلقة',
-            'view_active'    => 'عرض النشطة',
-            'view_completed' => 'عرض المكتملة',
-            'view_rejected'  => 'عرض المرفوضة',
-            'toggle_status'  => 'تغيير حالة التقديم',
-            'check_in'       => 'تسجيل دخول زائر',
-            'check_out'      => 'تسجيل خروج زائر',
+            'view'                => 'عرض',
+            'create'              => 'إضافة',
+            'update'              => 'تعديل',
+            'delete'              => 'حذف',
+            'print'               => 'طباعة',
+            'manage'              => 'إدارة كاملة',
+            'approve'             => 'اعتماد',
+            'reject'              => 'رفض',
+            'post'                => 'ترحيل مالي',
+            'export'              => 'تصدير التقارير',
+            'request'             => 'تقديم طلب',
+            'close'               => 'إغلاق',
+            'download'            => 'تحميل',
+            'gate_check'          => 'فحص البوابة',
+            'convert'             => 'تثبيت كـ موظف',
+            'view_pending'        => 'عرض المعلقة',
+            'view_active'         => 'عرض النشطة',
+            'view_completed'      => 'عرض المكتملة',
+            'view_rejected'       => 'عرض المرفوضة',
+            'toggle_status'       => 'تغيير حالة التقديم',
+            'check_in'            => 'تسجيل دخول زائر',
+            'check_out'           => 'تسجيل خروج زائر',
+            'stock_card'          => 'كارت الصنف التفصيلي',
+            'stock_balance'       => 'أرصدة وتقيم المخزون',
+            'integrity_audit'     => 'فحص تدقيق ومطابقة البيانات',
+            'discrepancies'       => 'فروقات وتسويات الجرد',
+            'transfers_tracking'  => 'تتبع التحويلات',
+            'batch_expiry'        => 'الصلاحيات والتشغيلات',
+            'serial_tracking'     => 'الأرقام التسلسلية',
+            'reorder_alerts'      => 'نواقص المخزون وإعادة الطلب',
+            'production_variance' => 'انحرافات وتكاليف الإنتاج',
         ];
 
         $formattedActions = [];

@@ -13,15 +13,16 @@ readonly class JournalEntryDto
      */
     public function __construct(
         public DateTimeInterface|string $date,
-        public array $details, // مصفوفة من كائنات JournalEntryDetailDto
+        public array $details,
         public ?string $description = null,
         public ?int $currency_id = null,
-        public ?string $source = null, // 🌟 الإضافة هنا: استقبال مصدر القيد الآلي
+        public ?string $source = null,
+        public ?string $reference_type = null,
+        public ?int $reference_id = null,
     ) {}
 
     /**
      * دالة مساعدة للتحقق من أن المدخلات هي فعلاً كائنات DTO صحيحة
-     * (للحماية من إرسال مصفوفات عادية بالخطأ)
      */
     public function validateDetails(): void
     {

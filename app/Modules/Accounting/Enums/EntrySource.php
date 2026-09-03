@@ -6,12 +6,14 @@ namespace App\Modules\Accounting\Enums;
 
 enum EntrySource: string
 {
-    case Manual = 'manual';         // قيد يدوي من المحاسب
-    case Sales = 'sales';           // قيد آلي من فاتورة مبيعات
-    case Purchases = 'purchases';   // قيد آلي من فاتورة مشتريات
-    case Inventory = 'inventory';   // قيد آلي من حركة مخزنية (تسوية/تالف)
-    case Payroll = 'payroll';       // قيد آلي من مسير الرواتب
-    case OpeningBalance = 'opening'; // قيد افتتاحي (رصيد بداية المدة)
+    case Manual = 'manual';                 // قيد يدوي من المحاسب
+    case Sales = 'sales';                   // قيد آلي من فاتورة مبيعات
+    case Purchases = 'purchases';           // قيد آلي من فاتورة مشتريات
+    case Inventory = 'inventory';           // قيد آلي من حركة مخزنية (تسوية/تالف)
+    case Payroll = 'payroll';               // قيد آلي من مسير الرواتب
+    case OpeningBalance = 'opening';        // قيد افتتاحي (رصيد بداية المدة)
+    case Payment = 'payment';               // قيد آلي من سند صرف
+    case Receipt = 'receipt';               // قيد آلي من سند قبض
 
     public function label(): string
     {
@@ -22,6 +24,8 @@ enum EntrySource: string
             self::Inventory => 'مخزون',
             self::Payroll => 'رواتب',
             self::OpeningBalance => 'رصيد افتتاحي',
+            self::Payment => 'سند صرف',
+            self::Receipt => 'سند قبض',
         };
     }
 }

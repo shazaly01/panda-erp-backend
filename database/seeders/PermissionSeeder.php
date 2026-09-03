@@ -30,16 +30,30 @@ class PermissionSeeder extends Seeder
                 'create' => 'إضافة',
                 'update' => 'تعديل',
                 'delete' => 'حذف',
-                'approve' => 'تفعيل الحسابات المعلقة' // الصلاحية الجديدة المضافة
+                'approve' => 'تفعيل الحسابات المعلقة'
             ],
             'role' => [
-                'view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'
+                'view' => 'عرض',
+                'create' => 'إضافة',
+                'update' => 'تعديل',
+                'delete' => 'حذف'
             ],
             'setting' => [
-                'view' => 'عرض', 'update' => 'تعديل'
+                'view' => 'عرض',
+                'update' => 'تعديل'
             ],
             'backup' => [
-                'view' => 'عرض', 'create' => 'إضافة', 'delete' => 'حذف', 'download' => 'تحميل'
+                'view' => 'عرض',
+                'create' => 'إضافة',
+                'delete' => 'حذف',
+                'download' => 'تحميل'
+            ],
+            'grant_request' => [
+                'view' => 'عرض',
+                'create' => 'إضافة',
+                'update' => 'تعديل',
+                'delete' => 'حذف',
+                'print' => 'طباعة الخطاب'
             ],
         ];
 
@@ -51,7 +65,7 @@ class PermissionSeeder extends Seeder
                 Permission::updateOrCreate(
                     ['name' => $permissionName, 'guard_name' => $guardName],
                     [
-                        'module' => 'system',
+                        'module' => $groupKey === 'grant_request' ? 'grant_requests' : 'system',
                         'group_name' => $groupKey,
                         'action_name' => $actionKey,
                         'display_name' => $displayName
@@ -60,7 +74,7 @@ class PermissionSeeder extends Seeder
             }
         }
 
-        // --- إنشاء الأدوار الجديدة (استخدام updateOrCreate لمنع التكرار) ---
+        // --- إنشاء الأدوار وتحديث الصلاحيات (استخدام updateOrCreate لمنع التكرار) ---
 
         // 1. إنشاء دور "Super Admin"
         Role::updateOrCreate(
@@ -78,9 +92,9 @@ class PermissionSeeder extends Seeder
         $dataEntryRole = Role::updateOrCreate(
             ['name' => 'Data Entry', 'guard_name' => $guardName]
         );
-        // إعطاء دور "مدخل بيانات" صلاحيات العرض والإنشاء والتحديث فقط
+        // إعطاء دور "مدخل بيانات" صلاحيات العرض والإنشاء والتحديث والطباعة
         $dataEntryPermissions = Permission::where('guard_name', $guardName)
-            ->whereIn('action_name', ['view', 'create', 'update'])
+            ->whereIn('action_name', ['view', 'create', 'update', 'print'])
             ->get();
         $dataEntryRole->syncPermissions($dataEntryPermissions);
 
@@ -88,9 +102,9 @@ class PermissionSeeder extends Seeder
         $auditorRole = Role::updateOrCreate(
             ['name' => 'Auditor', 'guard_name' => $guardName]
         );
-        // إعطاء دور "مراجع" صلاحيات العرض فقط، باستثناء لوحة التحكم
+        // إعطاء دور "مراجع" صلاحيات العرض والطباعة فقط، باستثناء لوحة التحكم
         $auditorPermissions = Permission::where('guard_name', $guardName)
-            ->where('action_name', 'view')
+            ->whereIn('action_name', ['view', 'print'])
             ->where('name', '!=', 'dashboard.view')
             ->get();
         $auditorRole->syncPermissions($auditorPermissions);

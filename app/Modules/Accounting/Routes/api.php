@@ -13,6 +13,8 @@ use App\Modules\Accounting\Http\Controllers\CurrencyController;
 use App\Modules\Accounting\Http\Controllers\BoxController;
 use App\Modules\Accounting\Http\Controllers\BankAccountController;
 use App\Modules\Accounting\Http\Controllers\VoucherController;
+use App\Modules\Accounting\Http\Controllers\AccountPartySearchController;
+use App\Modules\Accounting\Http\Controllers\BudgetController;
 
 Route::middleware('auth:sanctum')
     ->prefix('accounting')
@@ -26,6 +28,11 @@ Route::middleware('auth:sanctum')
     Route::apiResource('accounts', AccountController::class);
     Route::apiResource('cost-centers', CostCenterController::class);
     Route::apiResource('fiscal-years', FiscalYearController::class);
+
+
+    // --- البحث الموحد في الحسابات والأطراف المساعدة ---
+    Route::get('parties/search', [AccountPartySearchController::class, 'search']);
+    Route::get('parties/types', [AccountPartySearchController::class, 'types']);
 
     // ===========================================
     // 2. إدارة النقدية (Treasury) - [الجديد]
@@ -77,5 +84,15 @@ Route::middleware('auth:sanctum')
 
     // اعتماد السند
     Route::post('vouchers/{voucher}/approve', [VoucherController::class, 'approve']);
+
+
+    // ===========================================
+    // 6. الموازنات التقديرية (Budgets)
+    // ===========================================
+    Route::apiResource('budgets', BudgetController::class);
+    Route::post('budgets/{budget}/approve', [BudgetController::class, 'approve']);
+    Route::post('budgets/{budget}/activate', [BudgetController::class, 'activate']);
+    Route::post('budgets/{budget}/close', [BudgetController::class, 'close']);
+    Route::get('budgets/{budget}/variance-report', [BudgetController::class, 'varianceReport']);
 
 });

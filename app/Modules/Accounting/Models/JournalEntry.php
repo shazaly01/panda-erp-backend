@@ -9,9 +9,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use App\Modules\Accounting\Enums\EntryStatus;
 use App\Modules\Accounting\Enums\EntrySource;
-use App\Models\User; // موديل المستخدم من التطبيق الأساسي
+use App\Models\User;
 use App\Modules\Accounting\Database\Factories\JournalEntryFactory;
 
 class JournalEntry extends Model
@@ -26,7 +27,9 @@ class JournalEntry extends Model
         'description',
         'currency_id',
         'created_by',
-        'posted_at'
+        'posted_at',
+        'reference_type',
+        'reference_id',
     ];
 
     protected $casts = [
@@ -53,6 +56,15 @@ class JournalEntry extends Model
     }
 
     /**
+     * المرجع للمستند الأصلي (تسوية جردية، فاتورة، سند، إلخ)
+     * Polymorphic Relation
+     */
+    public function reference(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
      * حماية دفتر الأستاذ (The Ledger Immutability)
      */
     protected static function boot()
@@ -66,19 +78,16 @@ class JournalEntry extends Model
             }
         });
 
-        // 2. منع التعديل إذا كان القيد مرحلاً (حماية إضافية)
+        // 2. منع التعديل إذا كان القيد مرحلاً
         static::updating(function ($entry) {
-            // نسمح فقط بتعديل القيد إذا لم يكن مرحلاً،
-            // إلا إذا كنا نقوم بعملية "إلغاء ترحيل" (وهذا سنناقشه لاحقاً)
             if ($entry->original['status'] === EntryStatus::Posted->value && $entry->status !== EntryStatus::Void) {
-                // هنا يمكن تخفيف الشرط للسماح بتعديل "الشرح" فقط، لكن حالياً سنمنع التعديل تماماً
-                // abort(409, 'لا يمكن تعديل قيد مرحل.');
+                // منع التعديل إذا كان القيد مرحلاً
             }
         });
     }
 
     protected static function newFactory()
-{
-    return JournalEntryFactory::new();
-}
+    {
+        return JournalEntryFactory::new();
+    }
 }

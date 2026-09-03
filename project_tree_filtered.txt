@@ -13,6 +13,7 @@
 │   │   │   ├── CompanyController.php
 │   │   │   ├── DashboardController.php
 │   │   │   ├── DocumentController.php
+│   │   │   ├── GrantRequestController.php
 │   │   │   ├── PaymentController.php
 │   │   │   ├── ProjectController.php
 │   │   │   ├── ReportController.php
@@ -28,6 +29,9 @@
 │   │   ├── [DIR] Company
 │   │   ├── [DIR] Document
 │   │   │   ├── StoreDocumentRequest.php
+│   │   ├── [DIR] GrantRequest
+│   │   │   ├── StoreGrantRequest.php
+│   │   │   ├── UpdateGrantRequest.php
 │   │   ├── [DIR] Payment
 │   │   ├── [DIR] Project
 │   │   ├── [DIR] Role
@@ -42,6 +46,8 @@
 │   │   │   ├── CompanyResource.php
 │   │   │   ├── DashboardStatsResource.php
 │   │   │   ├── DocumentResource.php
+│   │   │   ├── GrantRequestItemResource.php
+│   │   │   ├── GrantRequestResource.php
 │   │   │   ├── PaymentResource.php
 │   │   │   ├── PermissionResource.php
 │   │   │   ├── ProjectResource.php
@@ -50,12 +56,16 @@
 ├── [DIR] Models
 │   ├── Company.php
 │   ├── Document.php
+│   ├── GrantRequest.php
+│   ├── GrantRequestItem.php
 │   ├── Payment.php
 │   ├── Permission.php
 │   ├── Project.php
 │   ├── User.php
 ├── [DIR] Modules
 │   ├── [DIR] Accounting
+│   │   ├── [DIR] Contracts
+│   │   │   ├── PartySearchProviderInterface.php
 │   │   ├── [DIR] DTO
 │   │   │   ├── JournalEntryDetailDto.php
 │   │   │   ├── JournalEntryDto.php
@@ -86,6 +96,10 @@
 │   │   │   │   ├── 2026_04_03_055442_add_payee_name_to_vouchers_table.php
 │   │   │   │   ├── 2026_04_04_071452_add_source_id_to_journal_entries_table.php
 │   │   │   │   ├── 2026_04_15_092218_add_party_to_voucher_details_table.php
+│   │   │   │   ├── 2026_08_18_202723_add_reference_to_journal_entries_table.php
+│   │   │   │   ├── 2026_08_29_195841_create_budgets_table.php
+│   │   │   │   ├── 2026_08_29_200120_create_budget_lines_table.php
+│   │   │   │   ├── 2026_09_01_181223_make_account_id_nullable_in_budget_lines_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── AccountMappingSeeder.php
 │   │   │   │   ├── AccountingPermissionsSeeder.php
@@ -93,6 +107,9 @@
 │   │   ├── [DIR] Enums
 │   │   │   ├── AccountNature.php
 │   │   │   ├── AccountType.php
+│   │   │   ├── BudgetControlMode.php
+│   │   │   ├── BudgetPeriodType.php
+│   │   │   ├── BudgetStatus.php
 │   │   │   ├── CostCenterType.php
 │   │   │   ├── EntrySource.php
 │   │   │   ├── EntryStatus.php
@@ -103,8 +120,10 @@
 │   │   │   ├── [DIR] Controllers
 │   │   │   │   ├── AccountController.php
 │   │   │   │   ├── AccountMappingController.php
+│   │   │   │   ├── AccountPartySearchController.php
 │   │   │   │   ├── BankAccountController.php
 │   │   │   │   ├── BoxController.php
+│   │   │   │   ├── BudgetController.php
 │   │   │   │   ├── CostCenterController.php
 │   │   │   │   ├── CurrencyController.php
 │   │   │   │   ├── FiscalYearController.php
@@ -115,6 +134,7 @@
 │   │   │   │   ├── StoreAccountRequest.php
 │   │   │   │   ├── StoreBankAccountRequest.php
 │   │   │   │   ├── StoreBoxRequest.php
+│   │   │   │   ├── StoreBudgetRequest.php
 │   │   │   │   ├── StoreCostCenterRequest.php
 │   │   │   │   ├── StoreCurrencyRequest.php
 │   │   │   │   ├── StoreFiscalYearRequest.php
@@ -124,6 +144,7 @@
 │   │   │   │   ├── UpdateAccountRequest.php
 │   │   │   │   ├── UpdateBankAccountRequest.php
 │   │   │   │   ├── UpdateBoxRequest.php
+│   │   │   │   ├── UpdateBudgetRequest.php
 │   │   │   │   ├── UpdateCostCenterRequest.php
 │   │   │   │   ├── UpdateCurrencyRequest.php
 │   │   │   │   ├── UpdateFiscalYearRequest.php
@@ -134,6 +155,8 @@
 │   │   │   │   ├── AccountResource.php
 │   │   │   │   ├── BankAccountResource.php
 │   │   │   │   ├── BoxResource.php
+│   │   │   │   ├── BudgetLineResource.php
+│   │   │   │   ├── BudgetResource.php
 │   │   │   │   ├── CostCenterResource.php
 │   │   │   │   ├── CurrencyResource.php
 │   │   │   │   ├── FiscalYearResource.php
@@ -146,6 +169,8 @@
 │   │   │   ├── AccountMapping.php
 │   │   │   ├── BankAccount.php
 │   │   │   ├── Box.php
+│   │   │   ├── Budget.php
+│   │   │   ├── BudgetLine.php
 │   │   │   ├── CostCenter.php
 │   │   │   ├── Currency.php
 │   │   │   ├── FiscalYear.php
@@ -157,6 +182,7 @@
 │   │   │   ├── AccountPolicy.php
 │   │   │   ├── BankAccountPolicy.php
 │   │   │   ├── BoxPolicy.php
+│   │   │   ├── BudgetPolicy.php
 │   │   │   ├── CostCenterPolicy.php
 │   │   │   ├── CurrencyPolicy.php
 │   │   │   ├── FiscalYearPolicy.php
@@ -168,7 +194,10 @@
 │   │   │   ├── PeriodIsOpenRule.php
 │   │   ├── [DIR] Services
 │   │   │   ├── AccountMappingService.php
+│   │   │   ├── AccountPartySearchService.php
 │   │   │   ├── AccountService.php
+│   │   │   ├── BudgetCheckerService.php
+│   │   │   ├── BudgetService.php
 │   │   │   ├── CostCenterService.php
 │   │   │   ├── FiscalYearService.php
 │   │   │   ├── JournalEntryService.php
@@ -176,32 +205,54 @@
 │   │   │   │   ├── AccountStatementService.php
 │   │   │   │   ├── AccountingReportingService.php
 │   │   │   │   ├── BalanceSheetService.php
+│   │   │   │   ├── BudgetVarianceService.php
 │   │   │   │   ├── IncomeStatementService.php
 │   │   │   │   ├── TrialBalanceService.php
+│   │   │   ├── [DIR] SearchProviders
+│   │   │   │   ├── AccountSearchProvider.php
+│   │   │   │   ├── EmployeeSearchProvider.php
+│   │   │   │   ├── PartnerSearchProvider.php
+│   │   │   │   ├── WarehouseSearchProvider.php
 │   │   │   ├── TreasuryService.php
 │   │   │   ├── VoucherService.php
 │   ├── [DIR] Core
 │   │   ├── [DIR] Database
 │   │   │   ├── [DIR] Migrations
 │   │   │   │   ├── 2025_12_25_070545_create_sequences_table.php
+│   │   │   │   ├── 2026_09_01_233830_create_partners_table.php
+│   │   │   ├── [DIR] Seeders
+│   │   │   │   ├── PartnerPermissionsSeeder.php
+│   │   ├── [DIR] Enums
+│   │   │   ├── PartnerStatus.php
+│   │   │   ├── PartnerTaxTreatment.php
+│   │   │   ├── PartnerType.php
 │   │   ├── [DIR] Http
 │   │   │   ├── [DIR] Controllers
+│   │   │   │   ├── PartnerController.php
 │   │   │   │   ├── SequenceController.php
 │   │   │   ├── [DIR] Requests
+│   │   │   │   ├── [DIR] Partner
+│   │   │   │   │   ├── StorePartnerRequest.php
+│   │   │   │   │   ├── UpdatePartnerRequest.php
 │   │   │   │   ├── UpdateSequenceRequest.php
 │   │   │   ├── [DIR] Resources
+│   │   │   │   ├── PartnerResource.php
 │   │   │   │   ├── SequenceResource.php
 │   │   ├── [DIR] Models
+│   │   │   ├── Partner.php
 │   │   │   ├── Sequence.php
 │   │   ├── [DIR] Policies
+│   │   │   ├── PartnerPolicy.php
 │   │   │   ├── SequencePolicy.php
 │   │   ├── [DIR] Services
+│   │   │   ├── PartnerService.php
 │   │   │   ├── SequenceService.php
 │   │   ├── [DIR] routes
 │   │   │   ├── api.php
 │   ├── [DIR] HR
 │   │   ├── [DIR] Console
 │   │   │   ├── [DIR] Commands
+│   │   │   │   ├── FixPastAttendanceLogsCommand.php
 │   │   │   │   ├── RecordAutoAttendanceCommand.php
 │   │   ├── [DIR] Database
 │   │   │   ├── [DIR] Factories
@@ -253,6 +304,14 @@
 │   │   │   │   ├── 2026_05_14_181508_add_audit_fields_to_hr_attendance_logs_table.php
 │   │   │   │   ├── 2026_05_17_142646_create_department_supervisors_table.php
 │   │   │   │   ├── 2026_06_04_131501_create_hr_leave_passes_table.php
+│   │   │   │   ├── 2026_06_14_175432_create_hr_visitors_table.php
+│   │   │   │   ├── 2026_06_14_184346_add_visit_date_to_hr_visitors_table.php
+│   │   │   │   ├── 2026_06_18_155825_create_hr_internship_applications_table.php
+│   │   │   │   ├── 2026_06_18_155832_add_internship_fields_to_employees_table.php
+│   │   │   │   ├── 2026_06_24_132635_add_tracking_fields_to_hr_internship_applications_table.php
+│   │   │   │   ├── 2026_06_24_155409_make_salary_structure_id_nullable_in_contracts_table.php
+│   │   │   │   ├── 2026_07_05_161244_change_internship_dates_to_nullable_in_hr_internship_applications_table.php
+│   │   │   │   ├── 2026_07_25_114345_add_tracking_code_to_employees_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── HRPermissionsSeeder.php
 │   │   │   │   ├── SalaryRulesSeeder.php
@@ -277,6 +336,7 @@
 │   │   │   │   ├── DepartmentController.php
 │   │   │   │   ├── EmployeeController.php
 │   │   │   │   ├── InternetVoucherController.php
+│   │   │   │   ├── InternshipDashboardController.php
 │   │   │   │   ├── LeavePassController.php
 │   │   │   │   ├── LeaveRequestController.php
 │   │   │   │   ├── LoanController.php
@@ -287,12 +347,14 @@
 │   │   │   │   ├── PayrollController.php
 │   │   │   │   ├── PayrollInputController.php
 │   │   │   │   ├── PositionController.php
+│   │   │   │   ├── PublicInternshipController.php
 │   │   │   │   ├── [DIR] Reports
 │   │   │   │   │   ├── AttendanceReportController.php
 │   │   │   │   ├── SalaryRuleController.php
 │   │   │   │   ├── SalaryStructureController.php
 │   │   │   │   ├── ShiftController.php
 │   │   │   │   ├── ShiftOverrideController.php
+│   │   │   │   ├── VisitorController.php
 │   │   │   │   ├── WorkingScheduleController.php
 │   │   │   ├── [DIR] Requests
 │   │   │   │   ├── [DIR] Attendance
@@ -305,8 +367,14 @@
 │   │   │   │   │   ├── StoreDepartmentRequest.php
 │   │   │   │   │   ├── UpdateDepartmentRequest.php
 │   │   │   │   ├── [DIR] Employee
+│   │   │   │   │   ├── ApproveInternApplicationRequest.php
+│   │   │   │   │   ├── CheckApplicationTrackingRequest.php
+│   │   │   │   │   ├── ConvertInternToFullTimeRequest.php
+│   │   │   │   │   ├── RejectInternApplicationRequest.php
 │   │   │   │   │   ├── StoreEmployeeRequest.php
+│   │   │   │   │   ├── StorePublicApplicationRequest.php
 │   │   │   │   │   ├── UpdateEmployeeRequest.php
+│   │   │   │   │   ├── UpdatePublicApplicationRequest.php
 │   │   │   │   ├── [DIR] InternetVoucher
 │   │   │   │   │   ├── AssignInternetVoucherRequest.php
 │   │   │   │   │   ├── ImportInternetVoucherRequest.php
@@ -351,6 +419,10 @@
 │   │   │   │   │   ├── AssignEmployeeShiftRequest.php
 │   │   │   │   │   ├── StoreShiftRequest.php
 │   │   │   │   │   ├── UpdateShiftRequest.php
+│   │   │   │   ├── [DIR] Visitor
+│   │   │   │   │   ├── GateActionRequest.php
+│   │   │   │   │   ├── StoreVisitorRequest.php
+│   │   │   │   │   ├── UpdateVisitorRequest.php
 │   │   │   ├── [DIR] Resources
 │   │   │   │   ├── AttendanceLogResource.php
 │   │   │   │   ├── CalendarExceptionResource.php
@@ -359,6 +431,7 @@
 │   │   │   │   ├── EmployeeResource.php
 │   │   │   │   ├── EmployeeShiftResource.php
 │   │   │   │   ├── InternetVoucherResource.php
+│   │   │   │   ├── InternshipApplicationResource.php
 │   │   │   │   ├── LeavePassResource.php
 │   │   │   │   ├── LeaveRequestResource.php
 │   │   │   │   ├── LoanResource.php
@@ -373,6 +446,7 @@
 │   │   │   │   ├── SalaryStructureResource.php
 │   │   │   │   ├── ShiftOverrideResource.php
 │   │   │   │   ├── ShiftResource.php
+│   │   │   │   ├── VisitorResource.php
 │   │   │   │   ├── WorkingScheduleLineResource.php
 │   │   │   │   ├── WorkingScheduleResource.php
 │   │   ├── [DIR] Models
@@ -387,6 +461,7 @@
 │   │   │   ├── EmployeeShift.php
 │   │   │   ├── HrLeavePass.php
 │   │   │   ├── InternetVoucher.php
+│   │   │   ├── InternshipApplication.php
 │   │   │   ├── LeaveBalance.php
 │   │   │   ├── LeaveRequest.php
 │   │   │   ├── LeaveType.php
@@ -404,6 +479,7 @@
 │   │   │   ├── SalaryStructure.php
 │   │   │   ├── Shift.php
 │   │   │   ├── ShiftOverride.php
+│   │   │   ├── Visitor.php
 │   │   │   ├── WorkingSchedule.php
 │   │   │   ├── WorkingScheduleLine.php
 │   │   ├── [DIR] Policies
@@ -414,6 +490,7 @@
 │   │   │   ├── EmployeePolicy.php
 │   │   │   ├── HrLeavePassPolicy.php
 │   │   │   ├── InternetVoucherPolicy.php
+│   │   │   ├── InternshipApplicationPolicy.php
 │   │   │   ├── LeaveRequestPolicy.php
 │   │   │   ├── LoanPolicy.php
 │   │   │   ├── OvertimePolicyPolicy.php
@@ -426,12 +503,14 @@
 │   │   │   ├── SalaryStructurePolicy.php
 │   │   │   ├── ShiftOverridePolicy.php
 │   │   │   ├── ShiftPolicy.php
+│   │   │   ├── VisitorPolicy.php
 │   │   │   ├── WorkingSchedulePolicy.php
 │   │   ├── [DIR] Routes
 │   │   │   ├── api.php
 │   │   ├── [DIR] Services
 │   │   │   ├── AttendanceService.php
 │   │   │   ├── InternetVoucherService.php
+│   │   │   ├── InternshipService.php
 │   │   │   ├── LeaveService.php
 │   │   │   ├── LoanService.php
 │   │   │   ├── ManagerAttendanceService.php
@@ -442,10 +521,195 @@
 │   │   │   ├── ScheduleResolutionService.php
 │   │   │   ├── ShiftService.php
 │   │   │   ├── TimeEvaluationService.php
+│   │   │   ├── VisitorService.php
 │   │   │   ├── WorkingScheduleService.php
+│   ├── [DIR] Inventory
+│   │   ├── [DIR] Database
+│   │   │   ├── [DIR] Migrations
+│   │   │   │   ├── 2026_07_26_132208_create_inventory_units_table.php
+│   │   │   │   ├── 2026_07_26_132227_create_inventory_categories_table.php
+│   │   │   │   ├── 2026_07_26_132259_create_inventory_warehouses_table.php
+│   │   │   │   ├── 2026_07_26_132305_create_inventory_warehouse_locations_table.php
+│   │   │   │   ├── 2026_07_26_132315_create_inventory_price_lists_table.php
+│   │   │   │   ├── 2026_07_26_132347_create_inventory_products_table.php
+│   │   │   │   ├── 2026_07_26_132404_create_inventory_product_units_table.php
+│   │   │   │   ├── 2026_07_26_132415_create_inventory_reorder_rules_table.php
+│   │   │   │   ├── 2026_07_26_133221_create_inventory_product_barcodes_table.php
+│   │   │   │   ├── 2026_07_26_133237_create_inventory_product_prices_table.php
+│   │   │   │   ├── 2026_07_26_133321_create_inventory_stock_batches_table.php
+│   │   │   │   ├── 2026_07_26_133330_create_inventory_serials_table.php
+│   │   │   │   ├── 2026_07_26_133341_create_inventory_product_stocks_table.php
+│   │   │   │   ├── 2026_07_26_133456_create_inventory_stock_movements_table.php
+│   │   │   │   ├── 2026_07_26_133517_create_inventory_transfers_table.php
+│   │   │   │   ├── 2026_07_26_133752_create_inventory_transfer_items_table.php
+│   │   │   │   ├── 2026_07_26_133811_create_inventory_adjustments_table.php
+│   │   │   │   ├── 2026_07_26_133938_create_inventory_adjustment_items_table.php
+│   │   │   │   ├── 2026_07_26_134050_create_inventory_boms_table.php
+│   │   │   │   ├── 2026_07_26_134153_create_inventory_bom_items_table.php
+│   │   │   │   ├── 2026_07_26_134220_create_inventory_production_orders_table.php
+│   │   │   │   ├── 2026_07_26_134306_create_inventory_production_order_items_table.php
+│   │   │   ├── [DIR] Seeders
+│   │   │   │   ├── InventoryPermissionsSeeder.php
+│   │   ├── [DIR] Http
+│   │   │   ├── [DIR] Controllers
+│   │   │   │   ├── AdjustmentController.php
+│   │   │   │   ├── CategoryController.php
+│   │   │   │   ├── InventoryReportController.php
+│   │   │   │   ├── PriceListController.php
+│   │   │   │   ├── ProductController.php
+│   │   │   │   ├── TransferController.php
+│   │   │   │   ├── UnitController.php
+│   │   │   │   ├── WarehouseController.php
+│   │   │   │   ├── WarehouseLocationController.php
+│   │   │   ├── [DIR] Requests
+│   │   │   │   ├── [DIR] Adjustments
+│   │   │   │   │   ├── StoreAdjustmentRequest.php
+│   │   │   │   │   ├── UpdateAdjustmentRequest.php
+│   │   │   │   ├── [DIR] Boms
+│   │   │   │   │   ├── StoreBomRequest.php
+│   │   │   │   │   ├── UpdateBomRequest.php
+│   │   │   │   ├── [DIR] Categories
+│   │   │   │   │   ├── StoreCategoryRequest.php
+│   │   │   │   │   ├── UpdateCategoryRequest.php
+│   │   │   │   ├── [DIR] PriceLists
+│   │   │   │   │   ├── StorePriceListRequest.php
+│   │   │   │   │   ├── UpdatePriceListRequest.php
+│   │   │   │   ├── [DIR] ProductionOrders
+│   │   │   │   │   ├── StoreProductionOrderRequest.php
+│   │   │   │   │   ├── UpdateProductionOrderRequest.php
+│   │   │   │   ├── [DIR] Products
+│   │   │   │   │   ├── StoreProductRequest.php
+│   │   │   │   │   ├── UpdateProductRequest.php
+│   │   │   │   ├── [DIR] StockBatches
+│   │   │   │   │   ├── StoreStockBatchRequest.php
+│   │   │   │   │   ├── UpdateStockBatchRequest.php
+│   │   │   │   ├── [DIR] Transfers
+│   │   │   │   │   ├── StoreTransferRequest.php
+│   │   │   │   │   ├── UpdateTransferRequest.php
+│   │   │   │   ├── [DIR] Units
+│   │   │   │   │   ├── StoreUnitRequest.php
+│   │   │   │   │   ├── UpdateUnitRequest.php
+│   │   │   │   ├── [DIR] WarehouseLocations
+│   │   │   │   │   ├── StoreWarehouseLocationRequest.php
+│   │   │   │   │   ├── UpdateWarehouseLocationRequest.php
+│   │   │   │   ├── [DIR] Warehouses
+│   │   │   │   │   ├── StoreWarehouseRequest.php
+│   │   │   │   │   ├── UpdateWarehouseRequest.php
+│   │   │   ├── [DIR] Resources
+│   │   │   │   ├── AdjustmentItemResource.php
+│   │   │   │   ├── AdjustmentResource.php
+│   │   │   │   ├── BomItemResource.php
+│   │   │   │   ├── BomResource.php
+│   │   │   │   ├── CategoryResource.php
+│   │   │   │   ├── PriceListItemResource.php
+│   │   │   │   ├── PriceListResource.php
+│   │   │   │   ├── ProductResource.php
+│   │   │   │   ├── ProductionOrderItemResource.php
+│   │   │   │   ├── ProductionOrderResource.php
+│   │   │   │   ├── StockBatchResource.php
+│   │   │   │   ├── TransferItemResource.php
+│   │   │   │   ├── TransferResource.php
+│   │   │   │   ├── UnitResource.php
+│   │   │   │   ├── WarehouseLocationResource.php
+│   │   │   │   ├── WarehouseResource.php
+│   │   ├── [DIR] Models
+│   │   │   ├── Adjustment.php
+│   │   │   ├── AdjustmentItem.php
+│   │   │   ├── Bom.php
+│   │   │   ├── BomItem.php
+│   │   │   ├── Category.php
+│   │   │   ├── PriceList.php
+│   │   │   ├── Product.php
+│   │   │   ├── ProductBarcode.php
+│   │   │   ├── ProductPrice.php
+│   │   │   ├── ProductStock.php
+│   │   │   ├── ProductUnit.php
+│   │   │   ├── ProductionOrder.php
+│   │   │   ├── ProductionOrderItem.php
+│   │   │   ├── ReorderRule.php
+│   │   │   ├── StockBatch.php
+│   │   │   ├── StockMovement.php
+│   │   │   ├── StockSerial.php
+│   │   │   ├── Transfer.php
+│   │   │   ├── TransferItem.php
+│   │   │   ├── Unit.php
+│   │   │   ├── Warehouse.php
+│   │   │   ├── WarehouseLocation.php
+│   │   ├── [DIR] Policies
+│   │   │   ├── AdjustmentPolicy.php
+│   │   │   ├── BomPolicy.php
+│   │   │   ├── CategoryPolicy.php
+│   │   │   ├── InventoryReportPolicy.php
+│   │   │   ├── PriceListPolicy.php
+│   │   │   ├── ProductPolicy.php
+│   │   │   ├── ProductionOrderPolicy.php
+│   │   │   ├── StockBatchPolicy.php
+│   │   │   ├── TransferPolicy.php
+│   │   │   ├── UnitPolicy.php
+│   │   │   ├── WarehouseLocationPolicy.php
+│   │   │   ├── WarehousePolicy.php
+│   │   ├── [DIR] Services
+│   │   │   ├── AdjustmentService.php
+│   │   │   ├── InventoryAccountingService.php
+│   │   │   ├── InventoryReportService.php
+│   │   │   ├── ProductService.php
+│   │   │   ├── [DIR] Reports
+│   │   │   │   ├── BatchExpiryReportService.php
+│   │   │   │   ├── InventoryIntegrityAuditService.php
+│   │   │   │   ├── ItemStockCardReportService.php
+│   │   │   │   ├── ProductionVarianceReportService.php
+│   │   │   │   ├── ReorderAlertReportService.php
+│   │   │   │   ├── SerialTrackingReportService.php
+│   │   │   │   ├── StockBalanceReportService.php
+│   │   │   │   ├── StockDiscrepancyReportService.php
+│   │   │   │   ├── TransferTrackingReportService.php
+│   │   │   ├── StockMovementService.php
+│   │   │   ├── TransferService.php
+│   │   ├── [DIR] routes
+│   │   │   ├── api.php
+│   ├── [DIR] Purchasing
+│   │   ├── [DIR] Database
+│   │   │   ├── [DIR] Migrations
+│   │   │   │   ├── 2026_09_02_143607_create_purchasing_requisitions_table.php
+│   │   │   │   ├── 2026_09_02_143628_create_purchasing_requisition_items_table.php
+│   │   │   │   ├── 2026_09_02_143816_create_purchasing_orders_table.php
+│   │   │   │   ├── 2026_09_02_143837_create_purchasing_order_items_table.php
+│   │   │   │   ├── 2026_09_02_143915_create_purchasing_receipts_table.php
+│   │   │   │   ├── 2026_09_02_143933_create_purchasing_receipt_items_table.php
+│   │   │   │   ├── 2026_09_02_144028_create_purchasing_bills_table.php
+│   │   │   │   ├── 2026_09_02_144049_create_purchasing_bill_items_table.php
+│   │   │   │   ├── 2026_09_02_144135_create_purchasing_returns_table.php
+│   │   │   │   ├── 2026_09_02_144158_create_purchasing_return_items_table.php
+│   │   │   ├── [DIR] Seeders
+│   │   │   │   ├── PurchasingPermissionsSeeder.php
+│   │   ├── [DIR] Enums
+│   │   │   ├── BillStatus.php
+│   │   │   ├── PurchaseOrderStatus.php
+│   │   │   ├── PurchaseReturnStatus.php
+│   │   │   ├── ReceiptStatus.php
+│   │   │   ├── RequisitionPriority.php
+│   │   │   ├── RequisitionStatus.php
+│   │   ├── [DIR] Models
+│   │   │   ├── PurchaseBill.php
+│   │   │   ├── PurchaseBillItem.php
+│   │   │   ├── PurchaseOrder.php
+│   │   │   ├── PurchaseOrderItem.php
+│   │   │   ├── PurchaseReceipt.php
+│   │   │   ├── PurchaseReceiptItem.php
+│   │   │   ├── PurchaseRequisition.php
+│   │   │   ├── PurchaseRequisitionItem.php
+│   │   │   ├── PurchaseReturn.php
+│   │   │   ├── PurchaseReturnItem.php
+│   │   ├── [DIR] Policies
+│   │   │   ├── PurchaseBillPolicy.php
+│   │   │   ├── PurchaseOrderPolicy.php
+│   │   │   ├── PurchaseReceiptPolicy.php
+│   │   │   ├── PurchaseRequisitionPolicy.php
+│   │   │   ├── PurchaseReturnPolicy.php
 ├── [DIR] Policies
 │   ├── CompanyPolicy.php
 │   ├── DocumentPolicy.php
+│   ├── GrantRequestPolicy.php
 │   ├── PaymentPolicy.php
 │   ├── ProjectPolicy.php
 │   ├── RolePolicy.php
@@ -481,6 +745,8 @@
 │   ├── 2026_06_04_102612_modify_users_for_phone_authentication.php
 │   ├── 2026_06_07_152329_add_module_display_name_to_permissions_table.php
 │   ├── 2026_06_07_155942_add_display_names_to_permissions_table.php
+│   ├── 2026_08_23_160055_create_grant_requests_table.php
+│   ├── 2026_08_23_160057_create_grant_request_items_table.php
 ├── [DIR] seeders
 │   ├── CoreConfigurationSeeder.php
 │   ├── DatabaseSeeder.php

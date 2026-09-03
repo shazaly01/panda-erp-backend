@@ -53,6 +53,8 @@ class AccountMappingSeeder extends Seeder
             'inventory_asset'                     => ['name' => 'حساب المخزون (أصول متداولة - يثبت في الجرد المستمر)', 'code' => '11301'],
             'inventory_adjustment_gain'           => ['name' => 'أرباح تسويات وجرد المخزون (تسجيل فائض بضاعة غير مبرر)', 'code' => '7104'],
             'inventory_adjustment_loss'           => ['name' => 'خسائر تسويات وجرد المخزون (تسجيل عجز أو تالف في البضاعة)', 'code' => '8103'],
+            'inventory_damage_expense'            => ['name' => 'خسائر بضاعة تالفة (إتلاف وتكهين بضاعة تالفة)', 'code' => '8106'],
+            'inventory_loss_expense'              => ['name' => 'خسائر فاقد وعجز المخزون (عجز غير مبرر وسرقات)', 'code' => '8107'],
             'inventory_grni'                      => ['name' => 'بضاعة مستلمة غير مفوترة (GRNI - التزام وسيط)', 'code' => '21102'],
             'inventory_landed_costs'              => ['name' => 'التكاليف المحملة وسيط (لتحميل الجمارك والشحن على المخزون)', 'code' => '11302'],
 

@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\Route;
 use App\Modules\Core\Http\Controllers\SequenceController;
+use App\Modules\Core\Http\Controllers\PartnerController;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,5 +28,11 @@ Route::middleware('auth:sanctum')
 
         // تحديث إعداد الترقيم (الصيغة وطريقة التصفير)
         Route::put('sequences/{sequence}', [SequenceController::class, 'update']);
+
+        // ===========================================
+        // إدارة جهات التعامل: العملاء والموردين (Partners)
+        // ===========================================
+
+        Route::apiResource('partners', PartnerController::class);
 
     });

@@ -167,6 +167,8 @@ class ChartOfAccountsSeeder extends Seeder
             ['code' => '8103', 'name' => 'خسائر تسويات وجرد المخزون', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '8'],
             ['code' => '8104', 'name' => 'خسائر استبعاد الأصول الثابتة', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '8'],
             ['code' => '8105', 'name' => 'مخالفات مرورية (مصاريف غير قابلة للخصم)', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '8'],
+            ['code' => '8106', 'name' => 'خسائر بضاعة تالفة (إتلاف مخزني)', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '8'],
+            ['code' => '8107', 'name' => 'خسائر فاقد وعجز المخزون', 'type' => 'expense', 'nature' => 'debit', 'is_transactional' => true, 'parent_code' => '8'],
         ];
 
         $insertedAccounts = [];

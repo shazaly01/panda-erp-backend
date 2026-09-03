@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -43,14 +45,45 @@ class CoreConfigurationSeeder extends Seeder
                 'current_year' => $now->year,
                 'current_month' => $now->month,
             ],
+            [
+                'model' => 'acc_cash_transfer', // تحويل نقدية بين الخزائن والبنوك
+                'branch_id' => null,
+                'format' => 'TRF-{Y}-{00000}',
+                'reset_frequency' => 'yearly',
+                'next_value' => 1,
+                'current_year' => $now->year,
+                'current_month' => $now->month,
+            ],
 
             // ==========================================
-            // 2. الموارد البشرية (HR Module)
+            // 2. جهات التعامل والشركاء (Contacts / CRM)
             // ==========================================
             [
-                'model' => 'hr_employee', // أرقام الموظفين
+                'model' => 'crm_customer', // كود العميل
                 'branch_id' => null,
-                'format'=> 'EMP-{00000}', // مثال: 900000001 (رقم وظيفي ثابت لا يتصفر)
+                'format' => 'CUST-{00000}', // تسلسلي دائم لا يتصفر
+                'reset_frequency' => 'never',
+                'next_value' => 1,
+                'current_year' => null,
+                'current_month' => null,
+            ],
+            [
+                'model' => 'crm_vendor', // كود المورد
+                'branch_id' => null,
+                'format' => 'VEND-{00000}', // تسلسلي دائم لا يتصفر
+                'reset_frequency' => 'never',
+                'next_value' => 1,
+                'current_year' => null,
+                'current_month' => null,
+            ],
+
+            // ==========================================
+            // 3. الموارد البشرية (HR Module)
+            // ==========================================
+            [
+                'model' => 'hr_employee', // أرقام الموظفين الوظيفية
+                'branch_id' => null,
+                'format' => 'EMP-{00000}',
                 'reset_frequency' => 'never',
                 'next_value' => 1,
                 'current_year' => null,
@@ -76,7 +109,7 @@ class CoreConfigurationSeeder extends Seeder
             ],
 
             // ==========================================
-            // 3. المبيعات (Sales Module)
+            // 4. المبيعات (Sales Module)
             // ==========================================
             [
                 'model' => 'sales_quotation', // عرض سعر
@@ -116,10 +149,19 @@ class CoreConfigurationSeeder extends Seeder
             ],
 
             // ==========================================
-            // 4. المشتريات (Purchases Module)
+            // 5. المشتريات (Purchases Module)
             // ==========================================
             [
-                'model' => 'pur_order', // أمر شراء
+                'model' => 'pur_requisition', // طلب شراء داخلي من الأقسام
+                'branch_id' => null,
+                'format' => 'PR-{Y}-{00000}',
+                'reset_frequency' => 'yearly',
+                'next_value' => 1,
+                'current_year' => $now->year,
+                'current_month' => $now->month,
+            ],
+            [
+                'model' => 'pur_order', // أمر شراء معتمد
                 'branch_id' => null,
                 'format' => 'PO-{Y}-{00000}',
                 'reset_frequency' => 'yearly',
@@ -147,13 +189,13 @@ class CoreConfigurationSeeder extends Seeder
             ],
 
             // ==========================================
-            // 5. المخزون (Inventory) - [حركات كثيفة = تصفير شهري]
+            // 6. المخزون (Inventory)
             // ==========================================
             [
-                'model' => 'inv_receipt', // سند استلام بضاعة
+                'model' => 'inv_receipt', // سند استلام بضاعة مخزني
                 'branch_id' => null,
-                'format' => 'IN-{YM}-{0000}', // مثال: IN-2604-0001 (سنة 26 شهر 04)
-                'reset_frequency' => 'monthly', // تصفير شهري لأن الحركات كثيرة
+                'format' => 'IN-{YM}-{0000}',
+                'reset_frequency' => 'monthly',
                 'next_value' => 1,
                 'current_year' => $now->year,
                 'current_month' => $now->month,
@@ -168,7 +210,7 @@ class CoreConfigurationSeeder extends Seeder
                 'current_month' => $now->month,
             ],
             [
-                'model' => 'inv_transfer', // تحويل مخزني داخلي
+                'model' => 'inv_transfer', // تحويل مخزني بين المستودعات
                 'branch_id' => null,
                 'format' => 'TR-{YM}-{0000}',
                 'reset_frequency' => 'monthly',
@@ -176,14 +218,76 @@ class CoreConfigurationSeeder extends Seeder
                 'current_year' => $now->year,
                 'current_month' => $now->month,
             ],
+            [
+                'model' => 'inv_adjustment', // محضر تسوية وجرد المخزون
+                'branch_id' => null,
+                'format' => 'ADJ-{YM}-{0000}',
+                'reset_frequency' => 'monthly',
+                'next_value' => 1,
+                'current_year' => $now->year,
+                'current_month' => $now->month,
+            ],
+            [
+                'model' => 'inv_scrap', // محضر إتلاف منتهي الصلاحية والهالك
+                'branch_id' => null,
+                'format' => 'SCRAP-{YM}-{0000}',
+                'reset_frequency' => 'monthly',
+                'next_value' => 1,
+                'current_year' => $now->year,
+                'current_month' => $now->month,
+            ],
 
             // ==========================================
-            // 6. نقاط البيع (POS) - [حركات كثيفة جداً = تصفير شهري]
+            // 7. نقاط البيع والورديات (POS & Shifts)
             // ==========================================
             [
-                'model' => 'pos_receipt', // فاتورة كاشير
+                'model' => 'pos_receipt', // فاتورة بيع نقطة بيع
                 'branch_id' => null,
-                'format' => 'POS-{YM}-{00000}', // مثال: POS-2604-00001
+                'format' => 'POS-{YM}-{00000}',
+                'reset_frequency' => 'monthly',
+                'next_value' => 1,
+                'current_year' => $now->year,
+                'current_month' => $now->month,
+            ],
+            [
+                'model' => 'pos_shift', // جلسة ووردية الكاشير
+                'branch_id' => null,
+                'format' => 'SHIFT-{YM}-{0000}',
+                'reset_frequency' => 'monthly',
+                'next_value' => 1,
+                'current_year' => $now->year,
+                'current_month' => $now->month,
+            ],
+
+            // ==========================================
+            // 8. الأصول الثابتة (Fixed Assets)
+            // ==========================================
+            [
+                'model' => 'ast_asset', // بطاقة تعريف الأصل الثابت
+                'branch_id' => null,
+                'format' => 'AST-{00000}',
+                'reset_frequency' => 'never',
+                'next_value' => 1,
+                'current_year' => null,
+                'current_month' => null,
+            ],
+            [
+                'model' => 'ast_depreciation', // قيد إهلاك الأصول الدوري
+                'branch_id' => null,
+                'format' => 'DEP-{Y}-{0000}',
+                'reset_frequency' => 'yearly',
+                'next_value' => 1,
+                'current_year' => $now->year,
+                'current_month' => $now->month,
+            ],
+
+            // ==========================================
+            // 9. التصنيع وتجهيز الوجبات (Kitchen / Manufacturing)
+            // ==========================================
+            [
+                'model' => 'mfg_production_order', // أمر إنتاج / تشغيل مطبخ
+                'branch_id' => null,
+                'format' => 'MO-{YM}-{0000}',
                 'reset_frequency' => 'monthly',
                 'next_value' => 1,
                 'current_year' => $now->year,
@@ -191,18 +295,18 @@ class CoreConfigurationSeeder extends Seeder
             ],
         ];
 
-       foreach ($sequences as $seq) {
-            // 🌟 الحل الأمثل: نتحقق أولاً إذا كان السجل موجوداً
+        foreach ($sequences as $seq) {
             $exists = DB::table('sequences')
                 ->where('model', $seq['model'])
                 ->where('branch_id', $seq['branch_id'])
                 ->exists();
 
             if (!$exists) {
-                // إذا كان الجدول فارغاً (بعد fresh)، نقوم بإدخال نظيف
-                DB::table('sequences')->insert(array_merge($seq, ['created_at' => $now, 'updated_at' => $now]));
+                DB::table('sequences')->insert(array_merge($seq, [
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]));
             } else {
-                // إذا كان السجل موجوداً، نحدث فقط الحقول الأساسية دون لمس الـ next_value الحالي
                 DB::table('sequences')
                     ->where('model', $seq['model'])
                     ->where('branch_id', $seq['branch_id'])
@@ -214,7 +318,6 @@ class CoreConfigurationSeeder extends Seeder
             }
         }
 
-        $this->command->info('تم تهيئة تسلسلات الترقيم (Panda ERP Standards) بنجاح.');
+        $this->command->info('تم تهيئة كافة تسلسلات الترقيم المعيارية لجميع الوحدات بنجاح.');
     }
 }
-

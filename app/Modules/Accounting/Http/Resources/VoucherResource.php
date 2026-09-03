@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Accounting\Http\Resources;
 
 use Illuminate\Http\Request;
@@ -11,7 +13,7 @@ class VoucherResource extends JsonResource
     {
         return [
             'id'            => $this->id,
-            'number'        => $this->number, // الرقم المميز (RY-PAY-001)
+            'number'        => $this->number,
             'date'          => $this->date->format('Y-m-d'),
 
             // النوع (صرف/قبض)
@@ -27,9 +29,9 @@ class VoucherResource extends JsonResource
             // الحالة (مع اللون للعرض في الجدول)
             'status'        => $this->status->value,
             'status_label'  => $this->status->label(),
-            'status_color'  => $this->status->color(), // (gray, green, red...)
+            'status_color'  => $this->status->color(),
 
-            // الفرع (مركز التكلفة)
+            // الفرع
             'branch'        => $this->whenLoaded('branch', function () {
                 return [
                     'id'   => $this->branch->id,
@@ -44,24 +46,23 @@ class VoucherResource extends JsonResource
             // تحديد وسيلة الدفع للعرض
             'payment_method' => $this->getPaymentMethodData(),
 
-            // التفاصيل (نستخدم الريسورس الصغير الذي أنشأناه قبل قليل)
+            // تفاصيل السند
             'details'       => VoucherDetailResource::collection($this->whenLoaded('details')),
 
-            // بيانات التدقيق (من أنشأ ومن رحل)
+            // بيانات التدقيق
             'audit' => [
                 'created_at' => $this->created_at->toDateTimeString(),
                 'posted_at'  => $this->posted_at?->toDateTimeString(),
-                // يمكن إضافة created_by_user هنا إذا كانت العلاقة موجودة
             ],
         ];
     }
 
     /**
-     * دالة مساعدة لتجهيز بيانات الدفع (خزينة أو بنك)
+     * دالة مساعدة لتجهيز بيانات الدفع (خزينة أو بنك) بأمان مع التحقق من وجود الكائن
      */
-   protected function getPaymentMethodData(): ?array
+    protected function getPaymentMethodData(): ?array
     {
-        if ($this->box_id && $this->relationLoaded('box')) {
+        if ($this->relationLoaded('box') && $this->box !== null) {
             return [
                 'type' => 'box',
                 'id'   => $this->box->id,
@@ -69,8 +70,7 @@ class VoucherResource extends JsonResource
             ];
         }
 
-        // تم تصحيح اسم الحقل هنا إلى bank_account_id
-        if ($this->bank_account_id && $this->relationLoaded('bankAccount')) {
+        if ($this->relationLoaded('bankAccount') && $this->bankAccount !== null) {
             return [
                 'type' => 'bank',
                 'id'   => $this->bankAccount->id,

@@ -13,6 +13,7 @@ use Kalnoy\Nestedset\NodeTrait;
 use App\Modules\Accounting\Enums\AccountNature;
 use App\Modules\Accounting\Database\Factories\AccountFactory;
 use App\Modules\Accounting\Enums\AccountType;
+use App\Modules\Inventory\Models\Warehouse;
 
 class Account extends Model
 {
@@ -59,15 +60,15 @@ class Account extends Model
                 abort(422, "لا يمكن حذف الحساب ({$account->name}) لوجود قيود مالية مسجلة عليه. قم بتعطيله بدلاً من حذفه.");
             }
 
-            // 3. حماية الارتباطات التشغيلية (خزائن/بنوك)
-            if ($account->boxes()->exists() || $account->bankAccounts()->exists()) {
-                 abort(422, "لا يمكن حذف الحساب لأنه مرتبط بخزينة أو حساب بنكي.");
+            // 3. حماية الارتباطات التشغيلية (خزائن/بنوك/مستودعات)
+            if ($account->boxes()->exists() || $account->bankAccounts()->exists() || $account->warehouses()->exists()) {
+                 abort(422, "لا يمكن حذف الحساب لأنه مرتبط بخزينة أو حساب بنكي أو مستودع.");
             }
         });
     }
 
     // ============================================
-    // العلاقات (Relationships) - الجزء الناقص
+    // العلاقات (Relationships)
     // ============================================
 
     /**
@@ -101,6 +102,14 @@ class Account extends Model
     public function bankAccounts(): HasMany
     {
         return $this->hasMany(BankAccount::class, 'account_id');
+    }
+
+    /**
+     * المستودعات المرتبطة بهذا الحساب
+     */
+    public function warehouses(): HasMany
+    {
+        return $this->hasMany(Warehouse::class, 'account_id');
     }
 
     protected static function newFactory()

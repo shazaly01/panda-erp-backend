@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\BackupController;
 use App\Http\Controllers\Api\DocumentController; // موديول الأرشفة العالمي
 use App\Http\Controllers\Api\BrandingController;
+use App\Http\Controllers\Api\GrantRequestController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -64,6 +65,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // --- مسارات نظام إدارة المستندات والأرشفة (DMS Routes) ---
     Route::get('documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
     Route::apiResource('documents', DocumentController::class);
+
+
+    // --- مسارات طلبات الدعم والمنح المؤسسية (Grant Requests) ---
+    Route::get('grant-requests/{grant_request}/print', [GrantRequestController::class, 'print'])->name('grant-requests.print');
+    Route::apiResource('grant-requests', GrantRequestController::class);
 
     // تسجيل الخروج
     Route::post('/logout', [AuthController::class, 'logout']);

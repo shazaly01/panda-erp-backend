@@ -30,12 +30,14 @@ class JournalEntryService
         return DB::transaction(function () use ($dto) {
             // 2. إنشاء رأس القيد
             $entry = JournalEntry::create([
-                'date'        => $dto->date,
-                'description' => $dto->description,
-                'currency_id' => $dto->currency_id,
-                'status'      => EntryStatus::Draft, // الافتراضي مسودة
-                'source'      => 'manual',
-                'created_by'  => Auth::id(),
+                'date'           => $dto->date,
+                'description'    => $dto->description,
+                'currency_id'    => $dto->currency_id,
+                'status'         => EntryStatus::Draft, // الافتراضي مسودة
+                'source'         => $dto->source ?? 'manual',
+                'reference_type' => $dto->reference_type,
+                'reference_id'   => $dto->reference_id,
+                'created_by'     => Auth::id(),
             ]);
 
             // 3. إنشاء التفاصيل
@@ -64,9 +66,12 @@ class JournalEntryService
         return DB::transaction(function () use ($entry, $dto) {
             // تحديث البيانات الأساسية
             $entry->update([
-                'date'        => $dto->date,
-                'description' => $dto->description,
-                'currency_id' => $dto->currency_id,
+                'date'           => $dto->date,
+                'description'    => $dto->description,
+                'currency_id'    => $dto->currency_id,
+                'source'         => $dto->source ?? $entry->source,
+                'reference_type' => $dto->reference_type ?? $entry->reference_type,
+                'reference_id'   => $dto->reference_id ?? $entry->reference_id,
             ]);
 
             // حذف التفاصيل القديمة (Hard Delete)
@@ -93,7 +98,7 @@ class JournalEntryService
         }
 
         return DB::transaction(function () use ($entry) {
-            // حذف التفاصيل أولاً (اختياري إذا كان هناك Cascade في الداتابيز، لكن أضمن في الكود)
+            // حذف التفاصيل أولاً
             $entry->details()->delete();
 
             // حذف الرأس (Soft Delete)
@@ -124,18 +129,15 @@ class JournalEntryService
         }
 
         return DB::transaction(function () use ($entry) {
-            // 🌟 التعديل المعماري هنا: استدعاء الكود العالمي بدلاً من مسار الموديل
-            $entryNumber = $this->sequenceService->generateNumber(
-                modelClass: 'acc_journal_entry',
-                branchId: null
-            );
-
+            // استدعاء الكود العالمي لتوليد رقم القيد
+            $entryNumber = $this->sequenceService->generateNumber('acc_journal_entry');
+        
             $entry->update([
                 'status'       => EntryStatus::Posted,
                 'entry_number' => $entryNumber,
                 'posted_at'    => now(),
             ]);
-
+        
             return $entry;
         });
     }
