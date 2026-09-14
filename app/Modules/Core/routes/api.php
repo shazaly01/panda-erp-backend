@@ -33,6 +33,10 @@ Route::middleware('auth:sanctum')
         // إدارة جهات التعامل: العملاء والموردين (Partners)
         // ===========================================
 
+        // نقطة نهاية جلب القوائم السريعة للشركاء (يجب وضعها قبل apiResource لتفادي تضارب المعرفات)
+        Route::get('partners/selector', [PartnerController::class, 'selector']);
+
+        // العمليات المعيارية للشركاء
         Route::apiResource('partners', PartnerController::class);
 
     });

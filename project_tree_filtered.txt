@@ -100,6 +100,7 @@
 │   │   │   │   ├── 2026_08_29_195841_create_budgets_table.php
 │   │   │   │   ├── 2026_08_29_200120_create_budget_lines_table.php
 │   │   │   │   ├── 2026_09_01_181223_make_account_id_nullable_in_budget_lines_table.php
+│   │   │   │   ├── 2026_09_06_135350_add_reference_to_voucher_details_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── AccountMappingSeeder.php
 │   │   │   │   ├── AccountingPermissionsSeeder.php
@@ -548,6 +549,7 @@
 │   │   │   │   ├── 2026_07_26_134153_create_inventory_bom_items_table.php
 │   │   │   │   ├── 2026_07_26_134220_create_inventory_production_orders_table.php
 │   │   │   │   ├── 2026_07_26_134306_create_inventory_production_order_items_table.php
+│   │   │   │   ├── 2026_09_12_210821_add_aliases_to_inventory_products_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── InventoryPermissionsSeeder.php
 │   │   ├── [DIR] Http
@@ -680,6 +682,8 @@
 │   │   │   │   ├── 2026_09_02_144049_create_purchasing_bill_items_table.php
 │   │   │   │   ├── 2026_09_02_144135_create_purchasing_returns_table.php
 │   │   │   │   ├── 2026_09_02_144158_create_purchasing_return_items_table.php
+│   │   │   │   ├── 2026_09_12_095322_add_warehouse_id_to_purchasing_bills_table.php
+│   │   │   │   ├── 2026_09_12_214510_modify_purchasing_requisition_items_for_free_text_items.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── PurchasingPermissionsSeeder.php
 │   │   ├── [DIR] Enums
@@ -689,6 +693,41 @@
 │   │   │   ├── ReceiptStatus.php
 │   │   │   ├── RequisitionPriority.php
 │   │   │   ├── RequisitionStatus.php
+│   │   ├── [DIR] Http
+│   │   │   ├── [DIR] Controllers
+│   │   │   │   ├── PurchaseBillController.php
+│   │   │   │   ├── PurchaseOrderController.php
+│   │   │   │   ├── PurchaseReceiptController.php
+│   │   │   │   ├── PurchaseRequisitionController.php
+│   │   │   │   ├── PurchaseReturnController.php
+│   │   │   ├── [DIR] Requests
+│   │   │   │   ├── [DIR] Bills
+│   │   │   │   │   ├── StorePurchaseBillRequest.php
+│   │   │   │   │   ├── UpdatePurchaseBillRequest.php
+│   │   │   │   ├── [DIR] Orders
+│   │   │   │   │   ├── StorePurchaseOrderRequest.php
+│   │   │   │   │   ├── UpdatePurchaseOrderRequest.php
+│   │   │   │   ├── [DIR] Receipts
+│   │   │   │   │   ├── StorePurchaseReceiptRequest.php
+│   │   │   │   │   ├── UpdatePurchaseReceiptRequest.php
+│   │   │   │   ├── [DIR] Requisitions
+│   │   │   │   │   ├── RejectPurchaseRequisitionRequest.php
+│   │   │   │   │   ├── StorePurchaseRequisitionRequest.php
+│   │   │   │   │   ├── UpdatePurchaseRequisitionRequest.php
+│   │   │   │   ├── [DIR] Returns
+│   │   │   │   │   ├── StorePurchaseReturnRequest.php
+│   │   │   │   │   ├── UpdatePurchaseReturnRequest.php
+│   │   │   ├── [DIR] Resources
+│   │   │   │   ├── PurchaseBillItemResource.php
+│   │   │   │   ├── PurchaseBillResource.php
+│   │   │   │   ├── PurchaseOrderItemResource.php
+│   │   │   │   ├── PurchaseOrderResource.php
+│   │   │   │   ├── PurchaseReceiptItemResource.php
+│   │   │   │   ├── PurchaseReceiptResource.php
+│   │   │   │   ├── PurchaseRequisitionItemResource.php
+│   │   │   │   ├── PurchaseRequisitionResource.php
+│   │   │   │   ├── PurchaseReturnItemResource.php
+│   │   │   │   ├── PurchaseReturnResource.php
 │   │   ├── [DIR] Models
 │   │   │   ├── PurchaseBill.php
 │   │   │   ├── PurchaseBillItem.php
@@ -706,6 +745,15 @@
 │   │   │   ├── PurchaseReceiptPolicy.php
 │   │   │   ├── PurchaseRequisitionPolicy.php
 │   │   │   ├── PurchaseReturnPolicy.php
+│   │   ├── [DIR] Routes
+│   │   │   ├── api.php
+│   │   ├── [DIR] Services
+│   │   │   ├── PurchaseBillService.php
+│   │   │   ├── PurchaseOrderService.php
+│   │   │   ├── PurchaseReceiptService.php
+│   │   │   ├── PurchaseRequisitionService.php
+│   │   │   ├── PurchaseReturnService.php
+│   │   │   ├── PurchasingAccountingService.php
 ├── [DIR] Policies
 │   ├── CompanyPolicy.php
 │   ├── DocumentPolicy.php

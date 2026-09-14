@@ -7,7 +7,10 @@ namespace App\Modules\Purchasing\Models;
 use App\Models\User;
 use App\Modules\Accounting\Models\Currency;
 use App\Modules\Accounting\Models\JournalEntry;
+use App\Modules\Accounting\Models\VoucherDetail;
 use App\Modules\Core\Models\Partner;
+use App\Modules\Inventory\Models\StockMovement;
+use App\Modules\Inventory\Models\Warehouse;
 use App\Modules\Purchasing\Enums\BillStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +29,7 @@ class PurchaseBill extends Model
         'bill_number',
         'supplier_bill_number',
         'supplier_id',
+        'warehouse_id',
         'purchase_order_id',
         'receipt_id',
         'currency_id',
@@ -55,6 +59,7 @@ class PurchaseBill extends Model
         'posted_at' => 'datetime',
         'status' => BillStatus::class,
         'supplier_id' => 'integer',
+        'warehouse_id' => 'integer',
         'purchase_order_id' => 'integer',
         'receipt_id' => 'integer',
         'currency_id' => 'integer',
@@ -75,6 +80,11 @@ class PurchaseBill extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Partner::class, 'supplier_id');
+    }
+
+    public function warehouse(): BelongsTo
+    {
+        return $this->belongsTo(Warehouse::class, 'warehouse_id');
     }
 
     public function purchaseOrder(): BelongsTo
@@ -120,5 +130,18 @@ class PurchaseBill extends Model
     public function journalEntries(): MorphMany
     {
         return $this->morphMany(JournalEntry::class, 'reference');
+    }
+
+    public function stockMovements(): MorphMany
+    {
+        return $this->morphMany(StockMovement::class, 'reference');
+    }
+
+    /**
+     * سطور سندات الصرف المرتبطة بسداد هذه الفاتورة
+     */
+    public function voucherDetails(): MorphMany
+    {
+        return $this->morphMany(VoucherDetail::class, 'reference');
     }
 }

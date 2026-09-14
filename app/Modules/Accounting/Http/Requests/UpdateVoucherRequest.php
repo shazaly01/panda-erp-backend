@@ -35,9 +35,12 @@ class UpdateVoucherRequest extends FormRequest
             'details.*.amount' => ['required', 'numeric', 'min:0.01'],
             'details.*.description' => ['nullable', 'string', 'max:255'],
 
-            // 👇 الإضافات الجديدة هنا لربط الأطراف (الموظفين) عند التعديل
             'details.*.party_type' => ['nullable', 'string', 'max:255'],
             'details.*.party_id' => ['nullable', 'string', 'max:255'],
+
+            // ربط السطر بالمستند المرجعي (فاتورة مشتريات / مبيعات)
+            'details.*.reference_type' => ['nullable', 'string', 'max:255'],
+            'details.*.reference_id' => ['nullable', 'integer'],
         ];
     }
 
@@ -65,7 +68,6 @@ class UpdateVoucherRequest extends FormRequest
         });
     }
 
-    // 👇 إضافة هذه الدالة لتجميل رسائل الخطأ
     public function attributes(): array
     {
         return [
@@ -77,6 +79,8 @@ class UpdateVoucherRequest extends FormRequest
             'details.*.account_id' => 'الحساب في السطر',
             'details.*.party_type' => 'نوع الطرف المستفيد',
             'details.*.party_id' => 'رقم الطرف المستفيد',
+            'details.*.reference_type' => 'نوع المستند المرجعي',
+            'details.*.reference_id' => 'رقم المستند المرجعي',
         ];
     }
 }

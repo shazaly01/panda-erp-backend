@@ -30,6 +30,7 @@ class StoreProductRequest extends FormRequest
                 Rule::exists('inventory_categories', 'id')->where(fn ($q) => $q->whereNull('deleted_at')),
             ],
             'name' => ['required', 'string', 'max:255'],
+            'aliases' => ['nullable', 'string', 'max:1000'],
             'sku' => [
                 'nullable',
                 'string',

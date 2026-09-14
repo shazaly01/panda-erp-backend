@@ -19,6 +19,7 @@ class Product extends Model
     protected $fillable = [
         'category_id',
         'name',
+        'aliases',
         'sku',
         'description',
         'type',
@@ -37,8 +38,6 @@ class Product extends Model
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
-
-  
 
     /**
      * العلاقة مع التصنيف

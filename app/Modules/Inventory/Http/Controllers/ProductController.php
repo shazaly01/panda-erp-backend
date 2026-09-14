@@ -85,6 +85,46 @@ class ProductController extends Controller
     }
 
     /**
+     * نقطة بحث خفيفة وسريعة لشاشات الطلبات الداخلية ومشتريات المواد دون إظهار أرصدة المخازن
+     */
+    public function searchForRequisition(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Product::class);
+
+        $search = $request->query('search');
+        $limit = min((int) $request->query('limit', 20), 50);
+
+        $products = $this->productService->searchForRequisition(
+            search: $search !== null ? (string) $search : null,
+            limit: $limit
+        );
+
+        $data = $products->map(function (Product $product): array {
+            return [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'aliases' => $product->aliases,
+                'units' => $product->units->map(function ($productUnit): array {
+                    return [
+                        'id' => $productUnit->id,
+                        'unit_id' => $productUnit->unit_id,
+                        'name' => $productUnit->unit?->name ?? null,
+                        'code' => $productUnit->unit?->code ?? null,
+                        'conversion_factor' => (float) $productUnit->conversion_factor,
+                        'is_base_unit' => (bool) $productUnit->is_base_unit,
+                        'is_purchase_unit' => (bool) $productUnit->is_purchase_unit,
+                    ];
+                })->values()->all(),
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+        ]);
+    }
+
+    /**
      * إنشاء صنف جديد باستخدام StoreProductRequest
      */
     public function store(StoreProductRequest $request): JsonResponse

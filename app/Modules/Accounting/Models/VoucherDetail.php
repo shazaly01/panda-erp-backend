@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Accounting\Models;
 
+use App\Modules\Accounting\Database\Factories\VoucherDetailFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Modules\Accounting\Database\Factories\VoucherDetailFactory;
 
 class VoucherDetail extends Model
 {
@@ -18,12 +20,15 @@ class VoucherDetail extends Model
         'cost_center_id',
         'amount',
         'description',
-        'party_type', // <-- تمت الإضافة: نوع الطرف (موظف، مورد، عميل)
-        'party_id'    // <-- تمت الإضافة: رقم الطرف
+        'party_type',
+        'party_id',
+        'reference_type',
+        'reference_id',
     ];
 
     protected $casts = [
         'amount' => 'float',
+        'reference_id' => 'integer',
     ];
 
     // --- العلاقات ---
@@ -51,7 +56,15 @@ class VoucherDetail extends Model
         return $this->morphTo(__FUNCTION__, 'party_type', 'party_id');
     }
 
-    protected static function newFactory()
+    /**
+     * العلاقة البوليمورفية لربط السطر بالمستند الأصلي (فاتورة مشتريات / فاتورة مبيعات)
+     */
+    public function reference(): MorphTo
+    {
+        return $this->morphTo(__FUNCTION__, 'reference_type', 'reference_id');
+    }
+
+    protected static function newFactory(): VoucherDetailFactory
     {
         return VoucherDetailFactory::new();
     }

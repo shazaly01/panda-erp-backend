@@ -70,4 +70,21 @@ class PurchaseBillPolicy
             BillStatus::POSTED,
         ], true) && (float) $bill->paid_amount <= 0.0001;
     }
+
+    public function applyPayment(User $user, PurchaseBill $bill): bool
+    {
+        // التحقق من صلاحية السداد أو التعديل
+        $hasPermission = $user->hasPermissionTo('purchasing.bills.pay') 
+            || $user->hasPermissionTo('purchasing.bills.update');
+
+        if (! $hasPermission) {
+            return false;
+        }
+
+        // السداد متاح فقط للفواتير المرحلة أو المسددة جزئياً والتي يتبقى عليها رصيد
+        return in_array($bill->status, [
+            BillStatus::POSTED,
+            BillStatus::PARTIALLY_PAID,
+        ], true) && (float) $bill->remaining_amount > 0.0001;
+    }
 }

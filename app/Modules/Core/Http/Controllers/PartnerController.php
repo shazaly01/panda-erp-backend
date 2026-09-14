@@ -21,6 +21,22 @@ class PartnerController extends Controller
         protected PartnerService $partnerService
     ) {}
 
+    /**
+     * نقطة نهاية مخصصة للقوائم المنسدلة تعيد البيانات التشغيلية والمالية الأساسية
+     */
+    public function selector(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Partner::class);
+
+        $role = (string) $request->input('role', 'supplier');
+
+        $partners = $this->partnerService->getSelector($role);
+
+        return response()->json([
+            'data' => $partners,
+        ], Response::HTTP_OK);
+    }
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Partner::class);

@@ -58,19 +58,11 @@ class CoreConfigurationSeeder extends Seeder
             // ==========================================
             // 2. جهات التعامل والشركاء (Contacts / CRM)
             // ==========================================
+        
             [
-                'model' => 'crm_customer', // كود العميل
+                'model' => 'partners', // كود المورد
                 'branch_id' => null,
-                'format' => 'CUST-{00000}', // تسلسلي دائم لا يتصفر
-                'reset_frequency' => 'never',
-                'next_value' => 1,
-                'current_year' => null,
-                'current_month' => null,
-            ],
-            [
-                'model' => 'crm_vendor', // كود المورد
-                'branch_id' => null,
-                'format' => 'VEND-{00000}', // تسلسلي دائم لا يتصفر
+                'format' => 'PRT-{00000}', // تسلسلي دائم لا يتصفر
                 'reset_frequency' => 'never',
                 'next_value' => 1,
                 'current_year' => null,

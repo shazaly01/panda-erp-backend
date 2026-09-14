@@ -7,6 +7,7 @@ namespace App\Modules\Purchasing\Models;
 use App\Models\User;
 use App\Modules\Inventory\Models\Product;
 use App\Modules\Inventory\Models\ProductUnit;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,7 @@ class PurchaseOrderItem extends Model
         'purchase_order_id',
         'requisition_item_id',
         'product_id',
+        'item_name',
         'product_unit_id',
         'quantity',
         'received_quantity',
@@ -96,5 +98,19 @@ class PurchaseOrderItem extends Model
     public function billItems(): HasMany
     {
         return $this->hasMany(PurchaseBillItem::class, 'purchase_order_item_id');
+    }
+
+    public function displayName(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->product?->name ?? $this->item_name ?? ''
+        );
+    }
+
+    public function isCustom(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): bool => $this->product_id === null
+        );
     }
 }

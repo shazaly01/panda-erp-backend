@@ -36,6 +36,7 @@ class UpdateProductRequest extends FormRequest
                 Rule::exists('inventory_categories', 'id')->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at')),
             ],
             'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'aliases' => ['nullable', 'string', 'max:1000'],
             'sku' => [
                 'nullable',
                 'string',

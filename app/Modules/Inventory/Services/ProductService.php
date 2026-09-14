@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Services;
 
 use App\Modules\Inventory\Models\Product;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ProductService
@@ -19,6 +20,7 @@ class ProductService
             $product = Product::create([
                 'category_id' => $data['category_id'] ?? null,
                 'name' => $data['name'],
+                'aliases' => $data['aliases'] ?? null,
                 'sku' => $data['sku'] ?? null,
                 'description' => $data['description'] ?? null,
                 'type' => $data['type'],
@@ -59,6 +61,7 @@ class ProductService
             $product->update(array_filter([
                 'category_id' => array_key_exists('category_id', $data) ? $data['category_id'] : $product->category_id,
                 'name' => $data['name'] ?? $product->name,
+                'aliases' => array_key_exists('aliases', $data) ? $data['aliases'] : $product->aliases,
                 'sku' => array_key_exists('sku', $data) ? $data['sku'] : $product->sku,
                 'description' => array_key_exists('description', $data) ? $data['description'] : $product->description,
                 'type' => $data['type'] ?? $product->type,
@@ -104,6 +107,35 @@ class ProductService
             $this->forceDeleteProductRelations($product);
             $product->delete();
         });
+    }
+
+    /**
+     * بحث خفيف وسريع عن الأصناف لطلبات الشراء والطلبات الداخلية بدون أي كميات أو أرصدة مخزنية
+     */
+    public function searchForRequisition(?string $search = null, int $limit = 20): Collection
+    {
+        $query = Product::query()
+            ->select(['id', 'name', 'sku', 'aliases', 'type'])
+            ->where('is_active', true)
+            ->with([
+                'units' => function ($q) {
+                    $q->select(['id', 'product_id', 'unit_id', 'conversion_factor', 'is_base_unit', 'is_purchase_unit'])
+                        ->with(['unit:id,name,code']);
+                },
+            ]);
+
+        if (! empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%")
+                    ->orWhere('aliases', 'like', "%{$search}%")
+                    ->orWhereHas('barcodes', function ($b) use ($search) {
+                        $b->where('barcode', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        return $query->limit($limit)->get();
     }
 
     /**
