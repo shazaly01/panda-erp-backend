@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Services;
 
 use App\Modules\Inventory\Models\Product;
+use App\Modules\Inventory\Models\ProductBarcode;
+use App\Modules\Inventory\Models\ProductPrice;
+use App\Modules\Inventory\Models\ProductStock;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -110,33 +113,190 @@ class ProductService
     }
 
     /**
-     * بحث خفيف وسريع عن الأصناف لطلبات الشراء والطلبات الداخلية بدون أي كميات أو أرصدة مخزنية
+     * بحث سريع وموجه لنقاط البيع والسوبرماركت يدعم:
+     * 1. مسار الباركود المباشر O(1)
+     * 2. مسار باركود الميزان (Variable Weight EAN-13)
+     * 3. مسار البحث النصي الفوري بالأصناف النشطة
      */
-    public function searchForRequisition(?string $search = null, int $limit = 20): Collection
-    {
-        $query = Product::query()
-            ->select(['id', 'name', 'sku', 'aliases', 'type'])
-            ->where('is_active', true)
-            ->with([
-                'units' => function ($q) {
-                    $q->select(['id', 'product_id', 'unit_id', 'conversion_factor', 'is_base_unit', 'is_purchase_unit'])
-                        ->with(['unit:id,name,code']);
-                },
-            ]);
+    public function fastSearch(
+        string $search,
+        ?int $warehouseId = null,
+        ?int $priceListId = null,
+        int $limit = 10
+    ): Collection {
+        $cleanSearch = trim($search);
 
-        if (! empty($search)) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('sku', 'like', "%{$search}%")
-                    ->orWhere('aliases', 'like', "%{$search}%")
-                    ->orWhereHas('barcodes', function ($b) use ($search) {
-                        $b->where('barcode', 'like', "%{$search}%");
-                    });
-            });
+        if ($cleanSearch === '') {
+            return new Collection();
         }
 
-        return $query->limit($limit)->get();
+        // المسار الأول: البحث التام عن الباركود المباشر عبر B-Tree Index
+        $barcodeMatch = ProductBarcode::query()
+            ->where('barcode', $cleanSearch)
+            ->with([
+                'product.units.unit',
+                'productUnit.unit',
+            ])
+            ->first();
+
+        if ($barcodeMatch && $barcodeMatch->product && $barcodeMatch->product->is_active) {
+            $product = $barcodeMatch->product;
+            $matchedUnit = $barcodeMatch->productUnit
+                ?? $product->units->firstWhere('is_sale_unit', true)
+                ?? $product->units->firstWhere('is_base_unit', true)
+                ?? $product->units->first();
+
+            $product->matched_unit = $matchedUnit;
+            $product->matched_barcode = $barcodeMatch->barcode;
+            $product->is_weight_barcode = false;
+            $product->scanned_quantity = 1.0000;
+
+            $this->enrichProductsWithStockAndPrice(
+                new Collection([$product]),
+                $warehouseId,
+                $priceListId
+            );
+
+            return new Collection([$product]);
+        }
+
+        // المسار الثاني: باركود الميزان الإلكتروني (13 رقماً ويبدأ بـ 20 أو 21 أو 99)
+        $isPotentialScaleBarcode = strlen($cleanSearch) === 13
+            && ctype_digit($cleanSearch)
+            && (str_starts_with($cleanSearch, '20') || str_starts_with($cleanSearch, '21') || str_starts_with($cleanSearch, '99'));
+
+        if ($isPotentialScaleBarcode) {
+            $itemCodeRaw = substr($cleanSearch, 2, 5);
+            $itemCodeTrimmed = ltrim($itemCodeRaw, '0');
+            $weightGrams = (int) substr($cleanSearch, 7, 5);
+            $scannedQuantity = $weightGrams > 0 ? round($weightGrams / 1000.0, 4) : 1.0000;
+
+            $scaleProduct = Product::query()
+                ->where('is_active', true)
+                ->where(function ($q) use ($itemCodeRaw, $itemCodeTrimmed) {
+                    $q->where('sku', $itemCodeRaw)
+                      ->orWhere('sku', $itemCodeTrimmed)
+                      ->orWhereHas('barcodes', function ($b) use ($itemCodeRaw, $itemCodeTrimmed) {
+                          $b->where('barcode', $itemCodeRaw)->orWhere('barcode', $itemCodeTrimmed);
+                      });
+                })
+                ->with(['units.unit'])
+                ->first();
+
+            if ($scaleProduct) {
+                $matchedUnit = $scaleProduct->units->firstWhere('is_sale_unit', true)
+                    ?? $scaleProduct->units->firstWhere('is_base_unit', true)
+                    ?? $scaleProduct->units->first();
+
+                $scaleProduct->matched_unit = $matchedUnit;
+                $scaleProduct->matched_barcode = $cleanSearch;
+                $scaleProduct->is_weight_barcode = true;
+                $scaleProduct->scanned_quantity = $scannedQuantity;
+
+                $this->enrichProductsWithStockAndPrice(
+                    new Collection([$scaleProduct]),
+                    $warehouseId,
+                    $priceListId
+                );
+
+                return new Collection([$scaleProduct]);
+            }
+        }
+
+        // المسار الثالث: البحث النصي الخفيف بالاسم، الكود، أو الأسماء البديلة
+        $products = Product::query()
+            ->select(['id', 'category_id', 'name', 'sku', 'aliases', 'cost_price', 'is_active'])
+            ->where('is_active', true)
+            ->where(function ($q) use ($cleanSearch) {
+                $q->where('name', 'like', "{$cleanSearch}%")
+                  ->orWhere('sku', 'like', "{$cleanSearch}%")
+                  ->orWhere('aliases', 'like', "%{$cleanSearch}%")
+                  ->orWhere('name', 'like', "%{$cleanSearch}%");
+            })
+            ->with(['units.unit'])
+            ->orderByRaw(
+                "CASE WHEN name LIKE ? THEN 1 WHEN sku LIKE ? THEN 2 ELSE 3 END",
+                ["{$cleanSearch}%", "{$cleanSearch}%"]
+            )
+            ->limit($limit)
+            ->get();
+
+        foreach ($products as $product) {
+            $matchedUnit = $product->units->firstWhere('is_sale_unit', true)
+                ?? $product->units->firstWhere('is_base_unit', true)
+                ?? $product->units->first();
+
+            $product->matched_unit = $matchedUnit;
+            $product->matched_barcode = null;
+            $product->is_weight_barcode = false;
+            $product->scanned_quantity = 1.0000;
+        }
+
+        $this->enrichProductsWithStockAndPrice($products, $warehouseId, $priceListId);
+
+        return $products;
     }
+
+    /**
+     * تزويد الأصناف بالرصيد الفعلي للمستودع المحدد وسعر البيع دفعة واحدة لمنع استعلامات N+1
+     */
+    protected function enrichProductsWithStockAndPrice(
+        Collection $products,
+        ?int $warehouseId,
+        ?int $priceListId
+    ): void {
+        if ($products->isEmpty()) {
+            return;
+        }
+
+        $productIds = $products->pluck('id')->all();
+
+        // 1. حساب الرصيد المتاح (quantity - reserved_quantity) للمستودع المحدد
+        $stockQuery = ProductStock::query()
+            ->whereIn('product_id', $productIds);
+
+        if ($warehouseId !== null) {
+            $stockQuery->where('warehouse_id', $warehouseId);
+        }
+
+        $stocks = $stockQuery->groupBy('product_id')
+            ->selectRaw('product_id, COALESCE(SUM(quantity - reserved_quantity), 0) as available_qty')
+            ->pluck('available_qty', 'product_id');
+
+        // 2. جلب سجلات الأسعار للأصناف المعنية دفعة واحدة
+        $allPrices = ProductPrice::query()
+            ->whereIn('product_id', $productIds)
+            ->get();
+
+        foreach ($products as $product) {
+            $product->available_quantity = (float) ($stocks->get($product->id) ?? 0.0000);
+
+            $unitId = $product->matched_unit?->id;
+            if (!$unitId) {
+                $product->resolved_price = (float) ($product->cost_price ?? 0.0000);
+                continue;
+            }
+
+            $unitPrices = $allPrices
+                ->where('product_id', $product->id)
+                ->where('product_unit_id', $unitId);
+
+            $priceRecord = null;
+            if ($priceListId !== null) {
+                $priceRecord = $unitPrices->firstWhere('price_list_id', $priceListId);
+            }
+
+            if (!$priceRecord) {
+                $priceRecord = $unitPrices->first();
+            }
+
+            $product->resolved_price = $priceRecord
+                ? (float) $priceRecord->price
+                : (float) ($product->cost_price ?? 0.0000);
+        }
+    }
+
+   
 
     /**
      * حفظ الوحدات والأسعار والباركودات المرتبطة بالصنف

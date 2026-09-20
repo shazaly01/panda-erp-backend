@@ -50,7 +50,9 @@ class RoleService
                 $moduleDisplayName = match ($moduleKey) {
                     'core', 'system' => 'إدارة النظام',
                     'grant_requests' => 'طلبات المنح والدعم',
-                    default => $moduleKey,
+                    'inventory'      => 'إدارة المخازن والمخزون',
+                    'purchasing'     => 'إدارة المشتريات والموردين',
+                    default          => $moduleKey,
                 };
             }
 
@@ -63,46 +65,46 @@ class RoleService
                     continue;
                 }
 
-                // جلب اسم الشاشة العربي المخزن في قاعدة البيانات مباشرة والذي تم بذره عبر الـ Seeder
+                // جلب اسم الشاشة العربي المخزن في قاعدة البيانات مباشرة
                 $groupDisplayName = $groupPermissions->first()->group_display_name;
                 if (empty($groupDisplayName)) {
                     $groupDisplayName = match ($groupKey) {
                         'grant_request' => 'طلبات الدعم والمنح',
-                        default => $groupKey,
+                        default         => $groupKey,
                     };
                 }
 
                 $formattedPermissions = $groupPermissions->map(function ($p) {
                     return [
-                        'id' => $p->id,
-                        'name' => $p->name,
-                        'action' => $p->action_name,
+                        'id'             => $p->id,
+                        'name'           => $p->name,
+                        'action'         => $p->action_name,
                         'action_display' => $p->display_name,
                     ];
                 })->values()->toArray();
 
                 $structuredGroups[] = [
-                    'key' => $groupKey,
+                    'key'          => $groupKey,
                     'display_name' => $groupDisplayName,
-                    'permissions' => $formattedPermissions,
+                    'permissions'  => $formattedPermissions,
                 ];
             }
 
             $structuredModules[] = [
-                'key' => $moduleKey,
+                'key'          => $moduleKey,
                 'display_name' => $moduleDisplayName,
-                'groups' => $structuredGroups,
+                'groups'       => $structuredGroups,
             ];
         }
 
-        // إرجاع المصفوفة الهيكلية الجديدة لتقوم الواجهة الأمامية برسمها ذاتياً بدون تعقيد
+        // إرجاع المصفوفة الهيكلية لتتمكن الواجهة الأمامية من رسمها ديناميكياً
         return [
             'modules' => $structuredModules,
-            'actions' => $this->getActionsList(),
+            'actions' => $this->getActionsList($permissions),
         ];
     }
 
-    private function getActionsList(): array
+    private function getActionsList($permissions = null): array
     {
         $actions = [
             'view'                => 'عرض',
@@ -113,6 +115,10 @@ class RoleService
             'manage'              => 'إدارة كاملة',
             'approve'             => 'اعتماد',
             'reject'              => 'رفض',
+            'confirm'             => 'تأكيد واعتماد',
+            'cancel'              => 'إلغاء',
+            'receive'             => 'تأكيد الاستلام',
+            'issue'               => 'تأكيد الصرف',
             'post'                => 'ترحيل مالي',
             'export'              => 'تصدير التقارير',
             'request'             => 'تقديم طلب',
@@ -127,8 +133,9 @@ class RoleService
             'toggle_status'       => 'تغيير حالة التقديم',
             'check_in'            => 'تسجيل دخول زائر',
             'check_out'           => 'تسجيل خروج زائر',
+            // صلاحيات تقارير المخازن
             'stock_card'          => 'كارت الصنف التفصيلي',
-            'stock_balance'       => 'أرصدة وتقيم المخزون',
+            'stock_balance'       => 'أرصدة وتقييم المخزون',
             'integrity_audit'     => 'فحص تدقيق ومطابقة البيانات',
             'discrepancies'       => 'فروقات وتسويات الجرد',
             'transfers_tracking'  => 'تتبع التحويلات',
@@ -136,7 +143,23 @@ class RoleService
             'serial_tracking'     => 'الأرقام التسلسلية',
             'reorder_alerts'      => 'نواقص المخزون وإعادة الطلب',
             'production_variance' => 'انحرافات وتكاليف الإنتاج',
+            // صلاحيات تقارير المشتريات
+            'summary'             => 'التقرير التجميعي',
+            'supplier_purchases'  => 'مشتريات الموردين',
+            'order_tracking'      => 'تتبع أوامر الشراء',
+            'pending_receipts'    => 'بضائع معلقة قيد الاستلام',
+            'pending_bills'       => 'فواتير مستحقة وغير مسددة',
+            'price_history'       => 'سجل تطور أسعار الشراء',
         ];
+
+        // دمج تلقائي لأي إجراء موجود في قاعدة البيانات لتفادي سقوط أي صلاحية مستقبلاً
+        if ($permissions !== null) {
+            foreach ($permissions as $perm) {
+                if (!empty($perm->action_name) && !isset($actions[$perm->action_name])) {
+                    $actions[$perm->action_name] = $perm->display_name ?: $perm->action_name;
+                }
+            }
+        }
 
         $formattedActions = [];
         foreach ($actions as $key => $display) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use App\Modules\Core\Http\Controllers\SequenceController;
 use App\Modules\Core\Http\Controllers\PartnerController;
+use App\Modules\Core\Http\Controllers\SystemSettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,6 +16,16 @@ use App\Modules\Core\Http\Controllers\PartnerController;
 Route::middleware('auth:sanctum')
     ->prefix('core')
     ->group(function () {
+
+        // ===========================================
+        // إعدادات النظام العامة (System Settings)
+        // ===========================================
+
+        // جلب الإعدادات والعملة والموديولات المفعلة
+        Route::get('system-settings', [SystemSettingController::class, 'show']);
+
+        // تحديث إعدادات النظام
+        Route::put('system-settings', [SystemSettingController::class, 'update']);
 
         // ===========================================
         // إعدادات ترقيم المستندات (Sequences Settings)

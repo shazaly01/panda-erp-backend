@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Inventory\Http\Requests\Products\FastSearchProductRequest;
 use App\Modules\Inventory\Http\Requests\Products\StoreProductRequest;
 use App\Modules\Inventory\Http\Requests\Products\UpdateProductRequest;
+use App\Modules\Inventory\Http\Resources\PosProductResource;
 use App\Modules\Inventory\Http\Resources\ProductResource;
 use App\Modules\Inventory\Models\Product;
 use App\Modules\Inventory\Services\ProductService;
@@ -22,6 +24,28 @@ class ProductController extends Controller
     public function __construct(
         protected ProductService $productService
     ) {}
+
+    /**
+     * نقطة بحث فائقة السرعة لنقاط البيع، الكاشير، والسوبرماركت
+     */
+    public function fastSearch(FastSearchProductRequest $request): AnonymousResourceCollection
+    {
+        $this->authorize('viewAny', Product::class);
+
+        $search = (string) $request->input('query');
+        $warehouseId = $request->filled('warehouse_id') ? (int) $request->input('warehouse_id') : null;
+        $priceListId = $request->filled('price_list_id') ? (int) $request->input('price_list_id') : null;
+        $limit = (int) $request->input('limit', 10);
+
+        $products = $this->productService->fastSearch(
+            search: $search,
+            warehouseId: $warehouseId,
+            priceListId: $priceListId,
+            limit: $limit
+        );
+
+        return PosProductResource::collection($products);
+    }
 
     /**
      * عرض قائمة الأصناف المفلترة
@@ -84,45 +108,7 @@ class ProductController extends Controller
         return ProductResource::collection($products);
     }
 
-    /**
-     * نقطة بحث خفيفة وسريعة لشاشات الطلبات الداخلية ومشتريات المواد دون إظهار أرصدة المخازن
-     */
-    public function searchForRequisition(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', Product::class);
-
-        $search = $request->query('search');
-        $limit = min((int) $request->query('limit', 20), 50);
-
-        $products = $this->productService->searchForRequisition(
-            search: $search !== null ? (string) $search : null,
-            limit: $limit
-        );
-
-        $data = $products->map(function (Product $product): array {
-            return [
-                'id' => $product->id,
-                'name' => $product->name,
-                'sku' => $product->sku,
-                'aliases' => $product->aliases,
-                'units' => $product->units->map(function ($productUnit): array {
-                    return [
-                        'id' => $productUnit->id,
-                        'unit_id' => $productUnit->unit_id,
-                        'name' => $productUnit->unit?->name ?? null,
-                        'code' => $productUnit->unit?->code ?? null,
-                        'conversion_factor' => (float) $productUnit->conversion_factor,
-                        'is_base_unit' => (bool) $productUnit->is_base_unit,
-                        'is_purchase_unit' => (bool) $productUnit->is_purchase_unit,
-                    ];
-                })->values()->all(),
-            ];
-        });
-
-        return response()->json([
-            'data' => $data,
-        ]);
-    }
+   
 
     /**
      * إنشاء صنف جديد باستخدام StoreProductRequest

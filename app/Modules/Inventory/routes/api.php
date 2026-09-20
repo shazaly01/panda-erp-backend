@@ -37,8 +37,9 @@ Route::middleware('auth:sanctum')
         // 2. الأصناف وقوائم الأسعار (Products & Pricing)
         // ===========================================
 
-        // بحث خفيف للأصناف خاص بالطلبات الداخلية (بدون كميات أو أرصدة مخازن)
-        Route::get('products/search-for-requisition', [ProductController::class, 'searchForRequisition']);
+    
+        // بحث فائق السرعة لنقاط البيع، الكاشير، والباركود والميزان
+        Route::get('products/fast-search', [ProductController::class, 'fastSearch']);
 
         // الأصناف (Products)
         Route::apiResource('products', ProductController::class);

@@ -27,13 +27,12 @@ class UpdateProductRequest extends FormRequest
     {
         $product = $this->route('product');
         $productId = is_object($product) ? $product->id : $product;
-        $companyId = $this->user()->company_id;
 
         return [
             'category_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('inventory_categories', 'id')->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at')),
+                Rule::exists('inventory_categories', 'id')->where(fn ($q) => $q->whereNull('deleted_at')),
             ],
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'aliases' => ['nullable', 'string', 'max:1000'],
@@ -43,7 +42,7 @@ class UpdateProductRequest extends FormRequest
                 'max:100',
                 Rule::unique('inventory_products', 'sku')
                     ->ignore($productId)
-                    ->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at')),
+                    ->where(fn ($q) => $q->whereNull('deleted_at')),
             ],
             'description' => ['nullable', 'string'],
             'type' => [
@@ -78,7 +77,7 @@ class UpdateProductRequest extends FormRequest
             'units.*.unit_id' => [
                 'required_with:units',
                 'integer',
-                Rule::exists('inventory_units', 'id')->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at')),
+                Rule::exists('inventory_units', 'id')->where(fn ($q) => $q->whereNull('deleted_at')),
             ],
             'units.*.conversion_factor' => ['required_with:units', 'numeric', 'gt:0'],
             'units.*.is_base_unit' => ['required_with:units', 'boolean'],
@@ -90,7 +89,7 @@ class UpdateProductRequest extends FormRequest
             'units.*.prices.*.price_list_id' => [
                 'required_with:units.*.prices',
                 'integer',
-                Rule::exists('inventory_price_lists', 'id')->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at')),
+                Rule::exists('inventory_price_lists', 'id')->where(fn ($q) => $q->whereNull('deleted_at')),
             ],
             'units.*.prices.*.price' => ['required_with:units.*.prices', 'numeric', 'min:0'],
             'units.*.prices.*.min_quantity' => ['nullable', 'numeric', 'min:0'],
@@ -103,7 +102,7 @@ class UpdateProductRequest extends FormRequest
                 'max:100',
                 'distinct',
                 Rule::unique('inventory_product_barcodes', 'barcode')
-                    ->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at'))
+                    ->where(fn ($q) => $q->whereNull('deleted_at'))
                     ->whereNotIn('product_unit_id', function ($query) use ($productId) {
                         $query->select('id')
                             ->from('inventory_product_units')
@@ -117,7 +116,7 @@ class UpdateProductRequest extends FormRequest
                 'required_with:reorder_rules',
                 'integer',
                 'distinct',
-                Rule::exists('inventory_warehouses', 'id')->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at')),
+                Rule::exists('inventory_warehouses', 'id')->where(fn ($q) => $q->whereNull('deleted_at')),
             ],
             'reorder_rules.*.min_quantity' => ['required_with:reorder_rules', 'numeric', 'min:0'],
             'reorder_rules.*.max_quantity' => ['required_with:reorder_rules', 'numeric', 'gte:reorder_rules.*.min_quantity'],
@@ -132,20 +131,20 @@ class UpdateProductRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'category_id.exists' => 'التصنيف المحدد غير موجود أو لا ينتمي لهذه الشركة.',
+            'category_id.exists' => 'التصنيف المحدد غير موجود.',
             'name.required' => 'اسم المنتج مطلوب.',
-            'sku.unique' => 'رمز SKU مستخدم من قبل في هذه الشركة.',
+            'sku.unique' => 'رمز SKU مستخدم من قبل.',
             'type.in' => 'نوع المنتج المحدد غير صالح.',
             'inventory_policy.in' => 'سياسة المخزون غير صالحة.',
             'tracking_type.in' => 'سياسة التتبع غير صالحة.',
             'valuation_method.in' => 'طريقة التقييم غير صالحة.',
             'units.required' => 'يجب إضافة وحدة قياس واحدة على الأقل للمنتج.',
             'units.min' => 'يجب إضافة وحدة قياس واحدة على الأقل للمنتج.',
-            'units.*.unit_id.exists' => 'وحدة القياس المحددة غير موجودة في هذه الشركة.',
+            'units.*.unit_id.exists' => 'وحدة القياس المحددة غير موجودة.',
             'units.*.conversion_factor.gt' => 'معامل التحويل يجب أن يكون أكبر من الصفر.',
-            'units.*.barcodes.*.unique' => 'الباركود محجوز مسبقاً لمنتج آخر في هذه الشركة.',
+            'units.*.barcodes.*.unique' => 'الباركود محجوز مسبقاً لمنتج آخر.',
             'reorder_rules.*.warehouse_id.required_with' => 'المستودع مطلوب لقاعدة إعادة الطلب.',
-            'reorder_rules.*.warehouse_id.exists' => 'المستودع المحدد لقاعدة إعادة الطلب غير موجود في هذه الشركة.',
+            'reorder_rules.*.warehouse_id.exists' => 'المستودع المحدد لقاعدة إعادة الطلب غير موجود.',
             'reorder_rules.*.warehouse_id.distinct' => 'لا يمكن تكرار المستودع نفسه أكثر من مرة في قواعد إعادة الطلب.',
             'reorder_rules.*.min_quantity.required_with' => 'الحد الأدنى (حد الأمان) مطلوب.',
             'reorder_rules.*.max_quantity.gte' => 'الحد الأقصى يجب أن يكون أكبر من أو يساوي الحد الأدنى (حد الأمان).',

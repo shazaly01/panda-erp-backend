@@ -44,8 +44,20 @@ class RoleController extends Controller
 
     public function destroy(Role $role)
     {
-        // حماية الأدوار النظامية الأساسية
-        if (in_array($role->name, ['Super Admin', 'Admin', 'User', 'Employee', 'HR Manager'])) {
+        // حماية الأدوار النظامية الأساسية بما فيها موديولات المخازن والمشتريات
+        if (in_array($role->name, [
+            'Super Admin',
+            'Admin',
+            'User',
+            'Employee',
+            'HR Manager',
+            'Inventory Manager',
+            'Inventory Officer',
+            'Inventory Worker',
+            'Purchasing Manager',
+            'Purchasing Officer',
+            'Purchasing Requester',
+        ])) {
             abort(Response::HTTP_FORBIDDEN, 'لا يمكن حذف الأدوار الافتراضية للنظام.');
         }
 
