@@ -27,6 +27,7 @@ use App\Modules\HR\Http\Controllers\ShiftOverrideController;
 use App\Modules\HR\Http\Controllers\InternetVoucherController;
 
 use App\Modules\HR\Http\Controllers\Reports\AttendanceReportController;
+use App\Modules\HR\Http\Controllers\Reports\EmployeeDetailedAttendanceReportController;
 use App\Modules\HR\Http\Controllers\LeavePassController;
 use App\Modules\HR\Http\Controllers\VisitorController;
 use App\Modules\HR\Http\Controllers\PublicInternshipController;
@@ -38,14 +39,24 @@ use App\Modules\HR\Http\Controllers\InternshipDashboardController;
 |--------------------------------------------------------------------------
 */
 
+// =========================================================================
+// المسارات العامة والمستقلة (Public Routes - لا تتطلب تسجيل دخول مسبق)
+// =========================================================================
 Route::post('hr/visitors/public-register', [VisitorController::class, 'publicStore']);
 Route::get('hr/visitors/search-hosts', [VisitorController::class, 'searchHosts']);
-
 Route::get('hr/visitors/check-status/{token}', [\App\Modules\HR\Http\Controllers\VisitorController::class, 'checkStatus']);
+
 Route::post('hr/internship/apply', [PublicInternshipController::class, 'store'])->middleware('throttle:5,1');
 Route::post('hr/internship/track', [PublicInternshipController::class, 'track'])->middleware('throttle:10,1');
 Route::post('hr/internship/update/{id}', [PublicInternshipController::class, 'update'])->middleware('throttle:5,1');
 
+// 🌟 المسار العام الجديد: كشف الحضور والانصراف المفصل للموظف (رابط خارجي مستقل)
+Route::get('hr/public/employee-detailed-attendance', EmployeeDetailedAttendanceReportController::class)
+    ->middleware('throttle:60,1');
+
+// =========================================================================
+// مسارات لوحة التحكم المحمية (Protected HR Admin Routes)
+// =========================================================================
 Route::middleware('auth:sanctum')
     ->prefix('hr') // 🌟 القفل والمفتاح: هذه البادئة تجعل الروابط تطابق طلبات الـ Vue Service
     ->group(function () {
@@ -82,7 +93,6 @@ Route::middleware('auth:sanctum')
     Route::post('contracts/{contract}/terminate', [ContractController::class, 'terminate']);
     Route::get('contracts/available-employees', [ContractController::class, 'availableEmployees']);
     Route::apiResource('contracts', ContractController::class);
-
 
     // ===========================================
     // 3. إعدادات الرواتب (Payroll Settings)
@@ -132,12 +142,12 @@ Route::middleware('auth:sanctum')
     Route::apiResource('attendance-logs', AttendanceLogController::class);
     Route::post('attendance-logs/scan', [AttendanceLogController::class, 'scanBarcode']);
     Route::get('reports/attendance-summary', AttendanceReportController::class);
+    Route::get('reports/employee-detailed-attendance', EmployeeDetailedAttendanceReportController::class);
 
     Route::prefix('team-attendance')->name('team_attendance.')->group(function () {
         Route::get('/', [ManagerAttendanceController::class, 'index'])->name('index');
         Route::post('/override', [ManagerAttendanceController::class, 'override'])->name('override');
     });
-
 
     Route::get('leave-passes/emergency-muster', [LeavePassController::class, 'emergencyMusterList']);
 
@@ -153,7 +163,6 @@ Route::middleware('auth:sanctum')
 
     // المدخلات المالية المتغيرة (حوافز/خصومات)
     Route::apiResource('payroll-inputs', PayrollInputController::class);
-
 
     // -------------------------------------------
     // أكواد الإنترنت (Internet Vouchers)
@@ -185,8 +194,6 @@ Route::middleware('auth:sanctum')
             ->middleware('can:hr.payroll.post');
     });
 
-
-
     // ===========================================
     // 6. إدارة الزوار وبوابات الأمن (Visitor Management)
     // ===========================================
@@ -195,6 +202,3 @@ Route::middleware('auth:sanctum')
     Route::post('visitors/gate/check-out', [VisitorController::class, 'checkOut']);
 
 });
-
-
-

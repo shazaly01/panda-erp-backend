@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\HR\Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Permission;
-use Spatie\Permission\Models\Role;
+use Illuminate\Database\Seeder;
 use Spatie\Permission\PermissionRegistrar;
 
 class HRPermissionsSeeder extends Seeder
@@ -126,8 +125,6 @@ class HRPermissionsSeeder extends Seeder
             ],
         ];
 
-        $permissionsObjects = [];
-
         foreach ($permissionsData as $groupKey => $groupData) {
             foreach ($groupData['actions'] as $actionKey => $displayName) {
 
@@ -137,7 +134,7 @@ class HRPermissionsSeeder extends Seeder
                     $permissionName = "hr.{$groupKey}.{$actionKey}";
                 }
 
-                $permissionsObjects[] = Permission::updateOrCreate(
+                Permission::updateOrCreate(
                     ['name' => $permissionName, 'guard_name' => $guardName],
                     [
                         'module' => $moduleKey,
@@ -150,58 +147,5 @@ class HRPermissionsSeeder extends Seeder
                 );
             }
         }
-
-        // 1. دور مدير الموارد البشرية (HR Manager) - يمتلك كافة صلاحيات القسم تلقائياً
-        $hrManagerRole = Role::firstOrCreate(['name' => 'HR Manager', 'guard_name' => $guardName]);
-        $hrManagerRole->syncPermissions($permissionsObjects);
-
-        // 2. دور موظف الموارد البشرية والعمليات (HR Officer)
-        $hrOfficerRole = Role::firstOrCreate(['name' => 'HR Officer', 'guard_name' => $guardName]);
-        $hrOfficerRole->syncPermissions([
-            'hr.departments.view',
-            'hr.positions.view',
-            'hr.employees.view',
-            'hr.employees.create',
-            'hr.employees.update',
-            'hr.employees.convert',
-            'hr.internship_applications.view_pending',
-            'hr.internship_applications.view_active',
-            'hr.internship_applications.view_completed',
-            'hr.internship_applications.view_rejected',
-            'hr.internship_applications.toggle_status',
-            'hr.internship_applications.approve',
-            'hr.internship_applications.reject',
-            'hr.internship_applications.delete',
-            'hr.contracts.view',
-            'hr.payroll.view',
-            'hr.shifts.view',
-            'hr.working_schedules.view',
-            'hr.calendar_exceptions.view',
-            'hr.shift_overrides.view',
-            'hr.shift_overrides.create',
-            'hr.shift_overrides.update',
-            'hr.shift_overrides.delete',
-            'hr.attendance.view',
-            'hr.attendance.manage',
-            'hr.leaves.view',
-            'hr.leaves.manage',
-            'hr.loans.view',
-            'hr_leave_passes.view',
-            'hr_leave_passes.create',
-            'hr_leave_passes.update',
-            'hr_leave_passes.delete',
-            'hr_leave_passes.approve',
-            'hr_leave_passes.gate_check',
-            'hr_visitors.view',
-            'hr_visitors.create',
-            'hr_visitors.update',
-            'hr_visitors.delete',
-            'hr_visitors.check_in',
-            'hr_visitors.check_out',
-        ]);
-
-        // 3. دور الموظف العادي (Employee)
-        $employeeRole = Role::firstOrCreate(['name' => 'Employee', 'guard_name' => $guardName]);
-        $employeeRole->syncPermissions(['hr.leaves.request', 'hr.loans.request']);
     }
 }

@@ -6,7 +6,6 @@ namespace App\Modules\Purchasing\Database\Seeders;
 
 use App\Models\Permission;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class PurchasingPermissionsSeeder extends Seeder
@@ -99,13 +98,11 @@ class PurchasingPermissionsSeeder extends Seeder
             ],
         ];
 
-        $permissionsObjects = [];
-
         foreach ($permissionsData as $groupKey => $groupData) {
             foreach ($groupData['actions'] as $actionKey => $displayName) {
                 $permissionName = "purchasing.{$groupKey}.{$actionKey}";
 
-                $permissionsObjects[] = Permission::updateOrCreate(
+                Permission::updateOrCreate(
                     ['name' => $permissionName, 'guard_name' => $guardName],
                     [
                         'module' => $moduleKey,
@@ -118,47 +115,5 @@ class PurchasingPermissionsSeeder extends Seeder
                 );
             }
         }
-
-        // 1. دور مدير المشتريات (Purchasing Manager) - يمتلك كامل الصلاحيات والاعتمادات والتقارير
-        $purchasingManagerRole = Role::firstOrCreate(['name' => 'Purchasing Manager', 'guard_name' => $guardName]);
-        $purchasingManagerRole->syncPermissions($permissionsObjects);
-
-        // 2. دور مسؤول المشتريات (Purchasing Officer) - صلاحيات التشغيل التنفيذية وإنشاء وتأكيد المستندات
-        $purchasingOfficerRole = Role::firstOrCreate(['name' => 'Purchasing Officer', 'guard_name' => $guardName]);
-        $purchasingOfficerRole->syncPermissions([
-            'purchasing.requisitions.view',
-            'purchasing.requisitions.create',
-            'purchasing.requisitions.update',
-            'purchasing.orders.view',
-            'purchasing.orders.create',
-            'purchasing.orders.update',
-            'purchasing.receipts.view',
-            'purchasing.receipts.create',
-            'purchasing.receipts.update',
-            'purchasing.issues.view',
-            'purchasing.issues.create',
-            'purchasing.issues.update',
-            'purchasing.issues.issue',
-            'purchasing.bills.view',
-            'purchasing.bills.create',
-            'purchasing.bills.update',
-            'purchasing.returns.view',
-            'purchasing.returns.create',
-            'purchasing.returns.update',
-            'purchasing.reports.summary',
-            'purchasing.reports.supplier_purchases',
-            'purchasing.reports.order_tracking',
-            'purchasing.reports.pending_receipts',
-            'purchasing.reports.pending_bills',
-            'purchasing.reports.price_history',
-        ]);
-
-        // 3. دور طالب الشراء (Purchasing Requester) - صلاحيات إنشاء ومتابعة طلبات الشراء الداخلية فقط
-        $purchasingRequesterRole = Role::firstOrCreate(['name' => 'Purchasing Requester', 'guard_name' => $guardName]);
-        $purchasingRequesterRole->syncPermissions([
-            'purchasing.requisitions.view',
-            'purchasing.requisitions.create',
-            'purchasing.requisitions.update',
-        ]);
     }
 }

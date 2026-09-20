@@ -6,7 +6,6 @@ namespace App\Modules\Accounting\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Permission;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class AccountingPermissionsSeeder extends Seeder
@@ -97,13 +96,11 @@ class AccountingPermissionsSeeder extends Seeder
             ],
         ];
 
-        $permissionsObjects = [];
-
         foreach ($permissionsData as $groupKey => $groupData) {
             foreach ($groupData['actions'] as $actionKey => $displayName) {
                 $permissionName = "{$groupKey}.{$actionKey}";
 
-                $permissionsObjects[] = Permission::updateOrCreate(
+                Permission::updateOrCreate(
                     ['name' => $permissionName, 'guard_name' => $guardName],
                     [
                         'module' => $moduleKey,
@@ -117,7 +114,7 @@ class AccountingPermissionsSeeder extends Seeder
             }
         }
 
-        $permissionsObjects[] = Permission::updateOrCreate(
+        Permission::updateOrCreate(
             ['name' => 'view_sequences', 'guard_name' => $guardName],
             [
                 'module' => 'core',
@@ -128,15 +125,5 @@ class AccountingPermissionsSeeder extends Seeder
                 'display_name' => 'عرض'
             ]
         );
-
-        $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => $guardName]);
-        $adminRole->syncPermissions(Permission::where('guard_name', $guardName)->get());
-
-        $accountantRole = Role::firstOrCreate(['name' => 'Accountant', 'guard_name' => $guardName]);
-        $accountantRole->syncPermissions([
-            'accounting.view', 'dashboard.view', 'payment.view', 'payment.create', 'payment.update',
-            'receipt.view', 'receipt.create', 'receipt.update', 'journal_entry.view', 'journal_entry.create',
-            'account.view', 'budget.view', 'report.statement.view', 'report.trial_balance.view', 'report.budget_variance.view'
-        ]);
     }
 }
