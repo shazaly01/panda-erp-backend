@@ -28,6 +28,7 @@ use App\Modules\HR\Http\Controllers\InternetVoucherController;
 
 use App\Modules\HR\Http\Controllers\Reports\AttendanceReportController;
 use App\Modules\HR\Http\Controllers\Reports\EmployeeDetailedAttendanceReportController;
+use App\Modules\HR\Http\Controllers\Reports\DepartmentMonthlyAttendanceReportController;
 use App\Modules\HR\Http\Controllers\LeavePassController;
 use App\Modules\HR\Http\Controllers\VisitorController;
 use App\Modules\HR\Http\Controllers\PublicInternshipController;
@@ -143,6 +144,7 @@ Route::middleware('auth:sanctum')
     Route::post('attendance-logs/scan', [AttendanceLogController::class, 'scanBarcode']);
     Route::get('reports/attendance-summary', AttendanceReportController::class);
     Route::get('reports/employee-detailed-attendance', EmployeeDetailedAttendanceReportController::class);
+    Route::get('reports/department-monthly-attendance', DepartmentMonthlyAttendanceReportController::class);
 
     Route::prefix('team-attendance')->name('team_attendance.')->group(function () {
         Route::get('/', [ManagerAttendanceController::class, 'index'])->name('index');
