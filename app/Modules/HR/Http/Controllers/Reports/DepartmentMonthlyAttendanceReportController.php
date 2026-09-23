@@ -17,34 +17,65 @@ use Illuminate\Support\Facades\Auth;
 class DepartmentMonthlyAttendanceReportController extends Controller
 {
     /**
-     * توليد تقرير الحضور الشهري لجميع موظفي قسم معين
-     * يعرض كل موظف وتحته سجله الشهري وملخص إحصائياته
-     * الشهر الحالي هو الافتراضي ما لم يتم تحديد تواريخ أخرى
+     * توليد تقرير الحضور (أسبوعي افتراضياً أو شهري) لجميع موظفي قسم معين
+     * يعرض كل موظف وتحته سجله الزمني وملخص إحصائياته مع استبعاد من لم يسجل حضوراً
      */
     public function __invoke(Request $request): JsonResponse
     {
         // 1. التحقق من صحة المدخلات
         $data = $request->validate([
             'department_id' => ['required', 'integer', 'exists:departments,id'],
+            'report_type'   => ['nullable', 'string', 'in:monthly,weekly'],
             'month'         => ['nullable', 'date_format:Y-m'],
             'start_date'    => ['nullable', 'date', 'date_format:Y-m-d'],
             'end_date'      => ['nullable', 'date', 'date_format:Y-m-d', 'after_or_equal:start_date'],
         ]);
 
-        // 2. ضبط النطاق الزمني
+        // جعل الأسبوعي هو النمط الافتراضي لتسريع الوصول
+        $reportType = $data['report_type'] ?? 'weekly';
+
+        // 2. ضبط النطاق الزمني وتوليد مسمى الفترة
         if (!empty($data['start_date']) && !empty($data['end_date'])) {
             $startDate = $data['start_date'];
             $endDate = $data['end_date'];
-            $monthTitle = Carbon::parse($startDate)->locale('ar')->translatedFormat('F Y');
+
+            $startCarbon = Carbon::parse($startDate)->locale('ar');
+            $endCarbon = Carbon::parse($endDate)->locale('ar');
+            $diffDays = $startCarbon->diffInDays($endCarbon) + 1;
+
+            if ($reportType === 'weekly' || $diffDays <= 7) {
+                $reportType = 'weekly';
+                $periodTitle = 'الفترة الأسبوعية (' . $startCarbon->translatedFormat('d M') . ' - ' . $endCarbon->translatedFormat('d M Y') . ')';
+            } else {
+                $reportType = 'monthly';
+                $periodTitle = $startCarbon->translatedFormat('F Y');
+            }
+            $monthTitle = $periodTitle;
         } elseif (!empty($data['month'])) {
-            $carbonMonth = Carbon::createFromFormat('Y-m', $data['month']);
+            $carbonMonth = Carbon::createFromFormat('Y-m', $data['month'])->locale('ar');
             $startDate = $carbonMonth->copy()->startOfMonth()->toDateString();
             $endDate = $carbonMonth->copy()->endOfMonth()->toDateString();
-            $monthTitle = $carbonMonth->locale('ar')->translatedFormat('F Y');
+            $periodTitle = $carbonMonth->translatedFormat('F Y');
+            $monthTitle = $periodTitle;
+            $reportType = 'monthly';
         } else {
-            $startDate = Carbon::today()->startOfMonth()->toDateString();
-            $endDate = Carbon::today()->endOfMonth()->toDateString();
-            $monthTitle = Carbon::today()->locale('ar')->translatedFormat('F Y');
+            // التحديد التلقائي: الأسبوع الحالي يبدأ من الأحد افتراضياً
+            if ($reportType === 'weekly') {
+                $now = Carbon::today()->locale('ar');
+                $startOfWeek = $now->copy()->startOfWeek(Carbon::SUNDAY);
+                $endOfWeek = $now->copy()->endOfWeek(Carbon::SATURDAY);
+
+                $startDate = $startOfWeek->toDateString();
+                $endDate = $endOfWeek->toDateString();
+                $periodTitle = 'الأسبوع الحالي (' . $startOfWeek->translatedFormat('d M') . ' - ' . $endOfWeek->translatedFormat('d M Y') . ')';
+                $monthTitle = $periodTitle;
+            } else {
+                $today = Carbon::today()->locale('ar');
+                $startDate = $today->copy()->startOfMonth()->toDateString();
+                $endDate = $today->copy()->endOfMonth()->toDateString();
+                $periodTitle = $today->translatedFormat('F Y');
+                $monthTitle = $periodTitle;
+            }
         }
 
         // 3. جلب القسم والتحقق من الصلاحيات
@@ -76,7 +107,6 @@ class DepartmentMonthlyAttendanceReportController extends Controller
                   ->orWhere('employment_type', '!=', EmploymentType::Intern->value);
             })
             ->where(function ($q) {
-                // استبعاد الحالات غير النشطة فقط مع قبول أي حالة أخرى أو القيم الفارغة
                 $q->whereNull('status')
                   ->orWhereNotIn('status', ['terminated', 'resigned', 'archived']);
             })
@@ -93,9 +123,11 @@ class DepartmentMonthlyAttendanceReportController extends Controller
                     'code' => $department->code,
                 ],
                 'filter' => [
-                    'start_date'  => $startDate,
-                    'end_date'    => $endDate,
-                    'month_title' => $monthTitle,
+                    'report_type'  => $reportType,
+                    'start_date'   => $startDate,
+                    'end_date'     => $endDate,
+                    'period_title' => $periodTitle,
+                    'month_title'  => $monthTitle,
                 ],
                 'employees' => [],
             ], 200);
@@ -113,9 +145,9 @@ class DepartmentMonthlyAttendanceReportController extends Controller
 
         $attendanceMode = env('ATTENDANCE_MODE', 'strict');
 
-        // 7. معالجة وحساب بيانات كل موظف
+        // 7. معالجة وحساب بيانات كل موظف مع تصفية من ليس لديه حركات
         $departmentSummary = [
-            'total_employees'           => $employees->count(),
+            'total_employees'           => 0,
             'total_days_logged'         => 0,
             'present_days'              => 0,
             'late_days'                 => 0,
@@ -132,6 +164,15 @@ class DepartmentMonthlyAttendanceReportController extends Controller
 
         foreach ($employees as $employee) {
             $employeeLogs = $logsGroupedByEmployee->get($employee->id, collect());
+
+            // استبعاد الموظف إذا لم يكن لديه أي سجلات أو لم يسجل أي بصمة حضور فعلية خلال الفترة
+            $hasRecordedAttendance = $employeeLogs->contains(function ($log) {
+                return !empty($log->check_in) || in_array($log->status, ['present', 'late'], true);
+            });
+
+            if (!$hasRecordedAttendance) {
+                continue;
+            }
 
             $employeeSummary = [
                 'total_days_logged'         => 0,
@@ -212,7 +253,7 @@ class DepartmentMonthlyAttendanceReportController extends Controller
 
             $employeeSummary['total_work_hours'] = round($employeeSummary['total_work_minutes'] / 60, 2);
 
-            // تجميع المجاميع للقسم ككل
+            // تجميع المجاميع للقسم ككل للموظفين المتبقين فقط
             $departmentSummary['total_days_logged'] += $employeeSummary['total_days_logged'];
             $departmentSummary['present_days'] += $employeeSummary['present_days'];
             $departmentSummary['late_days'] += $employeeSummary['late_days'];
@@ -239,6 +280,8 @@ class DepartmentMonthlyAttendanceReportController extends Controller
             ];
         }
 
+        // تحديث إجمالي عدد الموظفين وإجمالي الساعات بناءً على من ظهروا فعلياً في التقرير
+        $departmentSummary['total_employees'] = count($employeesData);
         $departmentSummary['total_work_hours'] = round($departmentSummary['total_work_minutes'] / 60, 2);
 
         // 8. إرجاع الاستجابة النهائية
@@ -251,8 +294,10 @@ class DepartmentMonthlyAttendanceReportController extends Controller
                 'is_active'   => $department->is_active,
             ],
             'filter' => [
+                'report_type'     => $reportType,
                 'start_date'      => $startDate,
                 'end_date'        => $endDate,
+                'period_title'    => $periodTitle,
                 'month_title'     => $monthTitle,
                 'attendance_mode' => $attendanceMode,
             ],

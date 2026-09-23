@@ -19,6 +19,8 @@ class UserResource extends JsonResource
             'default_cost_center_id'  => $this->default_cost_center_id,
             'default_box_id'          => $this->default_box_id,
             'default_bank_account_id' => $this->default_bank_account_id,
+            'department_id'           => $this->employee?->department_id,
+            'employee_id'             => $this->employee?->id,
             'created_at'              => $this->created_at->toDateTimeString(),
             'roles'                   => RoleResource::collection($this->whenLoaded('roles')),
         ];

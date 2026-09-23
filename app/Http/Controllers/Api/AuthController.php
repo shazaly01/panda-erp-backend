@@ -57,7 +57,7 @@ class AuthController extends Controller
             ], 403);
         }
 
-        $user->load('roles.permissions');
+        $user->load(['roles.permissions', 'employee']);
 
         // حذف التوكنات القديمة لتجنب التراكم
         $user->tokens()->delete();
