@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Accounting\Services;
 
+use App\Modules\Accounting\Enums\EntryStatus;
 use App\Modules\Accounting\Enums\VoucherStatus;
 use App\Modules\Accounting\Enums\VoucherType;
 use App\Modules\Accounting\Models\BankAccount;
@@ -16,7 +17,9 @@ use App\Modules\Accounting\Models\VoucherDetail;
 use App\Modules\Core\Services\SequenceService;
 use App\Modules\Purchasing\Enums\BillStatus;
 use App\Modules\Purchasing\Models\PurchaseBill;
+use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class VoucherService
@@ -40,11 +43,12 @@ class VoucherService
                 ? 'acc_payment'
                 : 'acc_receipt';
 
-            // 2. توليد الرقم التسلسلي
+            // 2. توليد الرقم التسلسلي بالاعتماد على تاريخ السند المدخل
             $number = $this->sequenceService->generateNumber(
                 $documentCode,
                 null,
-                $prefix
+                $prefix,
+                (string) $data['date']
             );
 
             // 3. إنشاء رأس السند
@@ -52,6 +56,8 @@ class VoucherService
                 'branch_id'       => $data['branch_id'],
                 'type'            => $data['type'],
                 'number'          => $number,
+                'paper_ref'       => $data['paper_ref'] ?? null,
+                'bank_ref_number' => $data['bank_ref_number'] ?? null,
                 'date'            => $data['date'],
                 'payee_name'      => $data['payee_name'],
                 'description'     => $data['description'] ?? null,
@@ -61,7 +67,7 @@ class VoucherService
                 'exchange_rate'   => $data['exchange_rate'] ?? 1.0,
                 'amount'          => $data['amount'],
                 'status'          => VoucherStatus::Draft,
-                'created_by'      => auth()->id(),
+                'created_by'      => Auth::id(),
             ]);
 
             // 4. إنشاء التفاصيل (السطور) مع بيانات الطرف والمستند المرجعي
@@ -96,6 +102,8 @@ class VoucherService
             $voucher->update([
                 'branch_id'       => $data['branch_id'] ?? $voucher->branch_id,
                 'date'            => $data['date'],
+                'paper_ref'       => array_key_exists('paper_ref', $data) ? $data['paper_ref'] : $voucher->paper_ref,
+                'bank_ref_number' => array_key_exists('bank_ref_number', $data) ? $data['bank_ref_number'] : $voucher->bank_ref_number,
                 'payee_name'      => $data['payee_name'] ?? $voucher->payee_name,
                 'description'     => $data['description'] ?? $voucher->description,
                 'box_id'          => $data['box_id'] ?? null,
@@ -156,8 +164,13 @@ class VoucherService
                 throw new Exception('لا يوجد حساب مالي مرتبط بالخزينة أو البنك المختار.');
             }
 
-            // 2. توليد رقم القيد وإنشاء رأس القيد المحاسبي
-            $entryNumber = $this->sequenceService->generateNumber('acc_journal_entry');
+            // 2. توليد رقم القيد مع تمرير تاريخ السند لضمان اتساق ترقيم القيود مع السنة المالية للسند
+            $entryNumber = $this->sequenceService->generateNumber(
+                'acc_journal_entry',
+                null,
+                null,
+                (string) $voucher->date
+            );
 
             $journalEntry = JournalEntry::create([
                 'entry_number' => $entryNumber,
@@ -166,8 +179,8 @@ class VoucherService
                 'status'       => 'posted',
                 'source'       => $voucher->type->value,
                 'source_id'    => $voucher->id,
-                'posted_at'    => now(),
-                'created_by'   => auth()->id(),
+                'posted_at'    => Carbon::now(),
+                'created_by'   => Auth::id(),
             ]);
 
             // 3. بناء أطراف القيد (Dr & Cr)
@@ -205,11 +218,48 @@ class VoucherService
             // 5. تحديث حالة السند
             $voucher->update([
                 'status'    => VoucherStatus::Posted,
-                'posted_by' => auth()->id(),
-                'posted_at' => now(),
+                'posted_by' => Auth::id(),
+                'posted_at' => Carbon::now(),
             ]);
 
             return $voucher;
+        });
+    }
+
+    /**
+     * إلغاء ترحيل السند وحذف القيد المحاسبي المرتبط وإعادته لمسودة
+     */
+    public function unpostVoucher(Voucher $voucher): Voucher
+    {
+        if (! $voucher->isPosted()) {
+            throw new Exception('لا يمكن إلغاء الترحيل لأن السند ليس في حالة ترحيل.');
+        }
+
+        return DB::transaction(function () use ($voucher): Voucher {
+            // 1. جلب القيود اليومية المرتبطة بهذا السند
+            $journalEntries = JournalEntry::where('source', $voucher->type->value)
+                ->where('source_id', $voucher->id)
+                ->get();
+
+            foreach ($journalEntries as $entry) {
+                // تعديل الحالة أولاً إلى مسودة لتجاوز قيد الأمان في boot() الخاص بـ JournalEntry
+                $entry->update(['status' => EntryStatus::Draft]);
+
+                // حذف أسطر القيد نهائياً لضمان عدم بقاء أي سجلات معلقة
+                $entry->details()->delete();
+
+                // حذف رأس القيد نهائياً (الحذف المباشر)
+                $entry->forceDelete();
+            }
+
+            // 2. إعادة حالة السند إلى مسودة وتصفير بيانات الترحيل
+            $voucher->update([
+                'status'    => VoucherStatus::Draft,
+                'posted_by' => null,
+                'posted_at' => null,
+            ]);
+
+            return $voucher->refresh();
         });
     }
 
@@ -240,7 +290,7 @@ class VoucherService
                     'paid_amount'      => $newPaidAmount,
                     'remaining_amount' => $newRemainingAmount,
                     'status'           => $newStatus,
-                    'updated_by'       => auth()->id() ?? $voucher->created_by,
+                    'updated_by'       => Auth::id() ?? $voucher->created_by,
                 ]);
             }
         }

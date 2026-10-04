@@ -22,6 +22,9 @@ class UpdateAttendanceLogRequest extends FormRequest
             // في حال تم إرسال check_in و check_out معاً، يجب أن يكون الانصراف بعد الحضور
             'check_out' => ['nullable', 'date_format:H:i', 'after:check_in'],
 
+            // الدقائق الإضافية المعتمدة من المشرف عند التعديل
+            'overtime_minutes' => ['nullable', 'integer', 'min:0', 'max:1440'],
+
             'status'    => ['sometimes', 'required', 'in:present,absent,late,on_leave'],
         ];
     }
@@ -30,6 +33,9 @@ class UpdateAttendanceLogRequest extends FormRequest
     {
         return [
             'check_out.after' => 'وقت الانصراف يجب أن يكون بعد وقت الحضور.',
+            'overtime_minutes.integer' => 'الدقائق الإضافية يجب أن تكون رقماً صحيحاً.',
+            'overtime_minutes.min' => 'الدقائق الإضافية لا يمكن أن تكون سالبة.',
+            'overtime_minutes.max' => 'الدقائق الإضافية لا يمكن أن تتجاوز 1440 دقيقة (24 ساعة).',
         ];
     }
 }

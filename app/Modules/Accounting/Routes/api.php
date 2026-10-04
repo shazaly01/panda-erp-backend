@@ -29,13 +29,12 @@ Route::middleware('auth:sanctum')
     Route::apiResource('cost-centers', CostCenterController::class);
     Route::apiResource('fiscal-years', FiscalYearController::class);
 
-
     // --- البحث الموحد في الحسابات والأطراف المساعدة ---
     Route::get('parties/search', [AccountPartySearchController::class, 'search']);
     Route::get('parties/types', [AccountPartySearchController::class, 'types']);
 
     // ===========================================
-    // 2. إدارة النقدية (Treasury) - [الجديد]
+    // 2. إدارة النقدية (Treasury)
     // ===========================================
 
     // العملات
@@ -45,7 +44,6 @@ Route::middleware('auth:sanctum')
     Route::apiResource('boxes', BoxController::class);
 
     // الحسابات البنكية
-    // ملاحظة: لارافيل سيفهم تلقائياً أن المتغير هو {bank_account}
     Route::apiResource('bank-accounts', BankAccountController::class);
 
     // ===========================================
@@ -73,18 +71,18 @@ Route::middleware('auth:sanctum')
     Route::put('account-mappings/{id}', [AccountMappingController::class, 'update']);
     Route::get('account-mappings/allowed-accounts/{key}', [AccountMappingController::class, 'allowedAccounts']);
 
-
     // 1. العمليات الأساسية (CRUD)
-    // تنشئ الراوتات: index, show, store, update, destroy
     Route::apiResource('vouchers', VoucherController::class);
 
     // 2. العمليات الإضافية (Actions)
     // ترحيل السند
     Route::post('vouchers/{voucher}/post', [VoucherController::class, 'post']);
 
+    // إلغاء ترحيل السند (حذف القيد وإعادته لمسودة)
+    Route::post('vouchers/{voucher}/unpost', [VoucherController::class, 'unpost']);
+
     // اعتماد السند
     Route::post('vouchers/{voucher}/approve', [VoucherController::class, 'approve']);
-
 
     // ===========================================
     // 6. الموازنات التقديرية (Budgets)

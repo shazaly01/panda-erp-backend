@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Accounting\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +21,8 @@ class Voucher extends Model
         'branch_id',
         'type',
         'number',
+        'paper_ref',
+        'bank_ref_number',
         'date',
         'payee_name',
         'description',
@@ -40,8 +44,8 @@ class Voucher extends Model
         'date' => 'date',
         'exchange_rate' => 'float',
         'amount' => 'float',
-        'type' => VoucherType::class,     // يربط مع ملف Enum
-        'status' => VoucherStatus::class, // يربط مع ملف Enum
+        'type' => VoucherType::class,
+        'status' => VoucherStatus::class,
         'posted_at' => 'datetime',
     ];
 
@@ -53,7 +57,7 @@ class Voucher extends Model
         return $this->hasMany(VoucherDetail::class);
     }
 
-    // 2. الفرع (وهو في الحقيقة مركز تكلفة كما اتفقنا)
+    // 2. الفرع (مركز التكلفة المحدد كفرع)
     public function branch(): BelongsTo
     {
         return $this->belongsTo(CostCenter::class, 'branch_id');

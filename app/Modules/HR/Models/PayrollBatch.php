@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\HR\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\User;
 use App\Modules\Accounting\Models\JournalEntry;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PayrollBatch extends Model
 {
@@ -16,27 +17,23 @@ class PayrollBatch extends Model
 
     protected $table = 'payroll_batches';
 
-    // تم تحديث الحقول لتطابق الـ Migration الاحترافي تماماً
     protected $fillable = [
-        'name',               // اسم المسير (مثال: رواتب شهر 04-2026)
-        'pay_period_id',      // الإضافة الجديدة
-        'run_type',           // الإضافة الجديدة
-        'status',             // draft, approved, paid, posted
-        'approved_at',        // وقت الاعتماد
-        'approved_by',        // المستخدم الذي اعتمد
-        'journal_entry_id',   // رقم القيد المحاسبي
+        'number',
+        'name',
+        'pay_period_id',
+        'run_type',
+        'status',
+        'approved_at',
+        'approved_by',
+        'journal_entry_id',
     ];
 
     protected $casts = [
-        'start_date' => 'date',
-        'end_date' => 'date',
         'approved_at' => 'datetime',
     ];
 
     /**
-     * المستخدم الذي قام باعتماد الرواتب
-     * (أبقينا اسم الدالة creator حتى لا نكسر الكود في الواجهة الأمامية،
-     * ولكن ربطناها بالحقل الصحيح approved_by في قاعدة البيانات)
+     * المستخدم الذي قام باعتماد وترحيل المسير
      */
     public function creator(): BelongsTo
     {
@@ -44,16 +41,26 @@ class PayrollBatch extends Model
     }
 
     /**
-     * القيد المحاسبي المرتبط بهذه الدفعة
+     * القيد المحاسبي المولد آلياً في شجرة الحسابات
      */
     public function journalEntry(): BelongsTo
     {
         return $this->belongsTo(JournalEntry::class, 'journal_entry_id');
     }
 
-
+    /**
+     * الفترة المالية التابع لها المسير
+     */
     public function payPeriod(): BelongsTo
     {
         return $this->belongsTo(PayPeriod::class, 'pay_period_id');
+    }
+
+    /**
+     * قسائم الرواتب الفردية للموظفين التابعة لهذه الدفعة
+     */
+    public function payslips(): HasMany
+    {
+        return $this->hasMany(Payslip::class, 'payroll_batch_id');
     }
 }

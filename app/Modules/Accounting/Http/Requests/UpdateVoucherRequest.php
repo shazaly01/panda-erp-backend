@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Accounting\Http\Requests;
 
+use App\Modules\Accounting\Rules\PeriodIsOpenRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -18,7 +19,9 @@ class UpdateVoucherRequest extends FormRequest
     {
         return [
             'branch_id' => ['required', 'exists:cost_centers,id'],
-            'date' => ['required', 'date'],
+            'date' => ['required', 'date', new PeriodIsOpenRule()],
+            'paper_ref' => ['nullable', 'string', 'max:255'],
+            'bank_ref_number' => ['nullable', 'string', 'max:255'],
             'payee_name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:500'],
 
@@ -72,6 +75,9 @@ class UpdateVoucherRequest extends FormRequest
     {
         return [
             'branch_id' => 'الفرع',
+            'date' => 'تاريخ السند',
+            'paper_ref' => 'الرقم المرجعي الورقي',
+            'bank_ref_number' => 'رقم الشيك / العملية',
             'box_id' => 'الخزينة',
             'bank_account_id' => 'الحساب البنكي',
             'payee_name' => 'اسم المستفيد / الدافع',

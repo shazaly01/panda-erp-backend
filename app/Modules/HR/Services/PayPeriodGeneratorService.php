@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\HR\Services;
 
 use App\Modules\HR\Models\PayGroup;
@@ -9,6 +11,24 @@ use Exception;
 
 class PayPeriodGeneratorService
 {
+    /**
+     * أسماء الأشهر باللغة العربية لضمان دقة التسمية وتجنب خلط اللغات
+     */
+    private const ARABIC_MONTHS = [
+        1  => 'يناير',
+        2  => 'فبراير',
+        3  => 'مارس',
+        4  => 'أبريل',
+        5  => 'مايو',
+        6  => 'يونيو',
+        7  => 'يوليو',
+        8  => 'أغسطس',
+        9  => 'سبتمبر',
+        10 => 'أكتوبر',
+        11 => 'نوفمبر',
+        12 => 'ديسمبر',
+    ];
+
     /**
      * توليد الفترات المالية لمجموعة دفع معينة في سنة محددة
      */
@@ -46,77 +66,101 @@ class PayPeriodGeneratorService
         return $periods;
     }
 
+    /**
+     * توليد الفترات الشهرية (12 شهراً) بالترقيم واللغة العربية وحالة مفتوحة
+     */
     private function generateMonthlyPeriods(int $groupId, int $year): array
     {
         $periods = [];
+        $now = now();
+
         for ($month = 1; $month <= 12; $month++) {
             $start = Carbon::create($year, $month, 1);
             $end = $start->copy()->endOfMonth();
 
+            $monthNumber = sprintf('%02d', $month);
+            $monthArabicName = self::ARABIC_MONTHS[$month] ?? '';
+            $periodName = "شهر {$monthNumber} ({$monthArabicName}) {$year}";
+
             $periods[] = [
                 'pay_group_id' => $groupId,
-                'name'         => "شهر " . $start->translatedFormat('F Y'), // مثال: شهر أبريل 2026
+                'name'         => $periodName,
                 'start_date'   => $start->format('Y-m-d'),
                 'end_date'     => $end->format('Y-m-d'),
-                'status'       => 'pending', // حالة مبدئية: مجدولة/قيد الانتظار
-                'created_at'   => now(),
-                'updated_at'   => now(),
+                'status'       => 'open',
+                'created_at'   => $now,
+                'updated_at'   => $now,
             ];
         }
+
         return $periods;
     }
 
+    /**
+     * توليد الفترات الأسبوعية
+     */
     private function generateWeeklyPeriods(int $groupId, int $year): array
     {
         $periods = [];
-        // نبدأ من أول يوم في السنة، ثم نعود لأول يوم أحد (أو السبت حسب إعدادات الأسبوع)
+        $now = now();
+
         $start = Carbon::create($year, 1, 1)->startOfWeek(Carbon::SUNDAY);
         $weekNumber = 1;
 
         while ($start->year <= $year || ($start->year == $year + 1 && $start->month == 1 && $start->day <= 6)) {
             $end = $start->copy()->addDays(6);
 
-            // التأكد من أن الأسبوع يقع أغلبه في السنة المستهدفة لتجنب التداخل الكبير
             if ($start->year == $year || $end->year == $year) {
+                $weekFormatted = sprintf('%02d', $weekNumber);
+
                 $periods[] = [
                     'pay_group_id' => $groupId,
-                    'name'         => "الأسبوع {$weekNumber} - {$year}",
+                    'name'         => "الأسبوع {$weekFormatted} - {$year}",
                     'start_date'   => $start->format('Y-m-d'),
                     'end_date'     => $end->format('Y-m-d'),
-                    'status'       => 'pending',
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
+                    'status'       => 'open',
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
                 ];
                 $weekNumber++;
             }
             $start->addWeek();
         }
+
         return $periods;
     }
 
+    /**
+     * توليد الفترات النصف شهرية (كل أسبوعين)
+     */
     private function generateBiWeeklyPeriods(int $groupId, int $year): array
     {
         $periods = [];
+        $now = now();
+
         $start = Carbon::create($year, 1, 1)->startOfWeek(Carbon::SUNDAY);
         $periodNumber = 1;
 
         while ($start->year <= $year) {
-            $end = $start->copy()->addDays(13); // 14 يوم
+            $end = $start->copy()->addDays(13);
 
             if ($start->year == $year || $end->year == $year) {
+                $periodFormatted = sprintf('%02d', $periodNumber);
+
                 $periods[] = [
                     'pay_group_id' => $groupId,
-                    'name'         => "فترة نصف شهرية {$periodNumber} - {$year}",
+                    'name'         => "فترة نصف شهرية {$periodFormatted} - {$year}",
                     'start_date'   => $start->format('Y-m-d'),
                     'end_date'     => $end->format('Y-m-d'),
-                    'status'       => 'pending',
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
+                    'status'       => 'open',
+                    'created_at'   => $now,
+                    'updated_at'   => $now,
                 ];
                 $periodNumber++;
             }
             $start->addWeeks(2);
         }
+
         return $periods;
     }
 }

@@ -74,11 +74,19 @@ class HRPermissionsSeeder extends Seeder
             ],
             'attendance' => [
                 'title' => 'الحضور والانصراف (كشك)',
-                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة']
+                'actions' => [
+                    'view' => 'عرض',
+                    'manage' => 'إدارة كاملة',
+                    'manual_entry' => 'إدخال يدوي',
+                ]
             ],
             'team_attendance' => [
                 'title' => 'إدارة حضور الفريق',
-                'actions' => ['manage' => 'إدارة الفريق']
+                'actions' => [
+                    'manage' => 'إدارة الفريق',
+                    'check_in' => 'تسجيل وتعديل الدخول',
+                    'check_out' => 'تسجيل وتعديل الخروج',
+                ]
             ],
             'leaves' => [
                 'title' => 'طلبات الإجازات',

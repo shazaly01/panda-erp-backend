@@ -12,27 +12,29 @@ class VoucherResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'            => $this->id,
-            'number'        => $this->number,
-            'date'          => $this->date->format('Y-m-d'),
+            'id'              => $this->id,
+            'number'          => $this->number,
+            'paper_ref'       => $this->paper_ref,
+            'bank_ref_number' => $this->bank_ref_number,
+            'date'            => $this->date->format('Y-m-d'),
 
             // النوع (صرف/قبض)
-            'type'          => $this->type->value,
-            'type_label'    => $this->type->label(),
+            'type'            => $this->type->value,
+            'type_label'      => $this->type->label(),
 
-            'payee_name'    => $this->payee_name,
+            'payee_name'      => $this->payee_name,
 
-            'description'   => $this->description,
-            'amount'        => (float) $this->amount,
-            'exchange_rate' => (float) $this->exchange_rate,
+            'description'     => $this->description,
+            'amount'          => (float) $this->amount,
+            'exchange_rate'   => (float) $this->exchange_rate,
 
             // الحالة (مع اللون للعرض في الجدول)
-            'status'        => $this->status->value,
-            'status_label'  => $this->status->label(),
-            'status_color'  => $this->status->color(),
+            'status'          => $this->status->value,
+            'status_label'    => $this->status->label(),
+            'status_color'    => $this->status->color(),
 
             // الفرع
-            'branch'        => $this->whenLoaded('branch', function () {
+            'branch'          => $this->whenLoaded('branch', function () {
                 return [
                     'id'   => $this->branch->id,
                     'name' => $this->branch->name,
@@ -41,13 +43,13 @@ class VoucherResource extends JsonResource
             }),
 
             // العملة
-            'currency'      => new CurrencyResource($this->whenLoaded('currency')),
+            'currency'        => new CurrencyResource($this->whenLoaded('currency')),
 
             // تحديد وسيلة الدفع للعرض
-            'payment_method' => $this->getPaymentMethodData(),
+            'payment_method'  => $this->getPaymentMethodData(),
 
             // تفاصيل السند
-            'details'       => VoucherDetailResource::collection($this->whenLoaded('details')),
+            'details'         => VoucherDetailResource::collection($this->whenLoaded('details')),
 
             // بيانات التدقيق
             'audit' => [
@@ -72,9 +74,10 @@ class VoucherResource extends JsonResource
 
         if ($this->relationLoaded('bankAccount') && $this->bankAccount !== null) {
             return [
-                'type' => 'bank',
-                'id'   => $this->bankAccount->id,
-                'name' => $this->bankAccount->bank_name . ' - ' . $this->bankAccount->account_number,
+                'type'            => 'bank',
+                'id'              => $this->bankAccount->id,
+                'name'            => $this->bankAccount->bank_name . ' - ' . $this->bankAccount->account_number,
+                'bank_ref_number' => $this->bank_ref_number,
             ];
         }
 

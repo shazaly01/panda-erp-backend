@@ -183,6 +183,8 @@ Route::middleware('auth:sanctum')
 
         // مسارات الاستعلامات والجلب
         Route::get('batches', [PayrollController::class, 'getBatches']);
+        Route::get('eligible-employees', [PayrollController::class, 'getEligibleEmployees'])
+            ->middleware('can:hr.payroll.view');
         Route::post('summary', [PayrollController::class, 'getSummary']);
         Route::get('processed-employees', [PayrollController::class, 'getProcessedEmployees']);
         Route::get('batches/{batchId}/export-bank', [PayrollController::class, 'exportBankFile']);
@@ -193,6 +195,10 @@ Route::middleware('auth:sanctum')
 
         // اعتماد وترحيل الرواتب (Post Batch)
         Route::post('post-batch', [PayrollController::class, 'postBatch'])
+            ->middleware('can:hr.payroll.post');
+
+        // إلغاء والتراجع عن مسير الرواتب المعتمد وعكس القيد المحاسبي (Rollback Batch)
+        Route::post('batches/{batchId}/rollback', [PayrollController::class, 'rollbackBatch'])
             ->middleware('can:hr.payroll.post');
     });
 

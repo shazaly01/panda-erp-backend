@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\Accounting\Policies;
 
-use App\Models\User; // أو مسار اليوزر الخاص بك
+use App\Models\User;
 use App\Modules\Accounting\Models\Voucher;
 use App\Modules\Accounting\Enums\VoucherType;
 use App\Modules\Accounting\Enums\VoucherStatus;
@@ -13,22 +15,11 @@ class VoucherPolicy
     use HandlesAuthorization;
 
     /**
-     * تجاوز الصلاحيات للأدمن (اختياري)
-     */
-    public function before(User $user, $ability)
-    {
-        if ($user->hasRole('Admin')) { // إذا كنت تستخدم Spatie Roles
-            return true;
-        }
-    }
-
-    /**
      * عرض القائمة
      */
     public function viewAny(User $user): bool
     {
-        // يسمح له إذا كان يملك صلاحية عرض السندات أو القبض
-        return $user->can('payment.view') || $user->can('receipt.view');
+        return $user->hasPermissionTo('payment.view') || $user->hasPermissionTo('receipt.view');
     }
 
     /**
@@ -37,19 +28,18 @@ class VoucherPolicy
     public function view(User $user, Voucher $voucher): bool
     {
         return match ($voucher->type) {
-            VoucherType::Payment => $user->can('payment.view'),
-            VoucherType::Receipt => $user->can('receipt.view'),
+            VoucherType::Payment => $user->hasPermissionTo('payment.view'),
+            VoucherType::Receipt => $user->hasPermissionTo('receipt.view'),
             default => false,
         };
     }
 
     /**
      * إنشاء سند جديد
-     * ملاحظة: التحقق من النوع يتم عادة في الكنترولر لأن السند لم ينشأ بعد
      */
     public function create(User $user): bool
     {
-        return $user->can('payment.create') || $user->can('receipt.create');
+        return $user->hasPermissionTo('payment.create') || $user->hasPermissionTo('receipt.create');
     }
 
     /**
@@ -58,14 +48,13 @@ class VoucherPolicy
      */
     public function update(User $user, Voucher $voucher): bool
     {
-        // لا يمكن تعديل سند مرحل أو ملغي
         if ($voucher->status === VoucherStatus::Posted || $voucher->status === VoucherStatus::Void) {
             return false;
         }
 
         return match ($voucher->type) {
-            VoucherType::Payment => $user->can('payment.update'),
-            VoucherType::Receipt => $user->can('receipt.update'),
+            VoucherType::Payment => $user->hasPermissionTo('payment.update'),
+            VoucherType::Receipt => $user->hasPermissionTo('receipt.update'),
             default => false,
         };
     }
@@ -77,50 +66,62 @@ class VoucherPolicy
     public function delete(User $user, Voucher $voucher): bool
     {
         if ($voucher->status === VoucherStatus::Posted) {
-            return false; // ممنوع حذف السندات المرحلة نهائياً
+            return false;
         }
 
         return match ($voucher->type) {
-            VoucherType::Payment => $user->can('payment.delete'),
-            VoucherType::Receipt => $user->can('receipt.delete'),
+            VoucherType::Payment => $user->hasPermissionTo('payment.delete'),
+            VoucherType::Receipt => $user->hasPermissionTo('receipt.delete'),
             default => false,
         };
     }
 
     /**
-     * [جديد] الاعتماد (Approval)
+     * الاعتماد (Approval)
      */
     public function approve(User $user, Voucher $voucher): bool
     {
-        // لا يمكن اعتماد سند مرحل أصلاً
         if ($voucher->status === VoucherStatus::Posted) {
             return false;
         }
 
         return match ($voucher->type) {
-            VoucherType::Payment => $user->can('payment.approve'),
-            VoucherType::Receipt => $user->can('receipt.approve'),
+            VoucherType::Payment => $user->hasPermissionTo('payment.approve'),
+            VoucherType::Receipt => $user->hasPermissionTo('receipt.approve'),
             default => false,
         };
     }
 
     /**
-     * [جديد] الترحيل (Posting)
-     * تحويل السند إلى قيد محاسبي
+     * الترحيل (Posting)
      */
     public function post(User $user, Voucher $voucher): bool
     {
-        // لا يمكن ترحيل سند مرحل مسبقاً
         if ($voucher->status === VoucherStatus::Posted) {
             return false;
         }
 
-        // يجب أن يكون السند معتمداً أولاً (إذا كنت تطبق دورة الاعتماد)
-        // if ($voucher->status !== VoucherStatus::Approved) { return false; }
+        return match ($voucher->type) {
+            VoucherType::Payment => $user->hasPermissionTo('payment.post'),
+            VoucherType::Receipt => $user->hasPermissionTo('receipt.post'),
+            default => false,
+        };
+    }
+
+    /**
+     * إلغاء الترحيل (Unpost)
+     * يعتمد على صلاحية التعديل
+     * الشرط: أن يكون السند في حالة مرحل
+     */
+    public function unpost(User $user, Voucher $voucher): bool
+    {
+        if ($voucher->status !== VoucherStatus::Posted) {
+            return false;
+        }
 
         return match ($voucher->type) {
-            VoucherType::Payment => $user->can('payment.post'),
-            VoucherType::Receipt => $user->can('receipt.post'),
+            VoucherType::Payment => $user->hasPermissionTo('payment.update'),
+            VoucherType::Receipt => $user->hasPermissionTo('receipt.update'),
             default => false,
         };
     }

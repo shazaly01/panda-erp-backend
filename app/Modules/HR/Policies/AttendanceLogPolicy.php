@@ -14,7 +14,7 @@ class AttendanceLogPolicy
 
     /**
      * تجاوز صلاحيات مدير الموارد البشرية على مستوى الموديول
-     * ملاحظة: تجاوز الـ Super Admin العام يجب أن يبقى في AuthServiceProvider (Gate::before)
+     * ملاحظة: تجاوز الـ Super Admin العام يتم مركزياً عبر Gate::before
      */
     public function before(User $user, $ability)
     {
@@ -40,11 +40,21 @@ class AttendanceLogPolicy
     }
 
     /**
-     * إنشاء سجل حضور يدوي (مسموح للـ HR)
+     * إنشاء سجل حضور يدوي (مسموح لإدارة الـ HR أو من يملك صلاحية الإدخال اليدوي)
      */
     public function create(User $user): bool
     {
-        return $user->hasPermissionTo('hr.attendance.manage');
+        return $user->hasPermissionTo('hr.attendance.manage')
+            || $user->hasPermissionTo('hr.attendance.manual_entry');
+    }
+
+    /**
+     * السماح بالإدخال اليدوي الصريح (عبر الكشك أو لوحة الأرقام)
+     */
+    public function manualEntry(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.attendance.manual_entry')
+            || $user->hasPermissionTo('hr.attendance.manage');
     }
 
     /**
@@ -72,6 +82,26 @@ class AttendanceLogPolicy
      */
     public function manageTeam(User $user): bool
     {
-        return $user->hasPermissionTo('hr.team_attendance.manage');
+        return $user->hasPermissionTo('hr.team_attendance.manage')
+            || $user->hasPermissionTo('hr.team_attendance.check_in')
+            || $user->hasPermissionTo('hr.team_attendance.check_out');
+    }
+
+    /**
+     * السماح للمشرف بتعديل أو تسجيل وقت الدخول لفريق العمل
+     */
+    public function overrideTeamCheckIn(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.team_attendance.manage')
+            || $user->hasPermissionTo('hr.team_attendance.check_in');
+    }
+
+    /**
+     * السماح للمشرف بتعديل أو تسجيل وقت الخروج لفريق العمل
+     */
+    public function overrideTeamCheckOut(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.team_attendance.manage')
+            || $user->hasPermissionTo('hr.team_attendance.check_out');
     }
 }

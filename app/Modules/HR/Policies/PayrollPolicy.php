@@ -32,4 +32,12 @@ class PayrollPolicy
     {
         return $user->can('hr.payroll.post');
     }
+
+    /**
+     * هل يحق للمستخدم التراجع وإلغاء مسير الرواتب المعتمد؟
+     */
+    public function rollback(User $user): bool
+    {
+        return $user->can('hr.payroll.post');
+    }
 }

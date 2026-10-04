@@ -23,22 +23,16 @@ class AttendanceLogController extends Controller
      */
     public function __construct(private readonly AttendanceService $attendanceService)
     {
-        // تفعيل السياسة (AttendanceLogPolicy)
-        // ملاحظة: المتغير في المسار (Route) يجب أن يكون attendance_log
         $this->authorizeResource(AttendanceLog::class, 'attendance_log');
     }
 
     /**
      * عرض سجلات الحضور التفصيلية المفلترة بالكامل
-     * يدعم حصر وفرز (الموظفين، المتدربين، أو كلاهما معاً) لحساب الأعداد الفعلية
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        // تم الفحص تلقائياً عبر AttendanceLogPolicy@viewAny
-
         $user = Auth::user();
 
-        // 🌟 إصلاح جوهري: كسر العزل داخل الـ Eager Loading لضمان شحن بيانات المتدربين والموظفين معاً في الاستعلام الرئيسي
         $query = AttendanceLog::with([
             'employee' => function ($q) {
                 $q->withoutGlobalScope('exclude_interns');
@@ -46,8 +40,6 @@ class AttendanceLogController extends Controller
             'shift'
         ]);
 
-        // 🌟 1. فلترة نوع العمل (employment_type) لحصر الحضور ومعرفة العدد الفعلي للفئة
-        // الخيارات المتوقعة من الواجهة الأمامية: 'full_time' (موظفين)، 'intern' (متدربين)، أو 'all' (الكل)
         if ($request->filled('employment_type') && $request->employment_type !== 'all') {
             $query->whereHas('employee', function ($q) use ($request) {
                 $q->withoutGlobalScope('exclude_interns')
@@ -55,20 +47,16 @@ class AttendanceLogController extends Controller
             });
         }
 
-        // 2. فلترة البحث المباشر بمعرف الموظف (إن وجد)
         if ($request->filled('employee_id')) {
             $query->where('employee_id', $request->employee_id);
         }
 
-        // 3. فلترة النطاق الزمني (بين تاريخين) لحل مشكلة عدم عمل فلاتر الجدول التفصيلي
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('date', [$request->start_date, $request->end_date]);
         } elseif ($request->filled('date')) {
-            // توافقية رجعية في حال أرسل جزء آخر من النظام حقل تاريخ منفرد
             $query->where('date', $request->date);
         }
 
-        // 4. فلترة البحث الذكي بنص (اسم الموظف الكامل أو الرقم الوظيفي) ليشمل الجميع بالسجلات
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->whereHas('employee', function ($q) use ($searchTerm) {
@@ -80,14 +68,12 @@ class AttendanceLogController extends Controller
             });
         }
 
-        // 5. فلترة القسم الإداري الخاص بالموظف أو المتدرب
         if ($request->filled('department_id')) {
             $query->whereHas('employee', function ($q) use ($request) {
                 $q->withoutGlobalScope('exclude_interns')->where('department_id', $request->department_id);
             });
         }
 
-        // 🌟 6. فلترة طريقة / مجموعة الدفع (pay_group_id) المربوطة بالعقد النشط للموظف
         if ($request->filled('pay_group_id')) {
             $query->whereHas('employee', function ($q) use ($request) {
                 $q->withoutGlobalScope('exclude_interns')
@@ -98,36 +84,32 @@ class AttendanceLogController extends Controller
             });
         }
 
-        // منطق الخدمة الذاتية (ESS): إذا لم يكن مديراً، يرى سجلاته فقط
         if (!$user->can('hr.attendance.manage') && $user->employee_id) {
             $query->where('employee_id', $user->employee_id);
         }
 
-        // يعيد البيانات مجمعة ومقسمة لصفحات، حيث يحتوي كائن الـ meta تلقائياً على الـ total الفعلي بعد الفلترة
         return AttendanceLogResource::collection($query->orderByDesc('date')->paginate(30));
     }
 
     /**
-     * إدخال سجل حضور يدوي (يدعم الموظفين والمتدربين)
+     * إدخال سجل حضور يدوي
      */
     public function store(StoreAttendanceLogRequest $request): JsonResponse
     {
-        // تم الفحص تلقائياً عبر AttendanceLogPolicy@create
-
         $data = $request->validated();
-
-        // استخدام withInterns لضمان قبول تسجيل حضور يدوي للمتدربين من شاشتهم الإدارية
         $employee = Employee::withInterns()->findOrFail($data['employee_id']);
 
         try {
+            $manualOvertimeMinutes = isset($data['overtime_minutes']) ? (int) $data['overtime_minutes'] : null;
+
             $log = $this->attendanceService->processDailyAttendance(
                 $employee,
                 $data['date'],
                 $data['check_in'] ?? null,
-                $data['check_out'] ?? null
+                $data['check_out'] ?? null,
+                $manualOvertimeMinutes
             );
 
-            // تحديث الحالة يدوياً إذا طُلب ذلك
             if (isset($data['status']) && $data['status'] !== $log->status) {
                 $log->update(['status' => $data['status']]);
             }
@@ -147,7 +129,6 @@ class AttendanceLogController extends Controller
      */
     public function show(AttendanceLog $attendanceLog): AttendanceLogResource
     {
-        // تم الفحص تلقائياً عبر AttendanceLogPolicy@view
         return new AttendanceLogResource($attendanceLog->load(['employee', 'shift']));
     }
 
@@ -156,20 +137,19 @@ class AttendanceLogController extends Controller
      */
     public function update(UpdateAttendanceLogRequest $request, AttendanceLog $attendanceLog): JsonResponse
     {
-        // تم الفحص تلقائياً عبر AttendanceLogPolicy@update
-
         $data = $request->validated();
 
         try {
             $checkIn = $data['check_in'] ?? $attendanceLog->check_in;
             $checkOut = $data['check_out'] ?? $attendanceLog->check_out;
+            $manualOvertimeMinutes = isset($data['overtime_minutes']) ? (int) $data['overtime_minutes'] : null;
 
-            // إعادة الحساب بناءً على التعديلات
             $updatedLog = $this->attendanceService->processDailyAttendance(
                 $attendanceLog->employee,
                 $attendanceLog->date->format('Y-m-d'),
                 $checkIn,
-                $checkOut
+                $checkOut,
+                $manualOvertimeMinutes
             );
 
             if (isset($data['status'])) {
@@ -191,26 +171,49 @@ class AttendanceLogController extends Controller
      */
     public function destroy(AttendanceLog $attendanceLog): JsonResponse
     {
-        // تم الفحص تلقائياً عبر AttendanceLogPolicy@delete
         $attendanceLog->delete();
 
         return response()->json(['message' => 'تم حذف سجل الحضور بنجاح.'], 200);
     }
 
-    /**
-     * تسجيل الدخول السريع عبر الباركود والـ QR Code (Kiosk Mode)
-     * مع الفحص التلقائي لصلاحية باركود المتدربين بناءً على تاريخ نهاية التدريب
-     */
     public function scanBarcode(Request $request): JsonResponse
     {
+        $rawEmployeeNumber = $request->input('employee_number');
+
+        // إذا وصل كـ Array (مثل مصفوفة أرقام من لوحة المفاتيح)
+        if (is_array($rawEmployeeNumber)) {
+            if (array_is_list($rawEmployeeNumber)) {
+                // دمج مصفوفة الأرقام المتتالية ['1', '0', '2'] لتصبح "102"
+                $rawEmployeeNumber = implode('', $rawEmployeeNumber);
+            } else {
+                $rawEmployeeNumber = $rawEmployeeNumber['employee_number']
+                    ?? $rawEmployeeNumber['barcode']
+                    ?? $rawEmployeeNumber['id']
+                    ?? $rawEmployeeNumber['value']
+                    ?? null;
+            }
+        }
+
+        if ($rawEmployeeNumber !== null) {
+            $request->merge([
+                'employee_number' => trim((string) $rawEmployeeNumber),
+            ]);
+        }
+
         $request->validate([
-            'employee_number' => 'required|string'
+            'employee_number' => ['required', 'string'],
+            'entry_mode'      => ['nullable', 'string', 'in:hardware,camera,qr,manual'],
         ]);
 
-        $scannedCode = $request->employee_number;
+        $entryMode = $request->input('entry_mode', 'hardware');
+
+        if ($entryMode === 'manual') {
+            $this->authorize('manualEntry', AttendanceLog::class);
+        }
+
+        $scannedCode = (string) $request->employee_number;
         $now = now();
 
-        // 1. البحث عن الموظف أو المتدرب عبر كسر العزل الآمن للـ Global Scope لحل ثغرة الـ 404
         $employee = Employee::withInterns()
             ->where(function ($query) use ($scannedCode) {
                 $query->where('employee_number', $scannedCode)
@@ -225,7 +228,6 @@ class AttendanceLogController extends Controller
             ], 404);
         }
 
-        // 2. 🛡️ التحقق تلقائياً من صلاحية باركود المتدرب بناءً على تاريخ انتهاء التدريب
         if ($employee->employment_type->value === \App\Modules\HR\Enums\EmploymentType::Intern->value) {
             if ($employee->internship_end_date && $employee->internship_end_date->isPast()) {
                 return response()->json([
@@ -235,20 +237,17 @@ class AttendanceLogController extends Controller
             }
         }
 
-        // 3. تسجيل الضربة الخام في جدول البصمات البيومترية بعد اجتياز فحص الصلاحية
         \App\Modules\HR\Models\BiometricPunch::create([
             'employee_id' => $employee->id,
             'punch_time' => $now,
-            'punch_type' => 'auto',
-            'device_id' => 'barcode_scanner',
+            'punch_type' => $entryMode === 'manual' ? 'manual' : 'auto',
+            'device_id' => $entryMode === 'manual' ? 'manual_kiosk' : 'barcode_scanner',
             'is_processed' => true,
         ]);
 
-        // 4. تفويض معالجة البيانات بالكامل لمحرك الحضور (الخدمة)
         try {
             $result = $this->attendanceService->processAutoPunch($employee, $now);
 
-            // شحن علاقات الصور والمستخدم لتجنب الـ Lazy Loading وتحسين الأداء
             $employee->load(['profilePhoto', 'user']);
 
             return response()->json([
@@ -257,7 +256,6 @@ class AttendanceLogController extends Controller
                 'employee_name' => $employee->full_name,
                 'time' => $now->format('h:i A'),
                 'message' => $result['message'],
-                // جلب رابط الصورة الشخصية المرفوعة، وإذا لم توجد يجلب الـ Avatar الخاص بحسابه
                 'profile_photo' => $employee->profilePhoto
                     ? $employee->profilePhoto->url
                     : ($employee->user ? $employee->user->avatar_url : null),
