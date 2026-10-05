@@ -34,6 +34,7 @@ class ManagerAttendanceController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
             'position_id' => ['nullable', 'integer', 'exists:positions,id'],
             'status' => ['nullable', 'string', 'in:present,absent,late'],
+            'pay_group_id' => ['nullable', 'integer'],
         ]);
 
         /** @var User|null $user */
@@ -50,6 +51,7 @@ class ManagerAttendanceController extends Controller
             'search' => $request->input('search'),
             'position_id' => $request->input('position_id'),
             'status' => $request->input('status'),
+            'pay_group_id' => $request->input('pay_group_id'),
         ];
 
         $managerId = $user->employee->id;

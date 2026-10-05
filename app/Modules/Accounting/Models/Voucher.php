@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Modules\Accounting\Enums\VoucherType;
 use App\Modules\Accounting\Enums\VoucherStatus;
 use App\Modules\Accounting\Database\Factories\VoucherFactory;
+use App\Models\User;
 
 class Voucher extends Model
 {
@@ -79,6 +80,12 @@ class Voucher extends Model
     public function currency(): BelongsTo
     {
         return $this->belongsTo(Currency::class);
+    }
+
+    // 6. منشئ السند
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     // --- دوال مساعدة (Helpers) ---

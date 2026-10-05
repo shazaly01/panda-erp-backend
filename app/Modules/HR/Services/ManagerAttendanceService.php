@@ -22,6 +22,24 @@ class ManagerAttendanceService
     }
 
     /**
+     * استخراج كافة معرفات الأقسام الخاضعة لإشراف المشرف بما يشمل فروعها التابعة هرمياً
+     */
+    private function getSupervisedDepartmentIds(Employee $manager): array
+    {
+        $departmentIds = collect();
+
+        foreach ($manager->supervisedDepartments as $department) {
+            $departmentIds->push($department->id);
+
+            // جلب معرفات كافة الأقسام الفرعية التابعة للقسم هرمياً
+            $descendantIds = $department->descendants()->pluck('id');
+            $departmentIds = $departmentIds->merge($descendantIds);
+        }
+
+        return $departmentIds->unique()->values()->all();
+    }
+
+    /**
      * جلب مصفوفة الحضور اليومية لفريق المشرف مع تطبيق الفلاتر الديناميكية
      */
     public function getTeamDailyMatrix(int $managerEmployeeId, array $filters): Collection
@@ -32,7 +50,11 @@ class ManagerAttendanceService
             return collect();
         }
 
-        $supervisedDepartmentIds = $manager->supervisedDepartments->pluck('id')->toArray();
+        $supervisedDepartmentIds = $this->getSupervisedDepartmentIds($manager);
+
+        if (empty($supervisedDepartmentIds)) {
+            return collect();
+        }
 
         $date = $filters['date'] ?? now()->toDateString();
         $search = $filters['search'] ?? null;
@@ -102,7 +124,7 @@ class ManagerAttendanceService
             throw new Exception("غير مصرح لك، فأنت لست مشرفاً على أي قسم في النظام.");
         }
 
-        $supervisedDepartmentIds = $manager->supervisedDepartments->pluck('id')->toArray();
+        $supervisedDepartmentIds = $this->getSupervisedDepartmentIds($manager);
 
         $employee = Employee::where('id', $targetEmployeeId)
             ->whereIn('department_id', $supervisedDepartmentIds)

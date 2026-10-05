@@ -90,7 +90,8 @@ class VoucherController extends Controller
             'branch',
             'currency',
             'box',
-            'bankAccount'
+            'bankAccount',
+            'creator'
         ]);
 
         return new VoucherResource($voucher);

@@ -51,6 +51,15 @@ class VoucherResource extends JsonResource
             // تفاصيل السند
             'details'         => VoucherDetailResource::collection($this->whenLoaded('details')),
 
+            // منشئ السند
+            'creator'         => $this->whenLoaded('creator', function () {
+                return [
+                    'id'        => $this->creator->id,
+                    'username'  => $this->creator->username,
+                    'full_name' => $this->creator->full_name,
+                ];
+            }),
+
             // بيانات التدقيق
             'audit' => [
                 'created_at' => $this->created_at->toDateTimeString(),
