@@ -30,7 +30,7 @@ class VoucherController extends Controller
     public function index(Request $request)
     {
         $query = Voucher::query()
-            ->with(['branch', 'currency', 'box', 'bankAccount'])
+            ->with(['branch', 'currency', 'box', 'bankAccount', 'details.account'])
             ->latest('date');
 
         // فلترة نوع السند (صرف / قبض)

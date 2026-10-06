@@ -25,14 +25,24 @@ class UpdateCategoryRequest extends FormRequest
      */
     public function rules(): array
     {
-        $companyId = $this->user()->company_id;
         $category = $this->route('category');
-        $categoryId = $category?->id ?? $category;
+        $categoryId = is_object($category) ? $category->id : $category;
 
         return [
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('inventory_categories', 'code')->ignore($categoryId)->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at'))],
+            'code' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('inventory_categories', 'code')
+                    ->ignore($categoryId)
+                    ->where(fn ($q) => $q->whereNull('deleted_at')),
+            ],
             'name' => ['required', 'string', 'max:255'],
-            'parent_id' => ['nullable', 'integer', Rule::exists('inventory_categories', 'id')->where(fn ($q) => $q->where('company_id', $companyId)->whereNull('deleted_at'))],
+            'parent_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('inventory_categories', 'id')->where(fn ($q) => $q->whereNull('deleted_at')),
+            ],
             'description' => ['nullable', 'string', 'max:1000'],
             'is_active' => ['sometimes', 'boolean'],
         ];
@@ -44,7 +54,7 @@ class UpdateCategoryRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'code.unique' => 'رمز التصنيف مستخدم من قبل في هذه الشركة.',
+            'code.unique' => 'رمز التصنيف مستخدم من قبل.',
             'name.required' => 'اسم التصنيف مطلوب.',
             'parent_id.exists' => 'التصنيف الأب المحدد غير موجود.',
         ];

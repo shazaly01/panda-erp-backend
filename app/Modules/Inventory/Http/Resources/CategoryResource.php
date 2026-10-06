@@ -22,6 +22,7 @@ class CategoryResource extends JsonResource
             'name' => $this->name,
             'code' => $this->code,
             'description' => $this->description,
+            'full_path' => $this->full_path,
             'is_active' => (bool) $this->is_active,
             'parent' => new self($this->whenLoaded('parent')),
             'children' => self::collection($this->whenLoaded('children')),

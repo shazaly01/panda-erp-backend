@@ -22,7 +22,7 @@ class CategoryController extends Controller
     {
         $this->authorize('viewAny', Category::class);
 
-        $categories = Category::query()
+        $query = Category::query()
             ->with(['parent', 'children'])
             ->when($request->filled('search'), function ($q) use ($request) {
                 $search = $request->search;
@@ -38,9 +38,13 @@ class CategoryController extends Controller
                 if ($request->boolean('is_parent')) {
                     $q->whereNull('parent_id');
                 }
-            })
-            ->latest()
-            ->paginate($request->integer('per_page', 15));
+            });
+
+        if ($request->boolean('all')) {
+            $categories = $query->get()->sortBy('full_path', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        } else {
+            $categories = $query->latest()->paginate($request->integer('per_page', 15));
+        }
 
         return CategoryResource::collection($categories);
     }
