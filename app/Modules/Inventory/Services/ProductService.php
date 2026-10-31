@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Services;
 
+use App\Modules\Inventory\Enums\StockSerialStatus;
 use App\Modules\Inventory\Models\Product;
 use App\Modules\Inventory\Models\ProductBarcode;
 use App\Modules\Inventory\Models\ProductPrice;
 use App\Modules\Inventory\Models\ProductStock;
+use App\Modules\Inventory\Models\ProductUnit;
+use App\Modules\Inventory\Models\StockSerial;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 
 class ProductService
@@ -18,8 +22,7 @@ class ProductService
      */
     public function createProduct(array $data): Product
     {
-        return DB::transaction(function () use ($data) {
-            // 1. إنشاء الصنف الأساسي
+        return DB::transaction(function () use ($data): Product {
             $product = Product::create([
                 'category_id' => $data['category_id'] ?? null,
                 'name' => $data['name'],
@@ -34,13 +37,11 @@ class ProductService
                 'is_active' => $data['is_active'] ?? true,
             ]);
 
-            // 2. إنشاء الوحدات والأسعار والباركودات التابعة
-            if (!empty($data['units'])) {
+            if (! empty($data['units'])) {
                 $this->saveProductUnits($product, $data['units']);
             }
 
-            // 3. إنشاء قواعد إعادة الطلب المربوطة بالمستودعات (إن وجدت)
-            if (!empty($data['reorder_rules'])) {
+            if (! empty($data['reorder_rules'])) {
                 $this->saveReorderRules($product, $data['reorder_rules']);
             }
 
@@ -55,11 +56,11 @@ class ProductService
     }
 
     /**
-     * تحديث صنف قائم وإعادة بناء العلاقات التابعة مع معالجة SoftDeletes
+     * تحديث صنف قائم مع مزامنة ذكية للوحدات والأسعار لتفادي كسر القيود الأجنبية
      */
     public function updateProduct(Product $product, array $data): Product
     {
-        return DB::transaction(function () use ($product, $data) {
+        return DB::transaction(function () use ($product, $data): Product {
             // 1. تحديث بيانات الصنف الأساسية
             $product->update(array_filter([
                 'category_id' => array_key_exists('category_id', $data) ? $data['category_id'] : $product->category_id,
@@ -75,14 +76,9 @@ class ProductService
                 'is_active' => array_key_exists('is_active', $data) ? $data['is_active'] : $product->is_active,
             ], fn ($value) => $value !== null));
 
-            // 2. تحديث الوحدات والأسعار والباركودات (حذف التجميعات القديمة وإعادة البناء)
+            // 2. مزامنة الوحدات القائمة وتحديثها في مكانها دون حذف عشوائي
             if (isset($data['units'])) {
-                foreach ($product->units as $productUnit) {
-                    $productUnit->barcodes()->withTrashed()->forceDelete();
-                    $productUnit->prices()->withTrashed()->forceDelete();
-                    $productUnit->forceDelete();
-                }
-                $this->saveProductUnits($product, $data['units']);
+                $this->syncProductUnits($product, $data['units']);
             }
 
             // 3. تحديث قواعد إعادة الطلب
@@ -106,17 +102,88 @@ class ProductService
      */
     public function deleteProduct(Product $product): void
     {
-        DB::transaction(function () use ($product) {
+        DB::transaction(function () use ($product): void {
             $this->forceDeleteProductRelations($product);
             $product->delete();
         });
     }
 
     /**
-     * بحث سريع وموجه لنقاط البيع والسوبرماركت يدعم:
-     * 1. مسار الباركود المباشر O(1)
-     * 2. مسار باركود الميزان (Variable Weight EAN-13)
-     * 3. مسار البحث النصي الفوري بالأصناف النشطة
+     * مزامنة الوحدات وتحديثها بدقة (تعديل القائم وإنشاء الجديد وحذف المستبعد غير المرتبط)
+     */
+    protected function syncProductUnits(Product $product, array $unitsData): void
+    {
+        $uniqueSubmitted = collect($unitsData)->unique('unit_id')->values();
+        $submittedUnitIds = $uniqueSubmitted->pluck('unit_id')->map(fn ($id) => (int) $id)->all();
+
+        /** @var \Illuminate\Database\Eloquent\Collection<int, ProductUnit> $existingProductUnits */
+        $existingProductUnits = $product->units()->get()->keyBy('unit_id');
+
+        // حذف الوحدات التي استبعدها المستخدم من النموذج بشرط عدم ارتباطها بحركات
+        foreach ($existingProductUnits as $unitId => $existingUnit) {
+            if (! in_array((int) $unitId, $submittedUnitIds, true)) {
+                $existingUnit->barcodes()->delete();
+                $existingUnit->prices()->delete();
+                $existingUnit->delete();
+            }
+        }
+
+        // تحديث الوحدات القائمة أو إنشاء وحدات جديدة
+        foreach ($uniqueSubmitted as $unitData) {
+            $unitId = (int) $unitData['unit_id'];
+
+            /** @var ProductUnit|null $productUnit */
+            $productUnit = $existingProductUnits->get($unitId);
+
+            if ($productUnit) {
+                // تحديث الوحدة القائمة في مكانها للحفاظ على معرّفها وعلاقاتها في سندات الاستلام
+                $productUnit->update([
+                    'conversion_factor' => $unitData['conversion_factor'],
+                    'is_base_unit' => $unitData['is_base_unit'],
+                    'is_purchase_unit' => $unitData['is_purchase_unit'] ?? false,
+                    'is_sale_unit' => $unitData['is_sale_unit'] ?? false,
+                ]);
+            } else {
+                // إنشاء وحدة جديدة لم تكن مسجلة مسبقاً للصنف
+                $productUnit = $product->units()->create([
+                    'unit_id' => $unitId,
+                    'conversion_factor' => $unitData['conversion_factor'],
+                    'is_base_unit' => $unitData['is_base_unit'],
+                    'is_purchase_unit' => $unitData['is_purchase_unit'] ?? false,
+                    'is_sale_unit' => $unitData['is_sale_unit'] ?? false,
+                ]);
+            }
+
+            // مزامنة الأسعار التابعة للوحدة
+            if (isset($unitData['prices'])) {
+                $productUnit->prices()->delete();
+                foreach ($unitData['prices'] as $priceData) {
+                    $productUnit->prices()->create([
+                        'product_id' => $product->id,
+                        'price_list_id' => $priceData['price_list_id'],
+                        'price' => $priceData['price'],
+                        'min_quantity' => $priceData['min_quantity'] ?? 1.0000,
+                    ]);
+                }
+            }
+
+            // مزامنة الباركودات التابعة للوحدة
+            if (isset($unitData['barcodes'])) {
+                $productUnit->barcodes()->delete();
+                foreach ($unitData['barcodes'] as $barcode) {
+                    if (! empty($barcode)) {
+                        $productUnit->barcodes()->create([
+                            'product_id' => $product->id,
+                            'barcode' => $barcode,
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * بحث سريع وفوري يدعم باركود السيريال، باركود الصنف، والبحث النصي المباشر
      */
     public function fastSearch(
         string $search,
@@ -130,7 +197,42 @@ class ProductService
             return new Collection();
         }
 
-        // المسار الأول: البحث التام عن الباركود المباشر عبر B-Tree Index
+        // المسار الأول: البحث المباشر برقم السيريال الصريح لأسطوانات الغاز
+        $serialMatch = StockSerial::query()
+            ->where('serial_number', $cleanSearch)
+            ->with([
+                'product.units.unit',
+                'warehouse',
+                'location',
+            ])
+            ->first();
+
+        if ($serialMatch && $serialMatch->product && $serialMatch->product->is_active) {
+            $product = $serialMatch->product;
+            $matchedUnit = $product->units->firstWhere('is_base_unit', true)
+                ?? $product->units->firstWhere('is_sale_unit', true)
+                ?? $product->units->first();
+
+            $isWeightSerial = ($product->tracking_type === 'by_weight_serial');
+            $gasWeight = (float) ($serialMatch->current_gas_weight ?? 0.0);
+
+            $product->matched_unit = $matchedUnit;
+            $product->matched_barcode = null;
+            $product->matched_serial = $serialMatch;
+            $product->is_serial_barcode = true;
+            $product->is_weight_barcode = false;
+            $product->scanned_quantity = $isWeightSerial ? $gasWeight : 1.0000;
+
+            $this->enrichProductsWithStockAndPrice(
+                new Collection([$product]),
+                $warehouseId,
+                $priceListId
+            );
+
+            return new Collection([$product]);
+        }
+
+        // المسار الثاني: البحث التام عن الباركود المباشر عبر الفهرس
         $barcodeMatch = ProductBarcode::query()
             ->where('barcode', $cleanSearch)
             ->with([
@@ -148,6 +250,8 @@ class ProductService
 
             $product->matched_unit = $matchedUnit;
             $product->matched_barcode = $barcodeMatch->barcode;
+            $product->matched_serial = null;
+            $product->is_serial_barcode = false;
             $product->is_weight_barcode = false;
             $product->scanned_quantity = 1.0000;
 
@@ -160,62 +264,28 @@ class ProductService
             return new Collection([$product]);
         }
 
-        // المسار الثاني: باركود الميزان الإلكتروني (13 رقماً ويبدأ بـ 20 أو 21 أو 99)
-        $isPotentialScaleBarcode = strlen($cleanSearch) === 13
-            && ctype_digit($cleanSearch)
-            && (str_starts_with($cleanSearch, '20') || str_starts_with($cleanSearch, '21') || str_starts_with($cleanSearch, '99'));
-
-        if ($isPotentialScaleBarcode) {
-            $itemCodeRaw = substr($cleanSearch, 2, 5);
-            $itemCodeTrimmed = ltrim($itemCodeRaw, '0');
-            $weightGrams = (int) substr($cleanSearch, 7, 5);
-            $scannedQuantity = $weightGrams > 0 ? round($weightGrams / 1000.0, 4) : 1.0000;
-
-            $scaleProduct = Product::query()
-                ->where('is_active', true)
-                ->where(function ($q) use ($itemCodeRaw, $itemCodeTrimmed) {
-                    $q->where('sku', $itemCodeRaw)
-                      ->orWhere('sku', $itemCodeTrimmed)
-                      ->orWhereHas('barcodes', function ($b) use ($itemCodeRaw, $itemCodeTrimmed) {
-                          $b->where('barcode', $itemCodeRaw)->orWhere('barcode', $itemCodeTrimmed);
-                      });
-                })
-                ->with(['units.unit'])
-                ->first();
-
-            if ($scaleProduct) {
-                $matchedUnit = $scaleProduct->units->firstWhere('is_sale_unit', true)
-                    ?? $scaleProduct->units->firstWhere('is_base_unit', true)
-                    ?? $scaleProduct->units->first();
-
-                $scaleProduct->matched_unit = $matchedUnit;
-                $scaleProduct->matched_barcode = $cleanSearch;
-                $scaleProduct->is_weight_barcode = true;
-                $scaleProduct->scanned_quantity = $scannedQuantity;
-
-                $this->enrichProductsWithStockAndPrice(
-                    new Collection([$scaleProduct]),
-                    $warehouseId,
-                    $priceListId
-                );
-
-                return new Collection([$scaleProduct]);
-            }
-        }
-
-        // المسار الثالث: البحث النصي الخفيف بالاسم، الكود، أو الأسماء البديلة
+        // المسار الثالث: البحث النصي في الاسم والرمز SKU والأسماء البديلة
         $products = Product::query()
-            ->select(['id', 'category_id', 'name', 'sku', 'aliases', 'cost_price', 'is_active'])
+            ->select([
+                'id',
+                'category_id',
+                'name',
+                'sku',
+                'aliases',
+                'tracking_type',
+                'cost_price',
+                'is_active',
+            ])
             ->where('is_active', true)
-            ->where(function ($q) use ($cleanSearch) {
+            ->where(function ($q) use ($cleanSearch): void {
                 $q->where('name', 'like', "{$cleanSearch}%")
-                  ->orWhere('sku', 'like', "{$cleanSearch}%")
-                  ->orWhere('aliases', 'like', "%{$cleanSearch}%")
-                  ->orWhere('name', 'like', "%{$cleanSearch}%");
+                    ->orWhere('sku', 'like', "{$cleanSearch}%")
+                    ->orWhere('aliases', 'like', "%{$cleanSearch}%")
+                    ->orWhere('name', 'like', "%{$cleanSearch}%");
             })
             ->with(['units.unit'])
             ->orderByRaw(
-                "CASE WHEN name LIKE ? THEN 1 WHEN sku LIKE ? THEN 2 ELSE 3 END",
+                'CASE WHEN name LIKE ? THEN 1 WHEN sku LIKE ? THEN 2 ELSE 3 END',
                 ["{$cleanSearch}%", "{$cleanSearch}%"]
             )
             ->limit($limit)
@@ -228,6 +298,8 @@ class ProductService
 
             $product->matched_unit = $matchedUnit;
             $product->matched_barcode = null;
+            $product->matched_serial = null;
+            $product->is_serial_barcode = false;
             $product->is_weight_barcode = false;
             $product->scanned_quantity = 1.0000;
         }
@@ -238,7 +310,122 @@ class ProductService
     }
 
     /**
-     * تزويد الأصناف بالرصيد الفعلي للمستودع المحدد وسعر البيع دفعة واحدة لمنع استعلامات N+1
+     * إلحاق كميات واضحة بالأصناف دون حفظها في قاعدة البيانات.
+     *
+     * available_quantity يبقى الرصيد المتاح بوحدة الصنف الأساسية، كما كان.
+     * للأصناف by_weight_serial فقط:
+     * gas_stock_kg: رصيد دفتر المخزون قبل طرح المحجوز.
+     * gas_reserved_kg: المحجوز من دفتر المخزون.
+     * gas_available_kg: رصيد دفتر المخزون بعد طرح المحجوز.
+     * cylinders_count / cylinders_by_status: عدد سجلات الأسطوانات بالمواقع الداخلية.
+     *
+     * quantity_warehouse_id يحدد المخزن، أو يكون null عند جمع المخازن كلها.
+     * هذه البيانات ليست جرداً فعلياً ولا إثباتاً لملكية الأسطوانات أو رصيد المورد.
+     * يمكن إعادة استخدام الدالة لاحقاً لقائمة الأصناف دون تكرار منطق الكميات.
+     * تقبل مجموعة نماذج الأصناف العامة أو Eloquent؛ فهذا هو نوع getCollection
+     * المعلن في Paginator، ولا نستخدم هنا دوال خاصة بمجموعة Eloquent.
+     */
+    public function enrichInventoryQuantities(SupportCollection $products, ?int $warehouseId = null): SupportCollection
+    {
+        if ($products->isEmpty()) {
+            return $products;
+        }
+
+        $productIds = $products->pluck('id')->all();
+        $stockQuery = ProductStock::query()->whereIn('product_id', $productIds);
+        if ($warehouseId !== null) {
+            $stockQuery->where('warehouse_id', $warehouseId);
+        }
+
+        // نفس تعبير الرصيد المتاح القديم، مع إظهار الإجمالي والمحجوز بشكل مستقل.
+        // لا نخفي الأرصدة السالبة القديمة بتحويلها إلى صفر.
+        $stocks = $stockQuery->groupBy('product_id')
+            ->selectRaw('product_id, COALESCE(SUM(quantity), 0) as stock_qty, COALESCE(SUM(reserved_quantity), 0) as reserved_qty, COALESCE(SUM(quantity - reserved_quantity), 0) as available_qty')
+            ->get()
+            ->keyBy('product_id');
+
+        $cylinderCounts = $this->buildCylinderCounts($products, $warehouseId);
+
+        foreach ($products as $product) {
+            $stock = $stocks->get($product->id);
+            $product->available_quantity = (float) ($stock?->available_qty ?? 0.0000);
+            $product->quantity_warehouse_id = $warehouseId;
+
+            if ($product->tracking_type === 'by_weight_serial') {
+                $counts = $cylinderCounts[(int) $product->id];
+                $product->gas_stock_kg = (float) ($stock?->stock_qty ?? 0.0000);
+                $product->gas_reserved_kg = (float) ($stock?->reserved_qty ?? 0.0000);
+                $product->gas_available_kg = $product->available_quantity;
+                $product->cylinders_by_status = $counts;
+                $product->cylinders_count = array_sum($counts);
+            } else {
+                // null تعني أن حقول الغاز والأسطوانات لا تنطبق على هذا الصنف.
+                $product->gas_stock_kg = null;
+                $product->gas_reserved_kg = null;
+                $product->gas_available_kg = null;
+                $product->cylinders_by_status = null;
+                $product->cylinders_count = null;
+            }
+        }
+
+        return $products;
+    }
+
+    /**
+     * عد الأسطوانات من السجلات الفعلية، لا من أوزان الغاز أو عدد سطور المستندات.
+     * لا نعد WITH_VENDOR أو REPLACED أو SCRAPPED، حتى لو حمل سجل قديم مخزناً.
+     * لا نعد سجلاً محذوفاً منطقياً أو سجلاً بلا مخزن مرتبط.
+     */
+    protected function buildCylinderCounts(SupportCollection $products, ?int $warehouseId): array
+    {
+        $weightProductIds = $products
+            ->filter(fn ($product): bool => $product->tracking_type === 'by_weight_serial')
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($weightProductIds === []) {
+            return [];
+        }
+
+        $emptyCounts = [
+            StockSerialStatus::IN_STOCK->value => 0,
+            StockSerialStatus::IN_SERVICE->value => 0,
+            StockSerialStatus::EMPTY->value => 0,
+            StockSerialStatus::IN_MAINTENANCE->value => 0,
+        ];
+        $countsByProduct = [];
+        foreach ($weightProductIds as $productId) {
+            $countsByProduct[$productId] = $emptyCounts;
+        }
+
+        // استعلام مجمع لجميع أصناف الغاز في النتائج، بدلاً من استعلام لكل صنف.
+        $serialQuery = StockSerial::query()
+            ->whereIn('product_id', $weightProductIds)
+            ->whereNotNull('warehouse_id')
+            ->whereIn('status', array_keys($emptyCounts));
+        if ($warehouseId !== null) {
+            $serialQuery->where('warehouse_id', $warehouseId);
+        }
+
+        $rows = $serialQuery->selectRaw('product_id, status, COUNT(*) as cylinder_count')
+            ->groupBy('product_id', 'status')
+            ->get();
+
+        foreach ($rows as $row) {
+            $status = $row->status instanceof StockSerialStatus
+                ? $row->status->value
+                : (string) $row->status;
+            $countsByProduct[(int) $row->product_id][$status] = (int) $row->cylinder_count;
+        }
+
+        return $countsByProduct;
+    }
+
+    /**
+     * تزويد الأصناف بالكميات المنفصلة وسعر البيع، مع إبقاء السلوك السابق للأسعار.
      */
     protected function enrichProductsWithStockAndPrice(
         Collection $products,
@@ -249,30 +436,15 @@ class ProductService
             return;
         }
 
+        $this->enrichInventoryQuantities($products, $warehouseId);
         $productIds = $products->pluck('id')->all();
-
-        // 1. حساب الرصيد المتاح (quantity - reserved_quantity) للمستودع المحدد
-        $stockQuery = ProductStock::query()
-            ->whereIn('product_id', $productIds);
-
-        if ($warehouseId !== null) {
-            $stockQuery->where('warehouse_id', $warehouseId);
-        }
-
-        $stocks = $stockQuery->groupBy('product_id')
-            ->selectRaw('product_id, COALESCE(SUM(quantity - reserved_quantity), 0) as available_qty')
-            ->pluck('available_qty', 'product_id');
-
-        // 2. جلب سجلات الأسعار للأصناف المعنية دفعة واحدة
         $allPrices = ProductPrice::query()
             ->whereIn('product_id', $productIds)
             ->get();
 
         foreach ($products as $product) {
-            $product->available_quantity = (float) ($stocks->get($product->id) ?? 0.0000);
-
             $unitId = $product->matched_unit?->id;
-            if (!$unitId) {
+            if (! $unitId) {
                 $product->resolved_price = (float) ($product->cost_price ?? 0.0000);
                 continue;
             }
@@ -286,7 +458,7 @@ class ProductService
                 $priceRecord = $unitPrices->firstWhere('price_list_id', $priceListId);
             }
 
-            if (!$priceRecord) {
+            if (! $priceRecord) {
                 $priceRecord = $unitPrices->first();
             }
 
@@ -296,14 +468,14 @@ class ProductService
         }
     }
 
-   
-
     /**
-     * حفظ الوحدات والأسعار والباركودات المرتبطة بالصنف
+     * حفظ الوحدات والأسعار والباركودات عند إنشاء صنف جديد لأول مرة
      */
     protected function saveProductUnits(Product $product, array $unitsData): void
     {
-        foreach ($unitsData as $unitData) {
+        $uniqueUnits = collect($unitsData)->unique('unit_id')->values()->all();
+
+        foreach ($uniqueUnits as $unitData) {
             $productUnit = $product->units()->create([
                 'unit_id' => $unitData['unit_id'],
                 'conversion_factor' => $unitData['conversion_factor'],
@@ -312,8 +484,7 @@ class ProductService
                 'is_sale_unit' => $unitData['is_sale_unit'] ?? false,
             ]);
 
-            // حفظ الأسعار مع ربط product_id صراحةً
-            if (!empty($unitData['prices'])) {
+            if (! empty($unitData['prices'])) {
                 foreach ($unitData['prices'] as $priceData) {
                     $productUnit->prices()->create([
                         'product_id' => $product->id,
@@ -324,10 +495,9 @@ class ProductService
                 }
             }
 
-            // حفظ الباركودات مع ربط product_id صراحةً
-            if (!empty($unitData['barcodes'])) {
+            if (! empty($unitData['barcodes'])) {
                 foreach ($unitData['barcodes'] as $barcode) {
-                    if (!empty($barcode)) {
+                    if (! empty($barcode)) {
                         $productUnit->barcodes()->create([
                             'product_id' => $product->id,
                             'barcode' => $barcode,
@@ -355,14 +525,14 @@ class ProductService
     }
 
     /**
-     * الحذف النهائي (forceDelete) للعلاقات الفرعية لتفادي تعارض الـ Unique Constraint مع SoftDeletes
+     * الحذف النهائي للعلاقات الفرعية للصنف
      */
     protected function forceDeleteProductRelations(Product $product): void
     {
         foreach ($product->units as $productUnit) {
             $productUnit->barcodes()->withTrashed()->forceDelete();
             $productUnit->prices()->withTrashed()->forceDelete();
-            $productUnit->forceDelete();
+            $productUnit->delete();
         }
 
         $product->reorderRules()->withTrashed()->forceDelete();

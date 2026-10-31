@@ -20,6 +20,7 @@ class StorePurchaseRequisitionRequest extends FormRequest
     {
         return [
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
+            'received_by' => ['nullable', 'integer', 'exists:employees,id'],
             'request_date' => ['nullable', 'date'],
             'required_date' => ['nullable', 'date', 'after_or_equal:request_date'],
             'priority' => ['required', Rule::enum(RequisitionPriority::class)],
@@ -40,6 +41,7 @@ class StorePurchaseRequisitionRequest extends FormRequest
     {
         return [
             'department_id' => 'القسم',
+            'received_by' => 'الموظف المستلم',
             'request_date' => 'تاريخ الطلب',
             'required_date' => 'تاريخ الحاجة',
             'priority' => 'الأولوية',

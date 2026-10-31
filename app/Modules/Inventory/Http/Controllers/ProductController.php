@@ -64,6 +64,8 @@ class ProductController extends Controller
             ]);
 
         $warehouseId = $request->input('store_id') ?? $request->input('warehouse_id');
+        // نحافظ على نطاق تجميع الرصيد القديم، ونمرر معرفاً عددياً للخدمة.
+        $quantityWarehouseId = $warehouseId ? (int) $warehouseId : null;
 
         if ($warehouseId) {
             $query->withSum([
@@ -100,9 +102,18 @@ class ProductController extends Controller
 
         if ($request->boolean('all')) {
             $products = $query->latest('id')->get();
+            // تجهيز الكميات لجميع الأصناف التي أعادتها القائمة الحالية فقط.
+            $products = $this->productService->enrichInventoryQuantities($products, $quantityWarehouseId);
         } else {
             $perPage = (int) $request->input('per_page', 15);
             $products = $query->latest('id')->paginate($perPage);
+            // نثري أصناف الصفحة فقط ونحتفظ بكائن الترقيم وروابطه وإجمالياته.
+            $products->setCollection(
+                $this->productService->enrichInventoryQuantities(
+                    $products->getCollection(),
+                    $quantityWarehouseId
+                )
+            );
         }
 
         return ProductResource::collection($products);

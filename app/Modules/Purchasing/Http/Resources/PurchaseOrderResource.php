@@ -35,6 +35,13 @@ class PurchaseOrderResource extends JsonResource
                     'status' => $this->requisition->status?->value ?? null,
                 ];
             }),
+            'department_id' => $this->department_id,
+            'department' => $this->whenLoaded('department', function () {
+                return [
+                    'id' => $this->department->id,
+                    'name' => $this->department->name ?? null,
+                ];
+            }),
             'currency_id' => $this->currency_id,
             'currency' => $this->whenLoaded('currency', function () {
                 return [

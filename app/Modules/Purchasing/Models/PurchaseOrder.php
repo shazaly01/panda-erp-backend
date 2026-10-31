@@ -7,6 +7,7 @@ namespace App\Modules\Purchasing\Models;
 use App\Models\User;
 use App\Modules\Accounting\Models\Currency;
 use App\Modules\Core\Models\Partner;
+use App\Modules\HR\Models\Department;
 use App\Modules\Purchasing\Enums\PurchaseOrderStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,7 @@ class PurchaseOrder extends Model
         'order_number',
         'supplier_id',
         'requisition_id',
+        'department_id',
         'currency_id',
         'exchange_rate',
         'order_date',
@@ -52,6 +54,7 @@ class PurchaseOrder extends Model
         'status' => PurchaseOrderStatus::class,
         'supplier_id' => 'integer',
         'requisition_id' => 'integer',
+        'department_id' => 'integer',
         'currency_id' => 'integer',
         'confirmed_by' => 'integer',
         'created_by' => 'integer',
@@ -73,6 +76,11 @@ class PurchaseOrder extends Model
     public function requisition(): BelongsTo
     {
         return $this->belongsTo(PurchaseRequisition::class, 'requisition_id');
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'department_id');
     }
 
     public function currency(): BelongsTo

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Modules\Inventory\Http\Controllers\AdjustmentController;
 use App\Modules\Inventory\Http\Controllers\CategoryController;
+use App\Modules\Inventory\Http\Controllers\GasLeakageController;
 use App\Modules\Inventory\Http\Controllers\InventoryReportController;
 use App\Modules\Inventory\Http\Controllers\PriceListController;
 use App\Modules\Inventory\Http\Controllers\ProductController;
+use App\Modules\Inventory\Http\Controllers\StockSerialController;
 use App\Modules\Inventory\Http\Controllers\TransferController;
 use App\Modules\Inventory\Http\Controllers\UnitController;
 use App\Modules\Inventory\Http\Controllers\WarehouseController;
@@ -37,8 +39,7 @@ Route::middleware('auth:sanctum')
         // 2. الأصناف وقوائم الأسعار (Products & Pricing)
         // ===========================================
 
-    
-        // بحث فائق السرعة لنقاط البيع، الكاشير، والباركود والميزان
+        // بحث فائق السرعة لنقاط البيع، الكاشير، والباركود والميزان والسيريال
         Route::get('products/fast-search', [ProductController::class, 'fastSearch']);
 
         // الأصناف (Products)
@@ -48,7 +49,23 @@ Route::middleware('auth:sanctum')
         Route::apiResource('price-lists', PriceListController::class);
 
         // ===========================================
-        // 3. العمليات والتسويات المخزنية (Operations & Transfers & Adjustments)
+        // 3. إدارة الأرقام التسلسلية والأوزان (Serials & Catch Weight)
+        // ===========================================
+
+        // جلب قائمة الأرقام التسلسلية (مع دعم الفلترة بحسب الحالة مثل with_vendor)
+        Route::get('serials', [StockSerialController::class, 'index'])->name('inventory.serials.index');
+
+        // عرض تفاصيل رقم تسلسلي / أسطوانة محددة
+        Route::get('serials/{serial}', [StockSerialController::class, 'show'])->name('inventory.serials.show');
+
+        // إثبات فراغ الأسطوانة بالمحطة وتحويل حالتها إلى فارغة بالمستودع
+        Route::post('serials/{serial}/mark-as-empty', [StockSerialController::class, 'markAsEmpty'])->name('inventory.serials.mark-as-empty');
+
+        // توثيق تسريب أو فاقد وزني لأسطوانة غاز وترحيل الأثر المخزني
+        Route::post('gas-leakage', GasLeakageController::class)->name('inventory.gas-leakage.record');
+
+        // ===========================================
+        // 4. العمليات والتسويات المخزنية (Operations & Transfers & Adjustments)
         // ===========================================
 
         // اعتماد طلب التسوية / الرصيد الافتتاحي وتطبيق الأثر المخزني
@@ -67,7 +84,7 @@ Route::middleware('auth:sanctum')
         Route::apiResource('transfers', TransferController::class);
 
         // ===========================================
-        // 4. تقارير والرقابة على المخزون (Reports & Auditing)
+        // 5. التقارير والرقابة على المخزون (Reports & Auditing)
         // ===========================================
         Route::prefix('reports')->group(function () {
             // كارت الصنف التفصيلي والرصيد التراكمي

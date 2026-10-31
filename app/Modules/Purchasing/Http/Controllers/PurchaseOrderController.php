@@ -29,6 +29,7 @@ class PurchaseOrderController extends Controller
             'search',
             'status',
             'supplier_id',
+            'department_id',
             'currency_id',
             'requisition_id',
             'date_from',

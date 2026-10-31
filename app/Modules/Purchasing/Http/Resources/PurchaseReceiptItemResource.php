@@ -34,6 +34,7 @@ class PurchaseReceiptItemResource extends JsonResource
                     'name' => $this->product->name ?? null,
                     'code' => $this->product->code ?? null,
                     'sku' => $this->product->sku ?? null,
+                    'tracking_type' => $this->product->tracking_type ?? null,
                 ];
             }),
             'product_unit_id' => $this->product_unit_id,
@@ -66,6 +67,31 @@ class PurchaseReceiptItemResource extends JsonResource
             'total_cost' => (float) $this->total_cost,
             'rejection_reason' => $this->rejection_reason,
             'notes' => $this->notes,
+
+            // بيانات السيريالات والأوزان الموثقة في سطر المستند.
+            'serials' => $this->whenLoaded('serials', function () {
+                return $this->serials->map(function ($docSerial): array {
+                    // الأولوية للقيم المحفوظة على المستند، حتى لو لم يُنشأ
+                    // سجل الأسطوانة بعد أو تغيّرت بياناته لاحقاً.
+                    // الرجوع إلى العلاقة يحافظ على السلوك السابق للمستندات
+                    // القديمة التي لا تحتوي على هذه القيم؛ ولا يعدّل بياناتها.
+                    $serialNumber = $docSerial->serial_number ?? $docSerial->serial?->serial_number;
+                    $tareWeight = $docSerial->tare_weight ?? $docSerial->serial?->tare_weight;
+
+                    return [
+                        'id' => $docSerial->id,
+                        'serial_id' => $docSerial->serial_id,
+                        'serial_number' => $serialNumber,
+                        'replaced_serial_id' => $docSerial->replaced_serial_id,
+                        'replaced_serial_number' => $docSerial->replacedSerial?->serial_number,
+                        'tare_weight' => $tareWeight !== null ? (float) $tareWeight : null,
+                        'gross_weight' => $docSerial->gross_weight !== null ? (float) $docSerial->gross_weight : null,
+                        'net_weight' => $docSerial->net_weight !== null ? (float) $docSerial->net_weight : null,
+                        'notes' => $docSerial->notes,
+                    ];
+                });
+            }),
+
             'created_by' => $this->created_by,
             'creator' => $this->whenLoaded('creator', function () {
                 return [

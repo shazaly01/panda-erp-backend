@@ -68,4 +68,9 @@ class PurchaseRequisitionPolicy
 
         return $requisition->status === RequisitionStatus::PENDING_APPROVAL;
     }
+
+    public function changeDepartment(User $user): bool
+    {
+        return $user->hasPermissionTo('purchasing.requisitions.change_department');
+    }
 }

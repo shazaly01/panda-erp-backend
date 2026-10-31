@@ -186,13 +186,47 @@ class PurchaseBillService
 
     public function update(PurchaseBill $bill, array $data, int $userId): PurchaseBill
     {
-        if ($bill->status !== BillStatus::DRAFT) {
-            throw new RuntimeException('لا يمكن تعديل فاتورة الشراء إلا إذا كانت في حالة مسودة.');
+        if (! in_array($bill->status, [BillStatus::DRAFT, BillStatus::POSTED], true)) {
+            throw new RuntimeException('لا يمكن تعديل فاتورة الشراء إلا إذا كانت في حالة مسودة أو مرحلة.');
         }
 
-        return DB::transaction(function () use ($bill, $data, $userId): PurchaseBill {
-            $calculatedData = $this->calculateBillFinancials($data);
+        $calculatedData = $this->calculateBillFinancials($data);
 
+        if ($bill->status === BillStatus::POSTED && (float) $calculatedData['total_amount'] < (float) $bill->paid_amount) {
+            throw new RuntimeException('لا يمكن تعديل إجمالي الفاتورة ليصبح أقل من المبلغ المسدد مسبقاً (' . number_format((float) $bill->paid_amount, 2) . ').');
+        }
+
+        return DB::transaction(function () use ($bill, $data, $userId, $calculatedData): PurchaseBill {
+            $isPosted = ($bill->status === BillStatus::POSTED);
+            $oldPurchaseOrderId = $bill->purchase_order_id;
+
+            // 1. في حال كانت الفاتورة مرحلة مسبقاً، نقوم بعكس حركات المخزون والكميات المفعلة قبل التعديل
+            if ($isPosted) {
+                $bill->loadMissing('items');
+                $oldWasDirect = ! empty($bill->warehouse_id) && empty($bill->receipt_id);
+
+                foreach ($bill->items as $oldItem) {
+                    if ($oldItem->purchase_order_item_id && (float) $oldItem->quantity > 0) {
+                        $this->decrementOrderBilledQuantity(
+                            (int) $oldItem->purchase_order_item_id,
+                            (float) $oldItem->quantity,
+                            $userId
+                        );
+
+                        if ($oldWasDirect) {
+                            $this->decrementOrderReceivedQuantity(
+                                (int) $oldItem->purchase_order_item_id,
+                                (float) $oldItem->quantity,
+                                $userId
+                            );
+                        }
+                    }
+                }
+
+                $this->stockMovementService->clearDocumentMovements($bill);
+            }
+
+            // 2. تحديث رأس الفاتورة بالبيانات والقيم المحتسبة الجديدة
             $bill->update([
                 'supplier_bill_number' => array_key_exists('supplier_bill_number', $data) ? $data['supplier_bill_number'] : $bill->supplier_bill_number,
                 'supplier_id' => $data['supplier_id'],
@@ -215,6 +249,7 @@ class PurchaseBillService
                 'updated_by' => $userId,
             ]);
 
+            // 3. مزامنة بنود الفاتورة (حذف، تعديل، وإضافة)
             $existingItems = $bill->items()->get()->keyBy('id');
             $submittedItemIds = collect($calculatedData['items'])->pluck('id')->filter()->map(fn ($id) => (int) $id)->toArray();
 
@@ -265,6 +300,62 @@ class PurchaseBillService
                         'updated_by' => $userId,
                     ]);
                 }
+            }
+
+            // 4. إذا كانت الفاتورة مرحلة: إعادة تطبيق أثر المخزون وأوامر الشراء والقيد المحاسبي
+            if ($isPosted) {
+                $bill->loadMissing('items');
+                $isDirectInventoryPurchase = ! empty($bill->warehouse_id) && empty($bill->receipt_id);
+
+                if ($isDirectInventoryPurchase) {
+                    foreach ($bill->items as $item) {
+                        $quantity = (float) $item->quantity;
+                        if ($quantity > 0) {
+                            $unitCost = round((float) $item->subtotal / $quantity, 4);
+
+                            $this->stockMovementService->recordMovement(
+                                productId: (int) $item->product_id,
+                                warehouseId: (int) $bill->warehouse_id,
+                                productUnitId: (int) $item->product_unit_id,
+                                movementType: 'purchase',
+                                quantity: $quantity,
+                                unitCost: $unitCost,
+                                reference: $bill,
+                                notes: "إثبات مشتريات مباشرة بعد تعديل الفاتورة - فاتورة رقم: {$bill->bill_number}",
+                                userId: $userId
+                            );
+                        }
+                    }
+                }
+
+                foreach ($bill->items as $item) {
+                    if ($item->purchase_order_item_id && (float) $item->quantity > 0) {
+                        $this->incrementOrderBilledQuantity(
+                            (int) $item->purchase_order_item_id,
+                            (float) $item->quantity,
+                            $userId
+                        );
+
+                        if ($isDirectInventoryPurchase) {
+                            $this->incrementOrderReceivedQuantity(
+                                (int) $item->purchase_order_item_id,
+                                (float) $item->quantity,
+                                $userId
+                            );
+                        }
+                    }
+                }
+
+                if ($oldPurchaseOrderId && $oldPurchaseOrderId !== $bill->purchase_order_id) {
+                    $this->syncPurchaseOrderStatus((int) $oldPurchaseOrderId, $userId);
+                }
+
+                if ($bill->purchase_order_id) {
+                    $this->syncPurchaseOrderStatus((int) $bill->purchase_order_id, $userId);
+                }
+
+                // تحديث القيد المحاسبي في مكانه دون تغيير المعرف
+                $this->accountingService->updateBillJournalEntry($bill);
             }
 
             return $this->find($bill->id);

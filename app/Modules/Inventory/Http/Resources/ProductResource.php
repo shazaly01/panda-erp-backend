@@ -16,6 +16,8 @@ class ProductResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $isWeightSerial = $this->tracking_type === 'by_weight_serial';
+
         return [
             'id' => $this->id,
             'category_id' => $this->category_id,
@@ -42,6 +44,31 @@ class ProductResource extends JsonResource
                 fn () => (float) $this->current_stock,
                 fn () => (float) ($this->stock ?? $this->product_stocks_sum_quantity ?? 0.0)
             ),
+
+            // نفس عقد الكميات في PosProductResource؛ لا نغير الحقول القديمة أعلاه.
+            // null لنطاق المخزن يعني جميع المخازن عند تحميل الكميات من الخدمة.
+            'quantity_warehouse_id' => ($this->quantity_warehouse_id ?? null) !== null
+                ? (int) $this->quantity_warehouse_id
+                : null,
+
+            // الغاز من دفتر المخزون. غياب الكمية المحملة ليس رصيداً يساوي صفراً.
+            'gas_stock_kg' => $isWeightSerial && ($this->gas_stock_kg ?? null) !== null
+                ? (float) $this->gas_stock_kg
+                : null,
+            'gas_reserved_kg' => $isWeightSerial && ($this->gas_reserved_kg ?? null) !== null
+                ? (float) $this->gas_reserved_kg
+                : null,
+            'gas_available_kg' => $isWeightSerial && ($this->gas_available_kg ?? null) !== null
+                ? (float) $this->gas_available_kg
+                : null,
+
+            // العدد وتصنيفه جاهزان من ProductService؛ لا نحسبهما من الغاز هنا.
+            'cylinders_count' => $isWeightSerial && ($this->cylinders_count ?? null) !== null
+                ? (int) $this->cylinders_count
+                : null,
+            'cylinders_by_status' => $isWeightSerial
+                ? ($this->cylinders_by_status ?? null)
+                : null,
 
             // الوحدات والأسعار والباركودات
             'units' => $this->whenLoaded('units', function () {

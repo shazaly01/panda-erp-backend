@@ -17,7 +17,7 @@ class UpdateProductRequest extends FormRequest
     {
         $product = $this->route('product');
 
-        return $this->user()->can('update', $product);
+        return $product && ($this->user()->can('update', $product) ?? false);
     }
 
     /**
@@ -61,7 +61,7 @@ class UpdateProductRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                Rule::in(['none', 'by_batch', 'by_serial']),
+                Rule::in(['none', 'by_batch', 'by_serial', 'by_weight_serial']),
             ],
             'valuation_method' => [
                 'sometimes',
@@ -136,7 +136,7 @@ class UpdateProductRequest extends FormRequest
             'sku.unique' => 'رمز SKU مستخدم من قبل.',
             'type.in' => 'نوع المنتج المحدد غير صالح.',
             'inventory_policy.in' => 'سياسة المخزون غير صالحة.',
-            'tracking_type.in' => 'سياسة التتبع غير صالحة.',
+            'tracking_type.in' => 'سياسة التتبع يجب أن تكون (none, by_batch, by_serial, by_weight_serial).',
             'valuation_method.in' => 'طريقة التقييم غير صالحة.',
             'units.required' => 'يجب إضافة وحدة قياس واحدة على الأقل للمنتج.',
             'units.min' => 'يجب إضافة وحدة قياس واحدة على الأقل للمنتج.',

@@ -14,7 +14,6 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 use RuntimeException;
 
 class PurchaseOrderService
@@ -24,7 +23,10 @@ class PurchaseOrderService
         $query = PurchaseOrder::query()
             ->with([
                 'supplier',
+                'warehouse',
                 'currency',
+                'requisition',
+                'creator',
                 'confirmer',
             ])
             ->withCount('items');
@@ -34,7 +36,10 @@ class PurchaseOrderService
             $query->where(function (Builder $builder) use ($search): void {
                 $builder->where('order_number', 'like', "%{$search}%")
                     ->orWhere('notes', 'like', "%{$search}%")
-                    ->orWhere('terms_and_conditions', 'like', "%{$search}%");
+                    ->orWhereHas('supplier', function (Builder $supplierQuery) use ($search): void {
+                        $supplierQuery->where('name', 'like', "%{$search}%")
+                            ->orWhere('phone', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -44,6 +49,10 @@ class PurchaseOrderService
 
         if (! empty($filters['supplier_id'])) {
             $query->where('supplier_id', $filters['supplier_id']);
+        }
+
+        if (! empty($filters['warehouse_id'])) {
+            $query->where('warehouse_id', $filters['warehouse_id']);
         }
 
         if (! empty($filters['currency_id'])) {
@@ -69,11 +78,14 @@ class PurchaseOrderService
     {
         return PurchaseOrder::with([
             'supplier',
-            'requisition',
+            'warehouse',
             'currency',
-            'confirmer',
+            'requisition',
             'creator',
             'updater',
+            'confirmer',
+            'receipts',
+            'bills',
             'items.product',
             'items.productUnit',
             'items.requisitionItem',
@@ -90,13 +102,13 @@ class PurchaseOrderService
 
             $order = PurchaseOrder::create([
                 'order_number' => $orderNumber,
-                'supplier_id' => $data['supplier_id'],
                 'requisition_id' => $data['requisition_id'] ?? null,
+                'supplier_id' => $data['supplier_id'],
+                'warehouse_id' => $data['warehouse_id'] ?? null,
                 'currency_id' => $data['currency_id'],
                 'exchange_rate' => $data['exchange_rate'] ?? 1.0000,
                 'order_date' => $data['order_date'] ?? Carbon::now()->toDateString(),
                 'expected_delivery_date' => $data['expected_delivery_date'] ?? null,
-                'payment_terms' => $data['payment_terms'] ?? null,
                 'status' => PurchaseOrderStatus::DRAFT,
                 'subtotal' => $calculatedData['subtotal'],
                 'discount_type' => $calculatedData['discount_type'],
@@ -106,7 +118,6 @@ class PurchaseOrderService
                 'shipping_cost' => $calculatedData['shipping_cost'],
                 'total_amount' => $calculatedData['total_amount'],
                 'notes' => $data['notes'] ?? null,
-                'terms_and_conditions' => $data['terms_and_conditions'] ?? null,
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
@@ -114,12 +125,9 @@ class PurchaseOrderService
             foreach ($calculatedData['items'] as $itemData) {
                 $order->items()->create([
                     'requisition_item_id' => $itemData['requisition_item_id'] ?? null,
-                    'product_id' => $itemData['product_id'] ?? null,
-                    'item_name' => $itemData['item_name'] ?? null,
-                    'product_unit_id' => $itemData['product_unit_id'] ?? null,
+                    'product_id' => $itemData['product_id'],
+                    'product_unit_id' => $itemData['product_unit_id'],
                     'quantity' => $itemData['quantity'],
-                    'received_quantity' => 0.0000,
-                    'billed_quantity' => 0.0000,
                     'unit_price' => $itemData['unit_price'],
                     'discount_percentage' => $itemData['discount_percentage'],
                     'discount_amount' => $itemData['discount_amount'],
@@ -127,18 +135,12 @@ class PurchaseOrderService
                     'tax_amount' => $itemData['tax_amount'],
                     'subtotal' => $itemData['subtotal'],
                     'total' => $itemData['total'],
+                    'received_quantity' => 0.0000,
+                    'billed_quantity' => 0.0000,
                     'notes' => $itemData['notes'] ?? null,
                     'created_by' => $userId,
                     'updated_by' => $userId,
                 ]);
-
-                if (! empty($itemData['requisition_item_id'])) {
-                    $this->incrementRequisitionOrderedQuantity((int) $itemData['requisition_item_id'], (float) $itemData['quantity'], $userId);
-                }
-            }
-
-            if (! empty($data['requisition_id'])) {
-                $this->syncRequisitionStatus((int) $data['requisition_id'], $userId);
             }
 
             return $this->find($order->id);
@@ -147,20 +149,59 @@ class PurchaseOrderService
 
     public function update(PurchaseOrder $order, array $data, int $userId): PurchaseOrder
     {
-        if ($order->status !== PurchaseOrderStatus::DRAFT) {
-            throw new RuntimeException('لا يمكن تعديل أمر الشراء إلا إذا كان في حالة مسودة.');
+        if (! in_array($order->status, [PurchaseOrderStatus::DRAFT, PurchaseOrderStatus::CONFIRMED], true)) {
+            throw new RuntimeException('لا يمكن تعديل أمر الشراء إلا إذا كان في حالة مسودة أو مؤكد.');
         }
 
-        return DB::transaction(function () use ($order, $data, $userId): PurchaseOrder {
-            $calculatedData = $this->calculateOrderFinancials($data);
+        $calculatedData = $this->calculateOrderFinancials($data);
 
+        return DB::transaction(function () use ($order, $data, $userId, $calculatedData): PurchaseOrder {
+            $isConfirmed = ($order->status === PurchaseOrderStatus::CONFIRMED);
+            $oldRequisitionId = $order->requisition_id;
+
+            $existingItems = $order->items()->get()->keyBy('id');
+            $submittedItemIds = collect($calculatedData['items'])
+                ->pluck('id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->toArray();
+
+            // 1. صمام الأمان: التحقق من عدم حذف أو تنزيل كميات بنود تم استلامها أو فوترتها بالفعل
+            if ($isConfirmed) {
+                foreach ($existingItems as $existingItem) {
+                    $minQuantity = max((float) $existingItem->received_quantity, (float) $existingItem->billed_quantity);
+
+                    if ($minQuantity > 0.0) {
+                        if (! in_array($existingItem->id, $submittedItemIds, true)) {
+                            throw new RuntimeException("لا يمكن حذف أحد بنود أمر الشراء لوجود كميات مستلمة أو مفوترة منه مسبقاً ({$minQuantity}).");
+                        }
+
+                        $submittedItem = collect($calculatedData['items'])->firstWhere('id', $existingItem->id);
+                        if ($submittedItem && (float) $submittedItem['quantity'] < $minQuantity) {
+                            throw new RuntimeException("لا يمكن تقليل كمية البند إلى أقل من الكمية المستلمة أو المفوترة فعلياً ({$minQuantity}).");
+                        }
+                    }
+
+                    // عكس الكميات المحجوزة من طلب الاحتياج للبنود القديمة
+                    if ($existingItem->requisition_item_id && (float) $existingItem->quantity > 0) {
+                        $this->decrementRequisitionOrderedQuantity(
+                            (int) $existingItem->requisition_item_id,
+                            (float) $existingItem->quantity,
+                            $userId
+                        );
+                    }
+                }
+            }
+
+            // 2. تحديث رأس أمر الشراء
             $order->update([
+                'requisition_id' => array_key_exists('requisition_id', $data) ? $data['requisition_id'] : $order->requisition_id,
                 'supplier_id' => $data['supplier_id'],
+                'warehouse_id' => array_key_exists('warehouse_id', $data) ? $data['warehouse_id'] : $order->warehouse_id,
                 'currency_id' => $data['currency_id'],
                 'exchange_rate' => $data['exchange_rate'] ?? $order->exchange_rate,
                 'order_date' => $data['order_date'] ?? $order->order_date,
                 'expected_delivery_date' => array_key_exists('expected_delivery_date', $data) ? $data['expected_delivery_date'] : $order->expected_delivery_date,
-                'payment_terms' => array_key_exists('payment_terms', $data) ? $data['payment_terms'] : $order->payment_terms,
                 'subtotal' => $calculatedData['subtotal'],
                 'discount_type' => $calculatedData['discount_type'],
                 'discount_value' => $calculatedData['discount_value'],
@@ -169,22 +210,12 @@ class PurchaseOrderService
                 'shipping_cost' => $calculatedData['shipping_cost'],
                 'total_amount' => $calculatedData['total_amount'],
                 'notes' => array_key_exists('notes', $data) ? $data['notes'] : $order->notes,
-                'terms_and_conditions' => array_key_exists('terms_and_conditions', $data) ? $data['terms_and_conditions'] : $order->terms_and_conditions,
                 'updated_by' => $userId,
             ]);
 
-            $existingItems = $order->items()->get()->keyBy('id');
-            $submittedItemIds = collect($calculatedData['items'])->pluck('id')->filter()->map(fn ($id) => (int) $id)->toArray();
-
+            // 3. مزامنة بنود أمر الشراء (حذف، تعديل، إضافة)
             foreach ($existingItems as $existingId => $existingItem) {
                 if (! in_array($existingId, $submittedItemIds, true)) {
-                    if ($existingItem->requisition_item_id) {
-                        $this->decrementRequisitionOrderedQuantity(
-                            (int) $existingItem->requisition_item_id,
-                            (float) $existingItem->quantity,
-                            $userId
-                        );
-                    }
                     $existingItem->delete();
                 }
             }
@@ -193,13 +224,10 @@ class PurchaseOrderService
                 if (! empty($itemData['id']) && $existingItems->has($itemData['id'])) {
                     /** @var PurchaseOrderItem $existingItem */
                     $existingItem = $existingItems->get($itemData['id']);
-                    $quantityDiff = (float) $itemData['quantity'] - (float) $existingItem->quantity;
-
                     $existingItem->update([
                         'requisition_item_id' => $itemData['requisition_item_id'] ?? $existingItem->requisition_item_id,
-                        'product_id' => $itemData['product_id'] ?? null,
-                        'item_name' => $itemData['item_name'] ?? $existingItem->item_name,
-                        'product_unit_id' => $itemData['product_unit_id'] ?? null,
+                        'product_id' => $itemData['product_id'],
+                        'product_unit_id' => $itemData['product_unit_id'],
                         'quantity' => $itemData['quantity'],
                         'unit_price' => $itemData['unit_price'],
                         'discount_percentage' => $itemData['discount_percentage'],
@@ -211,23 +239,12 @@ class PurchaseOrderService
                         'notes' => $itemData['notes'] ?? null,
                         'updated_by' => $userId,
                     ]);
-
-                    if ($existingItem->requisition_item_id && $quantityDiff != 0.0) {
-                        if ($quantityDiff > 0) {
-                            $this->incrementRequisitionOrderedQuantity((int) $existingItem->requisition_item_id, $quantityDiff, $userId);
-                        } else {
-                            $this->decrementRequisitionOrderedQuantity((int) $existingItem->requisition_item_id, abs($quantityDiff), $userId);
-                        }
-                    }
                 } else {
                     $order->items()->create([
                         'requisition_item_id' => $itemData['requisition_item_id'] ?? null,
-                        'product_id' => $itemData['product_id'] ?? null,
-                        'item_name' => $itemData['item_name'] ?? null,
-                        'product_unit_id' => $itemData['product_unit_id'] ?? null,
+                        'product_id' => $itemData['product_id'],
+                        'product_unit_id' => $itemData['product_unit_id'],
                         'quantity' => $itemData['quantity'],
-                        'received_quantity' => 0.0000,
-                        'billed_quantity' => 0.0000,
                         'unit_price' => $itemData['unit_price'],
                         'discount_percentage' => $itemData['discount_percentage'],
                         'discount_amount' => $itemData['discount_amount'],
@@ -235,19 +252,36 @@ class PurchaseOrderService
                         'tax_amount' => $itemData['tax_amount'],
                         'subtotal' => $itemData['subtotal'],
                         'total' => $itemData['total'],
+                        'received_quantity' => 0.0000,
+                        'billed_quantity' => 0.0000,
                         'notes' => $itemData['notes'] ?? null,
                         'created_by' => $userId,
                         'updated_by' => $userId,
                     ]);
-
-                    if (! empty($itemData['requisition_item_id'])) {
-                        $this->incrementRequisitionOrderedQuantity((int) $itemData['requisition_item_id'], (float) $itemData['quantity'], $userId);
-                    }
                 }
             }
 
-            if ($order->requisition_id) {
-                $this->syncRequisitionStatus((int) $order->requisition_id, $userId);
+            // 4. في حال كان الأمر مؤكداً: إعادة قيد الكميات في طلب الاحتياج ومزامنة حالته
+            if ($isConfirmed) {
+                $order->loadMissing('items');
+
+                foreach ($order->items as $item) {
+                    if ($item->requisition_item_id && (float) $item->quantity > 0) {
+                        $this->incrementRequisitionOrderedQuantity(
+                            (int) $item->requisition_item_id,
+                            (float) $item->quantity,
+                            $userId
+                        );
+                    }
+                }
+
+                if ($oldRequisitionId && $oldRequisitionId !== $order->requisition_id) {
+                    $this->syncRequisitionStatus((int) $oldRequisitionId, $userId);
+                }
+
+                if ($order->requisition_id) {
+                    $this->syncRequisitionStatus((int) $order->requisition_id, $userId);
+                }
             }
 
             return $this->find($order->id);
@@ -261,21 +295,7 @@ class PurchaseOrderService
         }
 
         return DB::transaction(function () use ($order): bool {
-            foreach ($order->items as $item) {
-                if ($item->requisition_item_id) {
-                    $this->decrementRequisitionOrderedQuantity(
-                        (int) $item->requisition_item_id,
-                        (float) $item->quantity,
-                        (int) $order->updated_by
-                    );
-                }
-                $item->delete();
-            }
-
-            if ($order->requisition_id) {
-                $this->syncRequisitionStatus((int) $order->requisition_id, (int) $order->updated_by);
-            }
-
+            $order->items()->delete();
             return (bool) $order->delete();
         });
     }
@@ -287,29 +307,15 @@ class PurchaseOrderService
         }
 
         if ($order->items()->count() === 0) {
-            throw new RuntimeException('لا يمكن تأكيد أمر شراء بدون بنود.');
-        }
-
-        $order->update([
-            'status' => PurchaseOrderStatus::CONFIRMED,
-            'confirmed_by' => $userId,
-            'confirmed_at' => Carbon::now(),
-            'updated_by' => $userId,
-        ]);
-
-        return $this->find($order->id);
-    }
-
-    public function cancel(PurchaseOrder $order, int $userId): PurchaseOrder
-    {
-        if (! in_array($order->status, [PurchaseOrderStatus::DRAFT, PurchaseOrderStatus::CONFIRMED], true)) {
-            throw new RuntimeException('لا يمكن إلغاء أمر شراء تم استلام بضائع منه أو تمت فوترته.');
+            throw new RuntimeException('لا يمكن تأكيد أمر شراء لا يحتوي على أي بنود.');
         }
 
         return DB::transaction(function () use ($order, $userId): PurchaseOrder {
+            $order->loadMissing('items');
+
             foreach ($order->items as $item) {
-                if ($item->requisition_item_id) {
-                    $this->decrementRequisitionOrderedQuantity(
+                if ($item->requisition_item_id && (float) $item->quantity > 0) {
+                    $this->incrementRequisitionOrderedQuantity(
                         (int) $item->requisition_item_id,
                         (float) $item->quantity,
                         $userId
@@ -317,14 +323,62 @@ class PurchaseOrderService
                 }
             }
 
+            if ($order->requisition_id) {
+                $this->syncRequisitionStatus((int) $order->requisition_id, $userId);
+            }
+
+            $order->update([
+                'status' => PurchaseOrderStatus::CONFIRMED,
+                'confirmed_by' => $userId,
+                'confirmed_at' => Carbon::now(),
+                'updated_by' => $userId,
+            ]);
+
+            return $this->find($order->id);
+        });
+    }
+
+    public function cancel(PurchaseOrder $order, int $userId): PurchaseOrder
+    {
+        if ($order->status === PurchaseOrderStatus::CANCELLED) {
+            throw new RuntimeException('أمر الشراء ملغي بالفعل.');
+        }
+
+        if ($order->status === PurchaseOrderStatus::CLOSED) {
+            throw new RuntimeException('لا يمكن إلغاء أمر شراء مغلق.');
+        }
+
+        $order->loadMissing('items');
+
+        $hasMovements = $order->items->some(function ($item) {
+            return (float) $item->received_quantity > 0 || (float) $item->billed_quantity > 0;
+        });
+
+        if ($hasMovements) {
+            throw new RuntimeException('لا يمكن إلغاء أمر الشراء لوجود كميات مستلمة أو مفوترة منه بالفعل.');
+        }
+
+        return DB::transaction(function () use ($order, $userId): PurchaseOrder {
+            if ($order->status === PurchaseOrderStatus::CONFIRMED) {
+                foreach ($order->items as $item) {
+                    if ($item->requisition_item_id && (float) $item->quantity > 0) {
+                        $this->decrementRequisitionOrderedQuantity(
+                            (int) $item->requisition_item_id,
+                            (float) $item->quantity,
+                            $userId
+                        );
+                    }
+                }
+
+                if ($order->requisition_id) {
+                    $this->syncRequisitionStatus((int) $order->requisition_id, $userId);
+                }
+            }
+
             $order->update([
                 'status' => PurchaseOrderStatus::CANCELLED,
                 'updated_by' => $userId,
             ]);
-
-            if ($order->requisition_id) {
-                $this->syncRequisitionStatus((int) $order->requisition_id, $userId);
-            }
 
             return $this->find($order->id);
         });

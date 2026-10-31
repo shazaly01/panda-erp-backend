@@ -42,13 +42,21 @@ class SequenceService
             $targetDate = $date ? Carbon::parse($date) : Carbon::now();
             $nextValue = (int) $sequence->next_value;
 
-            // 2. منطق إعادة التصفير بناءً على تاريخ المستند
+            // 2. منطق إعادة التصفير بناءً على تاريخ المستند المحاسبي
             $shouldReset = false;
 
-            if ($sequence->reset_frequency === 'yearly' && $sequence->current_year != $targetDate->year) {
-                $shouldReset = true;
-            } elseif ($sequence->reset_frequency === 'monthly' && ($sequence->current_month != $targetDate->month || $sequence->current_year != $targetDate->year)) {
-                $shouldReset = true;
+            if ($sequence->reset_frequency === 'yearly') {
+                // لا يتم التصفير إلا إذا كانت هناك سنة مسجلة فعلياً وهي تختلف عن سنة المستند المالي
+                if (! empty($sequence->current_year) && (int) $sequence->current_year !== $targetDate->year) {
+                    $shouldReset = true;
+                }
+            } elseif ($sequence->reset_frequency === 'monthly') {
+                // لا يتم التصفير الشهري إلا إذا كانت السنة والشهر مسجلين فعلياً ويختلفان عن تاريخ المستند
+                if (! empty($sequence->current_year) && ! empty($sequence->current_month)) {
+                    if ((int) $sequence->current_year !== $targetDate->year || (int) $sequence->current_month !== $targetDate->month) {
+                        $shouldReset = true;
+                    }
+                }
             }
 
             if ($shouldReset) {
@@ -57,6 +65,14 @@ class SequenceService
                     'current_year'  => $targetDate->year,
                     'current_month' => $targetDate->month,
                 ]);
+            } else {
+                // ضبط السنة والشهر إذا كانا فارغين دون تصفير العداد
+                if ($sequence->current_year !== $targetDate->year || $sequence->current_month !== $targetDate->month) {
+                    DB::table('sequences')->where('id', $sequence->id)->update([
+                        'current_year'  => $targetDate->year,
+                        'current_month' => $targetDate->month,
+                    ]);
+                }
             }
 
             // 3. معالجة الصيغة (Pattern Parsing)

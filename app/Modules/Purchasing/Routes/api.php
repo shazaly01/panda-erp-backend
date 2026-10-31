@@ -8,6 +8,7 @@ use App\Modules\Purchasing\Http\Controllers\PurchaseOrderController;
 use App\Modules\Purchasing\Http\Controllers\PurchaseReceiptController;
 use App\Modules\Purchasing\Http\Controllers\PurchaseRequisitionController;
 use App\Modules\Purchasing\Http\Controllers\PurchaseReturnController;
+use App\Modules\Purchasing\Http\Controllers\SupplierPendingSerialController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')
@@ -63,8 +64,11 @@ Route::middleware('auth:sanctum')
         Route::apiResource('orders', PurchaseOrderController::class);
 
         // ===========================================
-        // 4. سندات الاستلام المخزني (Purchase Receipts)
+        // 4. سندات الاستلام المخزني وسيريالات الموردين (Purchase Receipts & Serials)
         // ===========================================
+
+        // استرجاع سيريالات الأسطوانات العالقة لدى المورد كعهدة للتعبئة والاستبدال
+        Route::get('suppliers/{supplierId?}/pending-serials', SupplierPendingSerialController::class);
 
         // تأكيد الاستلام وترحيل الأثر المخزني
         Route::post('receipts/{receipt}/receive', [PurchaseReceiptController::class, 'receive']);

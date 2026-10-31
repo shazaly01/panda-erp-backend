@@ -6,6 +6,7 @@ namespace App\Modules\Purchasing\Models;
 
 use App\Models\User;
 use App\Modules\HR\Models\Department;
+use App\Modules\HR\Models\Employee;
 use App\Modules\Purchasing\Enums\RequisitionPriority;
 use App\Modules\Purchasing\Enums\RequisitionStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,6 +25,7 @@ class PurchaseRequisition extends Model
         'requisition_number',
         'department_id',
         'requested_by',
+        'received_by',
         'request_date',
         'required_date',
         'priority',
@@ -44,6 +46,7 @@ class PurchaseRequisition extends Model
         'status' => RequisitionStatus::class,
         'department_id' => 'integer',
         'requested_by' => 'integer',
+        'received_by' => 'integer',
         'approved_by' => 'integer',
         'created_by' => 'integer',
         'updated_by' => 'integer',
@@ -57,6 +60,11 @@ class PurchaseRequisition extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by');
+    }
+
+    public function receiver(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'received_by');
     }
 
     public function approver(): BelongsTo

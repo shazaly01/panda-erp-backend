@@ -34,6 +34,13 @@ class PurchaseRequisitionResource extends JsonResource
                     'email' => $this->requester->email ?? null,
                 ];
             }),
+            'received_by' => $this->received_by,
+            'receiver' => $this->whenLoaded('receiver', function () {
+                return [
+                    'id' => $this->receiver->id,
+                    'full_name' => $this->receiver->full_name ?? null,
+                ];
+            }),
             'request_date' => $this->request_date?->format('Y-m-d'),
             'required_date' => $this->required_date?->format('Y-m-d'),
             'priority' => [

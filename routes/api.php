@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\BackupController;
 use App\Http\Controllers\Api\DocumentController; // موديول الأرشفة العالمي
 use App\Http\Controllers\Api\BrandingController;
 use App\Http\Controllers\Api\GrantRequestController;
+use App\Http\Controllers\Api\WhatsAppWebhookController;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -24,6 +25,9 @@ use App\Http\Controllers\Api\GrantRequestController;
 |
 */
 
+Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle'])
+    ->middleware(\App\Http\Middleware\ValidateWhatsAppSender::class);
+    
 // --- المسارات العامة (Public Routes) ---
 Route::get('/branding', [BrandingController::class, 'index']);
 // تم تطبيق الحماية الأمنية (Rate Limiting) هنا لمنع استهلاك رصيد SMS (بحد أقصى 3 طلبات في الدقيقة)

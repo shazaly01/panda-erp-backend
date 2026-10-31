@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Purchasing\Services;
 
+use App\Models\User;
 use App\Modules\Inventory\Models\ProductStock;
 use App\Modules\Inventory\Models\ProductUnit;
 use App\Modules\Purchasing\Enums\RequisitionStatus;
@@ -30,6 +31,7 @@ class PurchaseRequisitionService
             ->with([
                 'department',
                 'requester',
+                'receiver',
                 'approver',
             ])
             ->withCount('items');
@@ -58,6 +60,10 @@ class PurchaseRequisitionService
             $query->where('requested_by', $filters['requested_by']);
         }
 
+        if (! empty($filters['received_by'])) {
+            $query->where('received_by', $filters['received_by']);
+        }
+
         if (! empty($filters['date_from'])) {
             $query->whereDate('request_date', '>=', $filters['date_from']);
         }
@@ -74,6 +80,7 @@ class PurchaseRequisitionService
         return PurchaseRequisition::with([
             'department',
             'requester',
+            'receiver',
             'approver',
             'creator',
             'updater',
@@ -89,10 +96,18 @@ class PurchaseRequisitionService
         return DB::transaction(function () use ($data, $userId): PurchaseRequisition {
             $requisitionNumber = $this->generateRequisitionNumber();
 
+            $user = User::find($userId);
+            $canChangeDepartment = $user?->can('changeDepartment', PurchaseRequisition::class) ?? false;
+
+            $departmentId = $canChangeDepartment
+                ? ($data['department_id'] ?? $user?->department_id)
+                : ($user?->department_id ?? $data['department_id'] ?? null);
+
             $requisition = PurchaseRequisition::create([
                 'requisition_number' => $requisitionNumber,
-                'department_id' => $data['department_id'] ?? null,
+                'department_id' => $departmentId,
                 'requested_by' => $userId,
+                'received_by' => $data['received_by'] ?? null,
                 'request_date' => $data['request_date'] ?? Carbon::now()->toDateString(),
                 'required_date' => $data['required_date'] ?? null,
                 'priority' => $data['priority'],
@@ -131,8 +146,17 @@ class PurchaseRequisitionService
         }
 
         return DB::transaction(function () use ($requisition, $data, $userId): PurchaseRequisition {
+            $user = User::find($userId);
+            $canChangeDepartment = $user?->can('changeDepartment', PurchaseRequisition::class) ?? false;
+
+            $departmentId = $requisition->department_id;
+            if ($canChangeDepartment && array_key_exists('department_id', $data)) {
+                $departmentId = $data['department_id'] ?? null;
+            }
+
             $requisition->update([
-                'department_id' => $data['department_id'] ?? $requisition->department_id,
+                'department_id' => $departmentId,
+                'received_by' => array_key_exists('received_by', $data) ? $data['received_by'] : $requisition->received_by,
                 'request_date' => $data['request_date'] ?? $requisition->request_date,
                 'required_date' => array_key_exists('required_date', $data) ? $data['required_date'] : $requisition->required_date,
                 'priority' => $data['priority'] ?? $requisition->priority,

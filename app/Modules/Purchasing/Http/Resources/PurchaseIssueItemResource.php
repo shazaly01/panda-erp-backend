@@ -44,6 +44,22 @@ class PurchaseIssueItemResource extends JsonResource
             'unit_cost' => (float) $this->unit_cost,
             'total_cost' => (float) $this->total_cost,
             'notes' => $this->notes,
+
+            // تضمين بيانات الأرقام التسلسلية وقراءات الميزان الموثقة للصرف
+            'serials' => $this->whenLoaded('serials', function () {
+                return $this->serials->map(function ($docSerial): array {
+                    return [
+                        'id' => $docSerial->id,
+                        'serial_id' => $docSerial->serial_id,
+                        'serial_number' => $docSerial->serial?->serial_number,
+                        'tare_weight' => $docSerial->serial?->tare_weight !== null ? (float) $docSerial->serial->tare_weight : null,
+                        'gross_weight' => $docSerial->gross_weight !== null ? (float) $docSerial->gross_weight : null,
+                        'net_weight' => $docSerial->net_weight !== null ? (float) $docSerial->net_weight : null,
+                        'notes' => $docSerial->notes,
+                    ];
+                });
+            }),
+
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

@@ -145,11 +145,18 @@ class PurchaseReturnService
 
     public function update(PurchaseReturn $return, array $data, int $userId): PurchaseReturn
     {
-        if ($return->status !== PurchaseReturnStatus::DRAFT) {
-            throw new RuntimeException('لا يمكن تعديل سند المردود إلا إذا كان في حالة مسودة.');
+        if (! in_array($return->status, [PurchaseReturnStatus::DRAFT, PurchaseReturnStatus::POSTED], true)) {
+            throw new RuntimeException('لا يمكن تعديل سند المردود إلا إذا كان في حالة مسودة أو مرحل.');
         }
 
         return DB::transaction(function () use ($return, $data, $userId): PurchaseReturn {
+            $isPosted = ($return->status === PurchaseReturnStatus::POSTED);
+
+            // 1. في حال كان المردود مرحلاً مسبقاً، نقوم بتصفير حركات خروج المخزون السابقة
+            if ($isPosted) {
+                $this->stockMovementService->clearDocumentMovements($return);
+            }
+
             $calculatedData = $this->calculateReturnFinancials($data['items']);
 
             $return->update([
@@ -215,6 +222,33 @@ class PurchaseReturnService
                         'updated_by' => $userId,
                     ]);
                 }
+            }
+
+            // 2. إذا كان المردود مرحلاً، نقوم بإعادة تسجيل حركة المخزون وتحديث القيد المحاسبي المالي
+            if ($isPosted) {
+                $return->loadMissing('items');
+
+                foreach ($return->items as $item) {
+                    $returnQuantity = (float) $item->quantity;
+
+                    if ($returnQuantity > 0) {
+                        $this->stockMovementService->recordMovement(
+                            productId: (int) $item->product_id,
+                            warehouseId: (int) $return->warehouse_id,
+                            productUnitId: (int) $item->product_unit_id,
+                            movementType: 'purchase_return',
+                            quantity: $returnQuantity,
+                            unitCost: (float) $item->unit_price,
+                            reference: $return,
+                            locationId: $item->location_id ? (int) $item->location_id : null,
+                            batchId: $item->batch_id ? (int) $item->batch_id : null,
+                            notes: "إرجاع مشتريات للمورد بعد تعديل السند رقم: {$return->return_number}",
+                            userId: $userId
+                        );
+                    }
+                }
+
+                $this->accountingService->updateReturnJournalEntry($return);
             }
 
             return $this->find($return->id);

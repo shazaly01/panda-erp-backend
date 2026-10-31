@@ -28,6 +28,7 @@ class PurchasingPermissionsSeeder extends Seeder
                     'delete' => 'حذف',
                     'approve' => 'اعتماد الطلب',
                     'reject' => 'رفض الطلب',
+                    'change_department' => 'تحديد وتغيير القسم الطالب',
                 ],
             ],
             'orders' => [

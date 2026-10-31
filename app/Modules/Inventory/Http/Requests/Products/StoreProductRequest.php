@@ -51,7 +51,7 @@ class StoreProductRequest extends FormRequest
             'tracking_type' => [
                 'required',
                 'string',
-                Rule::in(['none', 'by_batch', 'by_serial']),
+                Rule::in(['none', 'by_batch', 'by_serial', 'by_weight_serial']),
             ],
             'valuation_method' => [
                 'required',
@@ -122,7 +122,7 @@ class StoreProductRequest extends FormRequest
             'inventory_policy.required' => 'سياسة خصم/إصدار المخزون مطلوبة.',
             'inventory_policy.in' => 'سياسة المخزون غير صالحة.',
             'tracking_type.required' => 'سياسة التتبع مطلوبة.',
-            'tracking_type.in' => 'سياسة التتبع يجب أن تكون (none, by_batch, by_serial).',
+            'tracking_type.in' => 'سياسة التتبع يجب أن تكون (none, by_batch, by_serial, by_weight_serial).',
             'valuation_method.required' => 'طريقة التقييم المالي مطلوبة.',
             'valuation_method.in' => 'طريقة التقييم يجب أن تكون (avco, fifo, standard).',
             'units.required' => 'يجب إضافة وحدة قياس واحدة على الأقل للمنتج.',

@@ -19,7 +19,10 @@
 │   │   │   ├── ReportController.php
 │   │   │   ├── RoleController.php
 │   │   │   ├── UserController.php
+│   │   │   ├── WhatsAppWebhookController.php
 │   │   ├── Controller.php
+│   ├── [DIR] Middleware
+│   │   ├── ValidateWhatsAppSender.php
 │   ├── [DIR] Requests
 │   │   ├── [DIR] Auth
 │   │   │   ├── ForgotPasswordRequest.php
@@ -51,6 +54,9 @@
 │   │   │   ├── ProjectResource.php
 │   │   │   ├── RoleResource.php
 │   │   │   ├── UserResource.php
+├── [DIR] Jobs
+│   ├── ProcessWhatsAppMessageJob.php
+│   ├── SendSmsJob.php
 ├── [DIR] Models
 │   ├── Company.php
 │   ├── Document.php
@@ -99,6 +105,8 @@
 │   │   │   │   ├── 2026_08_29_200120_create_budget_lines_table.php
 │   │   │   │   ├── 2026_09_01_181223_make_account_id_nullable_in_budget_lines_table.php
 │   │   │   │   ├── 2026_09_06_135350_add_reference_to_voucher_details_table.php
+│   │   │   │   ├── 2026_10_04_161622_add_paper_ref_to_vouchers_table.php
+│   │   │   │   ├── 2026_10_04_181718_add_bank_ref_number_to_vouchers_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── AccountMappingSeeder.php
 │   │   │   │   ├── AccountingPermissionsSeeder.php
@@ -219,8 +227,10 @@
 │   │   │   ├── [DIR] Migrations
 │   │   │   │   ├── 2025_12_25_070545_create_sequences_table.php
 │   │   │   │   ├── 2026_09_01_233830_create_partners_table.php
+│   │   │   │   ├── 2026_09_19_215301_create_system_settings_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── PartnerPermissionsSeeder.php
+│   │   │   │   ├── SystemSettingSeeder.php
 │   │   ├── [DIR] Enums
 │   │   │   ├── PartnerStatus.php
 │   │   │   ├── PartnerTaxTreatment.php
@@ -229,20 +239,26 @@
 │   │   │   ├── [DIR] Controllers
 │   │   │   │   ├── PartnerController.php
 │   │   │   │   ├── SequenceController.php
+│   │   │   │   ├── SystemSettingController.php
 │   │   │   ├── [DIR] Requests
 │   │   │   │   ├── [DIR] Partner
 │   │   │   │   │   ├── StorePartnerRequest.php
 │   │   │   │   │   ├── UpdatePartnerRequest.php
+│   │   │   │   ├── [DIR] SystemSetting
+│   │   │   │   │   ├── UpdateSystemSettingRequest.php
+│   │   │   │   ├── SystemSetting.php
 │   │   │   │   ├── UpdateSequenceRequest.php
 │   │   │   ├── [DIR] Resources
 │   │   │   │   ├── PartnerResource.php
 │   │   │   │   ├── SequenceResource.php
+│   │   │   │   ├── SystemSettingResource.php
 │   │   ├── [DIR] Models
 │   │   │   ├── Partner.php
 │   │   │   ├── Sequence.php
 │   │   ├── [DIR] Policies
 │   │   │   ├── PartnerPolicy.php
 │   │   │   ├── SequencePolicy.php
+│   │   │   ├── SystemSettingPolicy.php
 │   │   ├── [DIR] Services
 │   │   │   ├── PartnerService.php
 │   │   │   ├── SequenceService.php
@@ -311,6 +327,8 @@
 │   │   │   │   ├── 2026_06_24_155409_make_salary_structure_id_nullable_in_contracts_table.php
 │   │   │   │   ├── 2026_07_05_161244_change_internship_dates_to_nullable_in_hr_internship_applications_table.php
 │   │   │   │   ├── 2026_07_25_114345_add_tracking_code_to_employees_table.php
+│   │   │   │   ├── 2026_10_02_130433_add_overtime_source_to_hr_overtime_policies_table.php
+│   │   │   │   ├── 2026_10_02_231307_add_custom_calculation_fields_to_hr_overtime_policies_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── HRPermissionsSeeder.php
 │   │   │   │   ├── SalaryRulesSeeder.php
@@ -349,6 +367,8 @@
 │   │   │   │   ├── PublicInternshipController.php
 │   │   │   │   ├── [DIR] Reports
 │   │   │   │   │   ├── AttendanceReportController.php
+│   │   │   │   │   ├── DepartmentMonthlyAttendanceReportController.php
+│   │   │   │   │   ├── EmployeeDetailedAttendanceReportController.php
 │   │   │   │   ├── SalaryRuleController.php
 │   │   │   │   ├── SalaryStructureController.php
 │   │   │   │   ├── ShiftController.php
@@ -399,6 +419,7 @@
 │   │   │   │   │   ├── StorePayPeriodRequest.php
 │   │   │   │   │   ├── UpdatePayPeriodRequest.php
 │   │   │   │   ├── [DIR] Payroll
+│   │   │   │   │   ├── GetEligibleEmployeesRequest.php
 │   │   │   │   │   ├── PostPayrollBatchRequest.php
 │   │   │   │   │   ├── PreviewPayrollRequest.php
 │   │   │   │   │   ├── StorePayrollInputRequest.php
@@ -427,6 +448,7 @@
 │   │   │   │   ├── CalendarExceptionResource.php
 │   │   │   │   ├── ContractResource.php
 │   │   │   │   ├── DepartmentResource.php
+│   │   │   │   ├── EligiblePayrollEmployeeResource.php
 │   │   │   │   ├── EmployeeResource.php
 │   │   │   │   ├── EmployeeShiftResource.php
 │   │   │   │   ├── InternetVoucherResource.php
@@ -689,6 +711,7 @@
 │   │   │   │   ├── 2026_09_14_150745_create_purchasing_issue_items_table.php
 │   │   │   │   ├── 2026_09_14_161141_add_quantity_issued_to_purchasing_requisition_items_table.php
 │   │   │   │   ├── 2026_09_14_161203_modify_purchasing_order_items_for_free_text_items.php
+│   │   │   │   ├── 2026_10_08_134933_add_department_id_to_purchasing_orders_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── PurchasingPermissionsSeeder.php
 │   │   ├── [DIR] Enums
@@ -787,6 +810,27 @@
 │   ├── AuthService.php
 │   ├── DocumentService.php
 │   ├── RoleService.php
+│   ├── [DIR] WhatsApp
+│   │   ├── [DIR] Contracts
+│   │   │   ├── QueryHandlerInterface.php
+│   │   ├── [DIR] Handlers
+│   │   │   ├── ExpensesQueryHandler.php
+│   │   │   ├── HelpQueryHandler.php
+│   │   │   ├── ItemStockQueryHandler.php
+│   │   │   ├── LatestInvoiceQueryHandler.php
+│   │   │   ├── LiquidityQueryHandler.php
+│   │   │   ├── LowStockQueryHandler.php
+│   │   │   ├── MaterialConsumptionQueryHandler.php
+│   │   │   ├── PartyBalanceQueryHandler.php
+│   │   │   ├── SalesQueryHandler.php
+│   │   │   ├── TopCreditorsQueryHandler.php
+│   │   │   ├── TopDebtorsQueryHandler.php
+│   │   ├── IntentParsingService.php
+│   │   ├── QueryHandlerRegistry.php
+│   │   ├── ReportManagerService.php
+│   │   ├── [DIR] Traits
+│   │   │   ├── HandlesBranchConnections.php
+│   │   ├── WhatsAppResponseService.php
 
 ============ [ DATABASE FOLDER ] ============
 ├── .gitignore

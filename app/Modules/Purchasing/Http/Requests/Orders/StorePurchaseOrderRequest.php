@@ -19,6 +19,7 @@ class StorePurchaseOrderRequest extends FormRequest
         return [
             'supplier_id' => ['required', 'integer', 'exists:partners,id'],
             'requisition_id' => ['nullable', 'integer', 'exists:purchasing_requisitions,id'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'currency_id' => ['required', 'integer', 'exists:currencies,id'],
             'exchange_rate' => ['nullable', 'numeric', 'gt:0', 'max:9999999999.9999'],
             'order_date' => ['required', 'date'],
@@ -46,6 +47,7 @@ class StorePurchaseOrderRequest extends FormRequest
         return [
             'supplier_id' => 'المورد',
             'requisition_id' => 'طلب الشراء المرتبط',
+            'department_id' => 'القسم',
             'currency_id' => 'العملة',
             'exchange_rate' => 'سعر الصرف',
             'order_date' => 'تاريخ أمر الشراء',
