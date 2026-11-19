@@ -24,6 +24,7 @@ class JournalEntry extends Model
         'date',
         'status',
         'source',
+        'source_id',
         'description',
         'currency_id',
         'created_by',

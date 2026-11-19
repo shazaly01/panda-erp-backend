@@ -32,6 +32,7 @@ class StorePartnerRequest extends FormRequest
             'credit_limit' => ['nullable', 'numeric', 'min:0'],
             'credit_period_days' => ['nullable', 'integer', 'min:0', 'max:365'],
             'currency_id' => ['nullable', 'integer', 'exists:currencies,id'],
+            'price_list_id' => ['nullable', 'integer', 'exists:inventory_price_lists,id'],
             'receivable_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
             'payable_account_id' => ['nullable', 'integer', 'exists:accounts,id'],
             'bank_name' => ['nullable', 'string', 'max:100'],

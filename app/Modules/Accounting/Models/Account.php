@@ -13,6 +13,7 @@ use Kalnoy\Nestedset\NodeTrait;
 use App\Modules\Accounting\Enums\AccountNature;
 use App\Modules\Accounting\Database\Factories\AccountFactory;
 use App\Modules\Accounting\Enums\AccountType;
+use App\Modules\Accounting\Enums\EntryStatus;
 use App\Modules\Inventory\Models\Warehouse;
 
 class Account extends Model
@@ -62,9 +63,59 @@ class Account extends Model
 
             // 3. حماية الارتباطات التشغيلية (خزائن/بنوك/مستودعات)
             if ($account->boxes()->exists() || $account->bankAccounts()->exists() || $account->warehouses()->exists()) {
-                 abort(422, "لا يمكن حذف الحساب لأنه مرتبط بخزينة أو حساب بنكي أو مستودع.");
+                abort(422, "لا يمكن حذف الحساب لأنه مرتبط بخزينة أو حساب بنكي أو مستودع.");
             }
         });
+    }
+
+    // ============================================
+    // النطاقات والدوال الحسابية (Scopes & Helpers)
+    // ============================================
+
+    /**
+     * تحميل مجاميع المدين والدائن للقيود المُرحّلة فقط دفعة واحدة (لتفادي مشكلة N+1)
+     */
+    public function scopeWithPostedSums($query)
+    {
+        return $query
+            ->withSum(['details as posted_debit_sum' => function ($detailQuery) {
+                $detailQuery->whereHas('entry', function ($entryQuery) {
+                    $entryQuery->where('status', EntryStatus::Posted);
+                });
+            }], 'debit')
+            ->withSum(['details as posted_credit_sum' => function ($detailQuery) {
+                $detailQuery->whereHas('entry', function ($entryQuery) {
+                    $entryQuery->where('status', EntryStatus::Posted);
+                });
+            }], 'credit');
+    }
+
+    /**
+     * حساب الرصيد الحالي الفعلي للحساب (المدين - الدائن) من القيود المُرحّلة فقط
+     */
+    public function getCurrentBalance(): float
+    {
+        if (
+            array_key_exists('posted_debit_sum', $this->attributes) ||
+            array_key_exists('posted_credit_sum', $this->attributes)
+        ) {
+            $debit = (float) ($this->attributes['posted_debit_sum'] ?? 0.0);
+            $credit = (float) ($this->attributes['posted_credit_sum'] ?? 0.0);
+
+            return round($debit - $credit, 4);
+        }
+
+        $totals = $this->details()
+            ->whereHas('entry', function ($entryQuery) {
+                $entryQuery->where('status', EntryStatus::Posted);
+            })
+            ->selectRaw('COALESCE(SUM(debit), 0) as total_debit, COALESCE(SUM(credit), 0) as total_credit')
+            ->first();
+
+        $debit = (float) ($totals->total_debit ?? 0.0);
+        $credit = (float) ($totals->total_credit ?? 0.0);
+
+        return round($debit - $credit, 4);
     }
 
     // ============================================

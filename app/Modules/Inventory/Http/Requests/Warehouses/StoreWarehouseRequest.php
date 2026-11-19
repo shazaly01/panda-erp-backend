@@ -40,6 +40,7 @@ class StoreWarehouseRequest extends FormRequest
                 Rule::exists('accounts', 'id')
                     ->where(fn ($q) => $q->where('is_transactional', true)->whereNull('deleted_at')),
             ],
+            'is_operating' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

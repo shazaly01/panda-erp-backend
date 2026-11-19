@@ -19,6 +19,10 @@ class InventoryPermissionsSeeder extends Seeder
         $moduleDisplayName = 'إدارة المخازن والمخزون';
 
         $permissionsData = [
+            'dashboard' => [
+                'title' => 'لوحة تحكم وإحصائيات المخزون',
+                'actions' => ['view' => 'رؤية الإحصائيات ولوحة التحكم']
+            ],
             'units' => [
                 'title' => 'وحدات القياس',
                 'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
@@ -41,6 +45,10 @@ class InventoryPermissionsSeeder extends Seeder
             ],
             'batches' => [
                 'title' => 'التشغيلات والباتشات',
+                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
+            ],
+            'serials' => [
+                'title' => 'الأرقام التسلسلية والأسطوانات',
                 'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
             ],
             'stocks' => [

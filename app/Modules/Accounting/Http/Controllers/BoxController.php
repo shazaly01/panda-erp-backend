@@ -7,7 +7,6 @@ namespace App\Modules\Accounting\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Accounting\Models\Box;
 use App\Modules\Accounting\Services\TreasuryService;
-// 🌟 تم تصحيح المسارات (إزالة التخمين الخاص بمجلد Box)
 use App\Modules\Accounting\Http\Requests\StoreBoxRequest;
 use App\Modules\Accounting\Http\Requests\UpdateBoxRequest;
 use App\Modules\Accounting\Http\Resources\BoxResource;
@@ -23,7 +22,10 @@ class BoxController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Box::with(['account', 'currency']);
+        $query = Box::with([
+            'account' => fn ($q) => $q->withPostedSums(),
+            'currency',
+        ]);
 
         // 1. فلترة البحث (البحث في اسم الخزينة تشغيلياً أو كود الحساب المالي المرتبط بها)
         $query->when($request->search, function ($q, $search) {
@@ -59,7 +61,10 @@ class BoxController extends Controller
         // نرسل البيانات التشغيلية فقط، والسيرفس سيتولى توليد الحساب المالي تحت 11101
         $box = $this->treasuryService->createBox($request->validated());
 
-        $box->load(['account', 'currency']);
+        $box->load([
+            'account' => fn ($q) => $q->withPostedSums(),
+            'currency',
+        ]);
 
         return response()->json([
             'message' => 'تم إنشاء الخزينة وتوليد حسابها المالي آلياً بنجاح.',
@@ -72,7 +77,10 @@ class BoxController extends Controller
      */
     public function show(Box $box): JsonResponse
     {
-        $box->load(['account', 'currency']);
+        $box->load([
+            'account' => fn ($q) => $q->withPostedSums(),
+            'currency',
+        ]);
 
         return response()->json([
             'data' => new BoxResource($box)
@@ -89,7 +97,10 @@ class BoxController extends Controller
 
         return response()->json([
             'message' => 'تم تحديث بيانات الخزينة بنجاح.',
-            'data'    => new BoxResource($updatedBox->load(['account', 'currency']))
+            'data'    => new BoxResource($updatedBox->load([
+                'account' => fn ($q) => $q->withPostedSums(),
+                'currency',
+            ]))
         ]);
     }
 

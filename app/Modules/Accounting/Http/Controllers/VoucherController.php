@@ -30,8 +30,16 @@ class VoucherController extends Controller
     public function index(Request $request)
     {
         $query = Voucher::query()
-            ->with(['branch', 'currency', 'box', 'bankAccount', 'details.account'])
-            ->latest('date');
+            ->with([
+                'branch',
+                'currency',
+                'box',
+                'bankAccount',
+                'details.account',
+                'details.costCenter',
+            ])
+            ->orderByDesc('date')
+            ->orderByDesc('id');
 
         // فلترة نوع السند (صرف / قبض)
         $query->when($request->filled('type'), function ($q) use ($request) {
@@ -118,7 +126,7 @@ class VoucherController extends Controller
     }
 
     /**
-     * تحديث سند (مسودة)
+     * تحديث سند (مسودة أو مُرحّل حسب الصلاحية)
      */
     public function update(UpdateVoucherRequest $request, Voucher $voucher)
     {
@@ -132,17 +140,17 @@ class VoucherController extends Controller
     }
 
     /**
-     * حذف سند (مسودة)
+     * حذف سند (مسودة أو مُرحّل حسب الصلاحية)
      */
     public function destroy(Voucher $voucher)
     {
-        if ($voucher->status === VoucherStatus::Posted) {
-            return response()->json(['message' => 'لا يمكن حذف سند مرحل.'], 400);
+        try {
+            $this->voucherService->deleteVoucher($voucher);
+
+            return response()->json(['message' => 'تم حذف السند بنجاح.']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
         }
-
-        $voucher->delete();
-
-        return response()->json(['message' => 'تم حذف السند بنجاح.']);
     }
 
     /**

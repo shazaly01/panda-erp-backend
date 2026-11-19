@@ -228,6 +228,7 @@
 │   │   │   │   ├── 2025_12_25_070545_create_sequences_table.php
 │   │   │   │   ├── 2026_09_01_233830_create_partners_table.php
 │   │   │   │   ├── 2026_09_19_215301_create_system_settings_table.php
+│   │   │   │   ├── 2026_11_12_120728_add_price_list_id_to_partners_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── PartnerPermissionsSeeder.php
 │   │   │   │   ├── SystemSettingSeeder.php
@@ -571,15 +572,27 @@
 │   │   │   │   ├── 2026_07_26_134306_create_inventory_production_order_items_table.php
 │   │   │   │   ├── 2026_09_12_210821_add_aliases_to_inventory_products_table.php
 │   │   │   │   ├── 2026_09_16_101911_add_search_indexes_to_inventory_products_table.php
+│   │   │   │   ├── 2026_10_13_112814_add_weights_to_inventory_serials_table.php
+│   │   │   │   ├── 2026_10_13_112826_create_inventory_document_serials_table.php
+│   │   │   │   ├── 2026_10_15_154821_update_status_comment_in_inventory_serials_table.php
+│   │   │   │   ├── 2026_10_17_093916_update_tracking_type_in_inventory_products_table.php
+│   │   │   │   ├── 2026_10_18_170000_prepare_inventory_document_serials_for_drafts.php
+│   │   │   │   ├── 2026_10_20_163215_add_previous_status_to_inventory_document_serials_table.php
+│   │   │   │   ├── 2026_10_31_102226_add_operating_and_requisition_to_inventory_tables.php
+│   │   │   │   ├── 2026_11_12_120655_add_min_allowed_price_to_inventory_product_units_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── InventoryPermissionsSeeder.php
+│   │   ├── [DIR] Enums
+│   │   │   ├── StockSerialStatus.php
 │   │   ├── [DIR] Http
 │   │   │   ├── [DIR] Controllers
 │   │   │   │   ├── AdjustmentController.php
 │   │   │   │   ├── CategoryController.php
+│   │   │   │   ├── GasLeakageController.php
 │   │   │   │   ├── InventoryReportController.php
 │   │   │   │   ├── PriceListController.php
 │   │   │   │   ├── ProductController.php
+│   │   │   │   ├── StockSerialController.php
 │   │   │   │   ├── TransferController.php
 │   │   │   │   ├── UnitController.php
 │   │   │   │   ├── WarehouseController.php
@@ -604,6 +617,11 @@
 │   │   │   │   │   ├── FastSearchProductRequest.php
 │   │   │   │   │   ├── StoreProductRequest.php
 │   │   │   │   │   ├── UpdateProductRequest.php
+│   │   │   │   ├── [DIR] Serials
+│   │   │   │   │   ├── DispatchSerialsToVendorRequest.php
+│   │   │   │   │   ├── RecordGasLeakageRequest.php
+│   │   │   │   │   ├── ReturnEmptySerialsRequest.php
+│   │   │   │   │   ├── UpdateStockSerialRequest.php
 │   │   │   │   ├── [DIR] StockBatches
 │   │   │   │   │   ├── StoreStockBatchRequest.php
 │   │   │   │   │   ├── UpdateStockBatchRequest.php
@@ -632,6 +650,7 @@
 │   │   │   │   ├── ProductionOrderItemResource.php
 │   │   │   │   ├── ProductionOrderResource.php
 │   │   │   │   ├── StockBatchResource.php
+│   │   │   │   ├── StockSerialResource.php
 │   │   │   │   ├── TransferItemResource.php
 │   │   │   │   ├── TransferResource.php
 │   │   │   │   ├── UnitResource.php
@@ -643,6 +662,7 @@
 │   │   │   ├── Bom.php
 │   │   │   ├── BomItem.php
 │   │   │   ├── Category.php
+│   │   │   ├── InventoryDocumentSerial.php
 │   │   │   ├── PriceList.php
 │   │   │   ├── Product.php
 │   │   │   ├── ProductBarcode.php
@@ -669,12 +689,14 @@
 │   │   │   ├── ProductPolicy.php
 │   │   │   ├── ProductionOrderPolicy.php
 │   │   │   ├── StockBatchPolicy.php
+│   │   │   ├── StockSerialPolicy.php
 │   │   │   ├── TransferPolicy.php
 │   │   │   ├── UnitPolicy.php
 │   │   │   ├── WarehouseLocationPolicy.php
 │   │   │   ├── WarehousePolicy.php
 │   │   ├── [DIR] Services
 │   │   │   ├── AdjustmentService.php
+│   │   │   ├── GasLeakageService.php
 │   │   │   ├── InventoryAccountingService.php
 │   │   │   ├── InventoryReportService.php
 │   │   │   ├── ProductService.php
@@ -712,6 +734,8 @@
 │   │   │   │   ├── 2026_09_14_161141_add_quantity_issued_to_purchasing_requisition_items_table.php
 │   │   │   │   ├── 2026_09_14_161203_modify_purchasing_order_items_for_free_text_items.php
 │   │   │   │   ├── 2026_10_08_134933_add_department_id_to_purchasing_orders_table.php
+│   │   │   │   ├── 2026_10_11_102826_add_received_by_to_purchasing_requisitions_table.php
+│   │   │   │   ├── 2026_10_31_102306_add_quantity_transferred_to_purchasing_requisition_items_table.php
 │   │   │   ├── [DIR] Seeders
 │   │   │   │   ├── PurchasingPermissionsSeeder.php
 │   │   ├── [DIR] Enums
@@ -730,6 +754,7 @@
 │   │   │   │   ├── PurchaseReceiptController.php
 │   │   │   │   ├── PurchaseRequisitionController.php
 │   │   │   │   ├── PurchaseReturnController.php
+│   │   │   │   ├── SupplierPendingSerialController.php
 │   │   │   ├── [DIR] Requests
 │   │   │   │   ├── [DIR] Bills
 │   │   │   │   │   ├── StorePurchaseBillRequest.php
@@ -764,6 +789,7 @@
 │   │   │   │   ├── PurchaseRequisitionResource.php
 │   │   │   │   ├── PurchaseReturnItemResource.php
 │   │   │   │   ├── PurchaseReturnResource.php
+│   │   │   │   ├── SupplierPendingSerialResource.php
 │   │   ├── [DIR] Models
 │   │   │   ├── PurchaseBill.php
 │   │   │   ├── PurchaseBillItem.php
@@ -794,6 +820,70 @@
 │   │   │   ├── PurchaseRequisitionService.php
 │   │   │   ├── PurchaseReturnService.php
 │   │   │   ├── PurchasingAccountingService.php
+│   ├── [DIR] Sales
+│   │   ├── [DIR] Database
+│   │   │   ├── [DIR] Migrations
+│   │   │   │   ├── 2026_10_10_173303_create_pos_shifts_table.php
+│   │   │   │   ├── 2026_10_10_173334_create_sales_invoices_table.php
+│   │   │   │   ├── 2026_10_10_173423_create_sales_invoice_items_table.php
+│   │   │   │   ├── 2026_10_10_173458_create_sales_invoice_payments_table.php
+│   │   │   │   ├── 2026_10_10_173553_create_sales_returns_table.php
+│   │   │   │   ├── 2026_10_10_173621_create_sales_return_items_table.php
+│   │   │   │   ├── 2026_10_10_184019_create_sales_return_payments_table.php
+│   │   │   │   ├── 2026_11_12_120622_add_uuid_and_customer_name_text_to_sales_invoices_table.php
+│   │   │   ├── [DIR] Seeders
+│   │   │   │   ├── SalesPermissionsSeeder.php
+│   │   ├── [DIR] Http
+│   │   │   ├── [DIR] Controllers
+│   │   │   │   ├── PosShiftController.php
+│   │   │   │   ├── SalesInvoiceController.php
+│   │   │   │   ├── SalesInvoicePaymentController.php
+│   │   │   │   ├── SalesReturnController.php
+│   │   │   │   ├── SalesReturnPaymentController.php
+│   │   │   ├── [DIR] Requests
+│   │   │   │   ├── [DIR] Invoice
+│   │   │   │   │   ├── StoreSalesInvoiceRequest.php
+│   │   │   │   │   ├── UpdateSalesInvoiceRequest.php
+│   │   │   │   ├── [DIR] Payment
+│   │   │   │   │   ├── StoreSalesInvoicePaymentRequest.php
+│   │   │   │   │   ├── StoreSalesReturnPaymentRequest.php
+│   │   │   │   │   ├── UpdateSalesInvoicePaymentRequest.php
+│   │   │   │   │   ├── UpdateSalesReturnPaymentRequest.php
+│   │   │   │   ├── [DIR] Return
+│   │   │   │   │   ├── StoreSalesReturnRequest.php
+│   │   │   │   │   ├── UpdateSalesReturnRequest.php
+│   │   │   │   ├── [DIR] Shift
+│   │   │   │   │   ├── ClosePosShiftRequest.php
+│   │   │   │   │   ├── StorePosShiftRequest.php
+│   │   │   ├── [DIR] Resources
+│   │   │   │   ├── PosShiftResource.php
+│   │   │   │   ├── SalesInvoiceItemResource.php
+│   │   │   │   ├── SalesInvoicePaymentResource.php
+│   │   │   │   ├── SalesInvoiceResource.php
+│   │   │   │   ├── SalesReturnItemResource.php
+│   │   │   │   ├── SalesReturnPaymentResource.php
+│   │   │   │   ├── SalesReturnResource.php
+│   │   ├── [DIR] Models
+│   │   │   ├── PosShift.php
+│   │   │   ├── SalesInvoice.php
+│   │   │   ├── SalesInvoiceItem.php
+│   │   │   ├── SalesInvoicePayment.php
+│   │   │   ├── SalesReturn.php
+│   │   │   ├── SalesReturnItem.php
+│   │   │   ├── SalesReturnPayment.php
+│   │   ├── [DIR] Policies
+│   │   │   ├── PosShiftPolicy.php
+│   │   │   ├── SalesInvoicePaymentPolicy.php
+│   │   │   ├── SalesInvoicePolicy.php
+│   │   │   ├── SalesReturnPaymentPolicy.php
+│   │   │   ├── SalesReturnPolicy.php
+│   │   ├── [DIR] Services
+│   │   │   ├── PosShiftService.php
+│   │   │   ├── SalesAccountingService.php
+│   │   │   ├── SalesInvoiceService.php
+│   │   │   ├── SalesReturnService.php
+│   │   ├── [DIR] routes
+│   │   │   ├── api.php
 ├── [DIR] Policies
 │   ├── CompanyPolicy.php
 │   ├── DocumentPolicy.php
@@ -856,6 +946,7 @@
 │   ├── 2026_06_07_155942_add_display_names_to_permissions_table.php
 │   ├── 2026_08_23_160055_create_grant_requests_table.php
 │   ├── 2026_08_23_160057_create_grant_request_items_table.php
+│   ├── 2026_11_12_120546_add_pos_defaults_and_stock_control_to_users_table.php
 ├── [DIR] seeders
 │   ├── CoreConfigurationSeeder.php
 │   ├── DatabaseSeeder.php

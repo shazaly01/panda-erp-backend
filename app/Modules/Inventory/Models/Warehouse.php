@@ -6,6 +6,7 @@ namespace App\Modules\Inventory\Models;
 
 use App\Models\User;
 use App\Modules\Accounting\Models\Account;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,17 +26,27 @@ class Warehouse extends Model
         'address',
         'manager_id',
         'account_id',
+        'is_operating',
         'is_active',
     ];
 
     protected $casts = [
         'manager_id' => 'integer',
         'account_id' => 'integer',
+        'is_operating' => 'boolean',
         'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
+
+    /**
+     * نطاق المستودعات المخصصة للتشغيل المباشر
+     */
+    public function scopeOperating(Builder $query): Builder
+    {
+        return $query->where('is_operating', true);
+    }
 
     /**
      * مدير المستودع

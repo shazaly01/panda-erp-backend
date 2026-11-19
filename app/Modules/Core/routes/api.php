@@ -47,6 +47,9 @@ Route::middleware('auth:sanctum')
         // نقطة نهاية جلب القوائم السريعة للشركاء (يجب وضعها قبل apiResource لتفادي تضارب المعرفات)
         Route::get('partners/selector', [PartnerController::class, 'selector']);
 
+        // نقطة نهاية البحث السريع عن العميل/الشريك برقم الهاتف
+        Route::get('partners/find-by-phone', [PartnerController::class, 'findByPhone']);
+
         // العمليات المعيارية للشركاء
         Route::apiResource('partners', PartnerController::class);
 

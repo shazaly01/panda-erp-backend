@@ -18,6 +18,7 @@ use App\Modules\Accounting\Models\Account;
 use App\Modules\Accounting\Models\Currency;
 use App\Modules\Accounting\Models\JournalEntryDetail;
 use App\Modules\Accounting\Models\VoucherDetail;
+use App\Modules\Inventory\Models\PriceList;
 
 class Partner extends Model
 {
@@ -37,6 +38,7 @@ class Partner extends Model
         'credit_limit',
         'credit_period_days',
         'currency_id',
+        'price_list_id',
         'receivable_account_id',
         'payable_account_id',
         'bank_name',
@@ -60,6 +62,7 @@ class Partner extends Model
         'credit_limit' => 'decimal:4',
         'credit_period_days' => 'integer',
         'currency_id' => 'integer',
+        'price_list_id' => 'integer',
         'receivable_account_id' => 'integer',
         'payable_account_id' => 'integer',
     ];
@@ -142,6 +145,11 @@ class Partner extends Model
     public function currency(): BelongsTo
     {
         return $this->belongsTo(Currency::class, 'currency_id');
+    }
+
+    public function priceList(): BelongsTo
+    {
+        return $this->belongsTo(PriceList::class, 'price_list_id');
     }
 
     public function receivableAccount(): BelongsTo

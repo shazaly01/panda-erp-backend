@@ -3,15 +3,25 @@
 declare(strict_types=1);
 
 use App\Modules\Sales\Http\Controllers\PosShiftController;
+use App\Modules\Sales\Http\Controllers\SalesDashboardController;
 use App\Modules\Sales\Http\Controllers\SalesInvoiceController;
 use App\Modules\Sales\Http\Controllers\SalesInvoicePaymentController;
 use App\Modules\Sales\Http\Controllers\SalesReturnController;
 use App\Modules\Sales\Http\Controllers\SalesReturnPaymentController;
 use Illuminate\Support\Facades\Route;
 
+// رابط عام غير محمي بالمصادقة لاستعراض الفاتورة عبر UUID ومشاركتها للعميل عبر واتساب
+Route::get('sales/invoices/public/{uuid}', [SalesInvoiceController::class, 'publicShow'])
+    ->name('sales.invoices.public.show');
+
 Route::middleware('auth:sanctum')
     ->prefix('sales')
     ->group(function () {
+
+        // ===========================================
+        // 0. لوحة التحكم والإحصائيات (Dashboard)
+        // ===========================================
+        Route::get('dashboard', [SalesDashboardController::class, 'index']);
 
         // ===========================================
         // 1. ورديات وجلسات نقاط البيع والكاشير (POS Shifts)
@@ -33,6 +43,9 @@ Route::middleware('auth:sanctum')
         // ===========================================
         // 2. فواتير المبيعات (Sales Invoices)
         // ===========================================
+
+        // نقطة بيع الكاشير السريعة: حفظ وتأكيد وترحيل فوري في خطوة واحدة
+        Route::post('invoices/pos', [SalesInvoiceController::class, 'posCheckout']);
 
         // تأكيد واعتماد فاتورة المبيعات
         Route::post('invoices/{salesInvoice}/confirm', [SalesInvoiceController::class, 'confirm']);

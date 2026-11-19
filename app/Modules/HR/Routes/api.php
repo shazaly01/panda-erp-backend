@@ -33,6 +33,7 @@ use App\Modules\HR\Http\Controllers\LeavePassController;
 use App\Modules\HR\Http\Controllers\VisitorController;
 use App\Modules\HR\Http\Controllers\PublicInternshipController;
 use App\Modules\HR\Http\Controllers\InternshipDashboardController;
+use App\Modules\HR\Http\Controllers\HRDashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -61,6 +62,11 @@ Route::get('hr/public/employee-detailed-attendance', EmployeeDetailedAttendanceR
 Route::middleware('auth:sanctum')
     ->prefix('hr') // 🌟 القفل والمفتاح: هذه البادئة تجعل الروابط تطابق طلبات الـ Vue Service
     ->group(function () {
+
+    // ===========================================
+    // 0. لوحة التحكم والإحصائيات (Dashboard)
+    // ===========================================
+    Route::get('dashboard', [HRDashboardController::class, 'index']);
 
     // ===========================================
     // 1. الهيكل التنظيمي (Organizational Structure)

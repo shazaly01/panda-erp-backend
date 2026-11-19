@@ -60,6 +60,33 @@ class SalesInvoiceController extends Controller
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
+    /**
+     * نقطة بيع الكاشير السريعة: حفظ وتأكيد وترحيل الفاتورة ودفعاتها في خطوة واحدة
+     */
+    public function posCheckout(StoreSalesInvoiceRequest $request): JsonResponse
+    {
+        $this->authorize('create', SalesInvoice::class);
+
+        $invoice = $this->invoiceService->posCheckout(
+            $request->validated(),
+            (int) $request->user()->id
+        );
+
+        return (new SalesInvoiceResource($invoice))
+            ->response()
+            ->setStatusCode(Response::HTTP_CREATED);
+    }
+
+    /**
+     * استعراض عام للفاتورة عبر UUID للمشاركة المباشرة للعميل عبر واتساب
+     */
+    public function publicShow(string $uuid): JsonResponse
+    {
+        $invoice = $this->invoiceService->findByUuid($uuid);
+
+        return (new SalesInvoiceResource($invoice))->response();
+    }
+
     public function show(SalesInvoice $salesInvoice): JsonResponse
     {
         $this->authorize('view', $salesInvoice);

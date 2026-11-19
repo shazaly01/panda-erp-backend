@@ -30,8 +30,10 @@ class User extends Authenticatable
         'phone',
         'status',
         'default_cost_center_id',
+        'default_warehouse_id',
         'default_box_id',
         'default_bank_account_id',
+        'stock_control',
     ];
 
     /**
@@ -55,6 +57,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
             'password'          => 'hashed',
+            'stock_control'     => 'boolean',
         ];
     }
 
@@ -69,6 +72,11 @@ class User extends Authenticatable
     public function defaultCostCenter()
     {
         return $this->belongsTo(\App\Modules\Accounting\Models\CostCenter::class, 'default_cost_center_id');
+    }
+
+    public function defaultWarehouse()
+    {
+        return $this->belongsTo(\App\Modules\Inventory\Models\Warehouse::class, 'default_warehouse_id');
     }
 
     public function defaultBox()

@@ -19,6 +19,12 @@ class SalesPermissionsSeeder extends Seeder
         $moduleDisplayName = 'إدارة المبيعات ونقاط البيع';
 
         $permissionsData = [
+            'dashboard' => [
+                'title' => 'لوحة تحكم وإحصائيات المبيعات',
+                'actions' => [
+                    'view' => 'رؤية الإحصائيات ولوحة التحكم',
+                ],
+            ],
             'shifts' => [
                 'title' => 'ورديات وجلسات الكاشير',
                 'actions' => [

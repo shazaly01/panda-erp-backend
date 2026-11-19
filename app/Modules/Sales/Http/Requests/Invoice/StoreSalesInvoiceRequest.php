@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Sales\Http\Requests\Invoice;
 
+use App\Modules\Inventory\Models\ProductUnit;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreSalesInvoiceRequest extends FormRequest
 {
@@ -19,6 +22,7 @@ class StoreSalesInvoiceRequest extends FormRequest
             'invoice_date' => ['nullable', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'partner_id' => ['required', 'integer', 'exists:partners,id'],
+            'customer_name_text' => ['nullable', 'string', 'max:255'],
             'branch_id' => ['nullable', 'integer'],
             'warehouse_id' => ['required', 'integer', 'exists:inventory_warehouses,id'],
             'cost_center_id' => ['nullable', 'integer', 'exists:cost_centers,id'],
@@ -34,11 +38,12 @@ class StoreSalesInvoiceRequest extends FormRequest
             'delivery_fee' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'terms_conditions' => ['nullable', 'string', 'max:2000'],
+            'auto_post' => ['nullable', 'boolean'],
 
             // بنود الفاتورة
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:inventory_products,id'],
-            'items.*.unit_id' => ['nullable', 'integer', 'exists:inventory_units,id'],
+            'items.*.unit_id' => ['nullable', 'integer'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount_type' => ['nullable', 'string', 'in:fixed,percentage'],
@@ -51,11 +56,180 @@ class StoreSalesInvoiceRequest extends FormRequest
             'payments' => ['nullable', 'array'],
             'payments.*.payment_method' => ['required_with:payments', 'string', 'in:cash,card,bank_transfer,on_account'],
             'payments.*.amount' => ['required_with:payments', 'numeric', 'gt:0'],
-            'payments.*.box_id' => ['nullable', 'integer', 'exists:boxes,id'],
-            'payments.*.bank_account_id' => ['nullable', 'integer', 'exists:bank_accounts,id'],
+            'payments.*.box_id' => [
+                Rule::requiredIf(function (): bool {
+                    $payments = $this->input('payments', []);
+                    if (! is_array($payments)) {
+                        return false;
+                    }
+                    foreach ($payments as $payment) {
+                        if (($payment['payment_method'] ?? null) === 'cash' && empty($payment['box_id'])) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }),
+                'nullable',
+                'integer',
+                'exists:boxes,id',
+            ],
+            'payments.*.bank_account_id' => [
+                Rule::requiredIf(function (): bool {
+                    $payments = $this->input('payments', []);
+                    if (! is_array($payments)) {
+                        return false;
+                    }
+                    foreach ($payments as $payment) {
+                        if (in_array($payment['payment_method'] ?? null, ['card', 'bank_transfer'], true) && empty($payment['bank_account_id'])) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }),
+                'nullable',
+                'integer',
+                'exists:bank_accounts,id',
+            ],
             'payments.*.transaction_reference' => ['nullable', 'string', 'max:100'],
             'payments.*.notes' => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $this->validateItemsMinimumPrices($validator);
+            $this->validatePaymentsTotal($validator);
+        });
+    }
+
+    protected function validateItemsMinimumPrices(Validator $validator): void
+    {
+        $items = $this->input('items', []);
+        if (! is_array($items) || empty($items)) {
+            return;
+        }
+
+        foreach ($items as $index => $item) {
+            $productId = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+            $unitId = isset($item['unit_id']) && $item['unit_id'] !== null ? (int) $item['unit_id'] : null;
+            $unitPrice = isset($item['unit_price']) && is_numeric($item['unit_price']) ? (float) $item['unit_price'] : null;
+
+            if ($productId <= 0 || $unitPrice === null) {
+                continue;
+            }
+
+            $productUnit = null;
+            if ($unitId) {
+                $productUnit = ProductUnit::with(['product', 'unit'])
+                    ->where('product_id', $productId)
+                    ->where(function ($q) use ($unitId): void {
+                        $q->where('id', $unitId)->orWhere('unit_id', $unitId);
+                    })
+                    ->first();
+            }
+
+            if (! $productUnit) {
+                $productUnit = ProductUnit::with(['product', 'unit'])
+                    ->where('product_id', $productId)
+                    ->first();
+            }
+
+            if ($productUnit) {
+                $minAllowedPrice = (float) $productUnit->min_allowed_price;
+                if ($minAllowedPrice > 0 && $unitPrice < $minAllowedPrice) {
+                    $productName = $productUnit->product?->name ?? "رقم {$productId}";
+                    $unitName = $productUnit->unit?->name ?? 'المحددة';
+                    $validator->errors()->add(
+                        "items.{$index}.unit_price",
+                        "سعر الصنف [{$productName}] لوحدة [{$unitName}] ({$unitPrice}) أقل من السعر الأدنى المسموح به ({$minAllowedPrice})."
+                    );
+                }
+            } elseif ($unitId) {
+                $validator->errors()->add(
+                    "items.{$index}.unit_id",
+                    'الوحدة المحددة غير مرتبطة بهذا الصنف.'
+                );
+            }
+        }
+    }
+
+    protected function validatePaymentsTotal(Validator $validator): void
+    {
+        $payments = $this->input('payments', []);
+        if (! is_array($payments) || empty($payments)) {
+            return;
+        }
+
+        $totalPaid = 0.0;
+        foreach ($payments as $index => $payment) {
+            $method = $payment['payment_method'] ?? null;
+            $amount = isset($payment['amount']) && is_numeric($payment['amount']) ? (float) $payment['amount'] : 0.0;
+
+            if ($method === 'cash' && empty($payment['box_id'])) {
+                $validator->errors()->add("payments.{$index}.box_id", 'يجب تحديد الصندوق النقدي عند الدفع نقداً.');
+            }
+
+            if (in_array($method, ['card', 'bank_transfer'], true) && empty($payment['bank_account_id'])) {
+                $validator->errors()->add("payments.{$index}.bank_account_id", 'يجب تحديد الحساب البنكي عند الدفع بالبطاقة أو التحويل.');
+            }
+
+            if ($amount > 0) {
+                $totalPaid += $amount;
+            }
+        }
+
+        $expectedGrandTotal = $this->calculateExpectedGrandTotal();
+        if (round($totalPaid - $expectedGrandTotal, 2) > 0) {
+            $validator->errors()->add(
+                'payments',
+                'مجموع الدفعات المسددة (' . round($totalPaid, 2) . ') لا يجوز أن يتجاوز إجمالي الفاتورة (' . $expectedGrandTotal . ').'
+            );
+        }
+    }
+
+    protected function calculateExpectedGrandTotal(): float
+    {
+        $items = $this->input('items', []);
+        if (! is_array($items)) {
+            return 0.0;
+        }
+
+        $subtotal = 0.0;
+        $itemsTaxAmount = 0.0;
+
+        foreach ($items as $item) {
+            $quantity = isset($item['quantity']) && is_numeric($item['quantity']) ? (float) $item['quantity'] : 0.0;
+            $unitPrice = isset($item['unit_price']) && is_numeric($item['unit_price']) ? (float) $item['unit_price'] : 0.0;
+            $lineGross = round($quantity * $unitPrice, 2);
+
+            $discountType = $item['discount_type'] ?? 'fixed';
+            $discountValue = isset($item['discount_value']) && is_numeric($item['discount_value']) ? (float) $item['discount_value'] : 0.0;
+            $discountAmount = $discountType === 'percentage'
+                ? round($lineGross * ($discountValue / 100), 2)
+                : min($lineGross, round($discountValue, 2));
+
+            $lineSubtotal = round($lineGross - $discountAmount, 2);
+            $taxRate = isset($item['tax_rate']) && is_numeric($item['tax_rate']) ? (float) $item['tax_rate'] : 0.0;
+            $taxAmount = round($lineSubtotal * ($taxRate / 100), 2);
+
+            $subtotal += $lineSubtotal;
+            $itemsTaxAmount += $taxAmount;
+        }
+
+        $headerDiscountType = $this->input('discount_type', 'fixed');
+        $headerDiscountValue = is_numeric($this->input('discount_value')) ? (float) $this->input('discount_value') : 0.0;
+        $headerDiscountAmount = $headerDiscountType === 'percentage'
+            ? round($subtotal * ($headerDiscountValue / 100), 2)
+            : min($subtotal, round($headerDiscountValue, 2));
+
+        $taxableAmount = round($subtotal - $headerDiscountAmount, 2);
+        $serviceCharge = is_numeric($this->input('service_charge')) ? (float) $this->input('service_charge') : 0.0;
+        $deliveryFee = is_numeric($this->input('delivery_fee')) ? (float) $this->input('delivery_fee') : 0.0;
+
+        return max(0.0, round($taxableAmount + $itemsTaxAmount + $serviceCharge + $deliveryFee, 2));
     }
 
     public function messages(): array
@@ -73,6 +247,8 @@ class StoreSalesInvoiceRequest extends FormRequest
             'items.*.quantity.gt' => 'يجب أن تكون الكمية أكبر من الصفر.',
             'items.*.unit_price.required' => 'سعر الوحدة مطلوب.',
             'items.*.unit_price.min' => 'لا يمكن أن يكون سعر الوحدة بالسالب.',
+            'payments.*.box_id.exists' => 'الصندوق النقدي المحدد غير موجود.',
+            'payments.*.bank_account_id.exists' => 'الحساب البنكي المحدد غير موجود.',
         ];
     }
 }

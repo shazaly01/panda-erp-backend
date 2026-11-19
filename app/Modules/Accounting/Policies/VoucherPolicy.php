@@ -43,12 +43,11 @@ class VoucherPolicy
     }
 
     /**
-     * تعديل السند
-     * الشرط: (يملك الصلاحية) + (السند في حالة مسودة أو مرفوض)
+     * تعديل السند (سواء كان مسودة أو مُرحّلاً حسب الصلاحية)
      */
     public function update(User $user, Voucher $voucher): bool
     {
-        if ($voucher->status === VoucherStatus::Posted || $voucher->status === VoucherStatus::Void) {
+        if ($voucher->status === VoucherStatus::Void) {
             return false;
         }
 
@@ -60,15 +59,10 @@ class VoucherPolicy
     }
 
     /**
-     * حذف السند
-     * الشرط: (يملك الصلاحية) + (السند غير مرحل)
+     * حذف السند (سواء كان مسودة أو مُرحّلاً حسب الصلاحية)
      */
     public function delete(User $user, Voucher $voucher): bool
     {
-        if ($voucher->status === VoucherStatus::Posted) {
-            return false;
-        }
-
         return match ($voucher->type) {
             VoucherType::Payment => $user->hasPermissionTo('payment.delete'),
             VoucherType::Receipt => $user->hasPermissionTo('receipt.delete'),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Purchasing\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Inventory\Http\Resources\TransferResource;
 use App\Modules\Purchasing\Http\Requests\Requisitions\RejectPurchaseRequisitionRequest;
 use App\Modules\Purchasing\Http\Requests\Requisitions\StorePurchaseRequisitionRequest;
 use App\Modules\Purchasing\Http\Requests\Requisitions\TriagePurchaseRequisitionRequest;
@@ -123,7 +124,7 @@ class PurchaseRequisitionController extends Controller
     }
 
     /**
-     * قراءة الأرصدة اللحظية للمخزن المختار واقتراح إجراءات الفرز
+     * قراءة الأرصدة اللحظية للمخزن المختار واقتراح إجراءات الفرز الذكي
      */
     public function triageOverview(Request $request, PurchaseRequisition $requisition): JsonResponse
     {
@@ -142,7 +143,7 @@ class PurchaseRequisitionController extends Controller
     }
 
     /**
-     * تنفيذ التوزيع الذكي وتوليد مسودة إذن الصرف المخزني فورياً
+     * تنفيذ التوزيع الذكي وتوليد مسودة إذن الصرف أو أمر التحويل المخزني بحسب طبيعة الصنف
      */
     public function executeTriage(TriagePurchaseRequisitionRequest $request, PurchaseRequisition $requisition): JsonResponse
     {
@@ -155,11 +156,13 @@ class PurchaseRequisitionController extends Controller
         );
 
         return response()->json([
-            'message'              => 'تم فرز وتوزيع بنود الطلب وتوليد إذن الصرف بنجاح.',
-            'requisition'          => new PurchaseRequisitionResource($result['requisition']),
-            'draft_issue'          => $result['draft_issue'] ? new PurchaseIssueResource($result['draft_issue']) : null,
-            'issued_items_count'   => $result['issued_items_count'],
-            'purchase_items_count' => $result['purchase_items_count'],
+            'message'                 => 'تم فرز وتوزيع بنود الطلب بنجاح.',
+            'requisition'             => new PurchaseRequisitionResource($result['requisition']),
+            'draft_issue'             => $result['draft_issue'] ? new PurchaseIssueResource($result['draft_issue']) : null,
+            'draft_transfer'          => $result['draft_transfer'] ? new TransferResource($result['draft_transfer']) : null,
+            'issued_items_count'      => $result['issued_items_count'],
+            'transferred_items_count' => $result['transferred_items_count'],
+            'purchase_items_count'    => $result['purchase_items_count'],
         ], Response::HTTP_OK);
     }
 }

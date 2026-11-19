@@ -8,12 +8,18 @@ use App\Modules\Purchasing\Http\Controllers\PurchaseOrderController;
 use App\Modules\Purchasing\Http\Controllers\PurchaseReceiptController;
 use App\Modules\Purchasing\Http\Controllers\PurchaseRequisitionController;
 use App\Modules\Purchasing\Http\Controllers\PurchaseReturnController;
+use App\Modules\Purchasing\Http\Controllers\PurchasingDashboardController;
 use App\Modules\Purchasing\Http\Controllers\SupplierPendingSerialController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')
     ->prefix('purchasing')
     ->group(function () {
+
+        // ===========================================
+        // 0. لوحة التحكم والإحصائيات (Dashboard)
+        // ===========================================
+        Route::get('dashboard', [PurchasingDashboardController::class, 'index']);
 
         // ===========================================
         // 1. طلبات الشراء والاحتياج الداخلي (Purchase Requisitions)

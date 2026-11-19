@@ -38,6 +38,9 @@ class WarehouseController extends Controller
                         ->orWhere('address', 'like', "%{$search}%");
                 });
             })
+            ->when($request->filled('is_operating'), function ($q) use ($request) {
+                $q->where('is_operating', $request->boolean('is_operating'));
+            })
             ->when($request->filled('is_active'), function ($q) use ($request) {
                 $q->where('is_active', $request->boolean('is_active'));
             })
@@ -64,7 +67,7 @@ class WarehouseController extends Controller
 
         return response()->json([
             'message' => 'تم إنشاء المستودع بنجاح.',
-            'data' => new WarehouseResource($warehouse->load(['manager', 'account'])),
+            'data'    => new WarehouseResource($warehouse->load(['manager', 'account'])),
         ], 201);
     }
 
@@ -95,7 +98,7 @@ class WarehouseController extends Controller
 
         return response()->json([
             'message' => 'تم تحديث بيانات المستودع بنجاح.',
-            'data' => new WarehouseResource($warehouse->load(['manager', 'account'])),
+            'data'    => new WarehouseResource($warehouse->load(['manager', 'account'])),
         ]);
     }
 

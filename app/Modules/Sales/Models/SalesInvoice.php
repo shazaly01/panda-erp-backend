@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 
 class SalesInvoice extends Model
 {
@@ -22,11 +24,13 @@ class SalesInvoice extends Model
     protected $table = 'sales_invoices';
 
     protected $fillable = [
+        'uuid',
         'invoice_number',
         'reference_number',
         'invoice_date',
         'due_date',
         'partner_id',
+        'customer_name_text',
         'branch_id',
         'warehouse_id',
         'cost_center_id',
@@ -58,6 +62,8 @@ class SalesInvoice extends Model
     ];
 
     protected $casts = [
+        'uuid' => 'string',
+        'customer_name_text' => 'string',
         'invoice_date' => 'datetime',
         'due_date' => 'date',
         'posted_at' => 'datetime',
@@ -73,6 +79,31 @@ class SalesInvoice extends Model
         'paid_amount' => 'decimal:2',
         'remaining_amount' => 'decimal:2',
     ];
+
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function (self $invoice): void {
+            if (empty($invoice->uuid)) {
+                $invoice->uuid = (string) Str::uuid();
+            }
+        });
+    }
+
+    public function getPublicUrlAttribute(): ?string
+    {
+        if (! $this->uuid || ! Route::has('sales.invoices.public.show')) {
+            return null;
+        }
+
+        return route('sales.invoices.public.show', ['uuid' => $this->uuid]);
+    }
+
+    public function getPdfUrlAttribute(): ?string
+    {
+        return $this->public_url;
+    }
 
     public function partner(): BelongsTo
     {

@@ -30,6 +30,7 @@ class PurchaseRequisitionItem extends Model
         'quantity_approved',
         'quantity_ordered',
         'quantity_issued',
+        'quantity_transferred',
         'estimated_unit_cost',
         'specifications',
         'notes',
@@ -45,6 +46,7 @@ class PurchaseRequisitionItem extends Model
         'quantity_approved' => 'decimal:4',
         'quantity_ordered' => 'decimal:4',
         'quantity_issued' => 'decimal:4',
+        'quantity_transferred' => 'decimal:4',
         'estimated_unit_cost' => 'decimal:4',
         'created_by' => 'integer',
         'updated_by' => 'integer',
@@ -97,7 +99,7 @@ class PurchaseRequisitionItem extends Model
         return Attribute::make(
             get: function (): float {
                 $baseQuantity = (float) ($this->quantity_approved > 0 ? $this->quantity_approved : $this->quantity_requested);
-                $fulfilled = (float) $this->quantity_ordered + (float) $this->quantity_issued;
+                $fulfilled = (float) $this->quantity_ordered + (float) $this->quantity_issued + (float) $this->quantity_transferred;
                 return max(0.0, round($baseQuantity - $fulfilled, 4));
             }
         );

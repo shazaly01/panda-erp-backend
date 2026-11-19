@@ -7,6 +7,9 @@ namespace App\Modules\Purchasing\Services;
 use App\Models\User;
 use App\Modules\Inventory\Models\ProductStock;
 use App\Modules\Inventory\Models\ProductUnit;
+use App\Modules\Inventory\Models\Transfer;
+use App\Modules\Inventory\Models\Warehouse;
+use App\Modules\Inventory\Services\TransferService;
 use App\Modules\Purchasing\Enums\RequisitionStatus;
 use App\Modules\Purchasing\Models\PurchaseIssue;
 use App\Modules\Purchasing\Models\PurchaseRequisition;
@@ -22,7 +25,8 @@ use RuntimeException;
 class PurchaseRequisitionService
 {
     public function __construct(
-        protected PurchaseIssueService $issueService
+        protected PurchaseIssueService $issueService,
+        protected TransferService $transferService
     ) {}
 
     public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
@@ -105,33 +109,34 @@ class PurchaseRequisitionService
 
             $requisition = PurchaseRequisition::create([
                 'requisition_number' => $requisitionNumber,
-                'department_id' => $departmentId,
-                'requested_by' => $userId,
-                'received_by' => $data['received_by'] ?? null,
-                'request_date' => $data['request_date'] ?? Carbon::now()->toDateString(),
-                'required_date' => $data['required_date'] ?? null,
-                'priority' => $data['priority'],
-                'status' => RequisitionStatus::DRAFT,
-                'notes' => $data['notes'] ?? null,
-                'created_by' => $userId,
-                'updated_by' => $userId,
+                'department_id'      => $departmentId,
+                'requested_by'       => $userId,
+                'received_by'        => $data['received_by'] ?? null,
+                'request_date'       => $data['request_date'] ?? Carbon::now()->toDateString(),
+                'required_date'      => $data['required_date'] ?? null,
+                'priority'           => $data['priority'],
+                'status'             => RequisitionStatus::DRAFT,
+                'notes'              => $data['notes'] ?? null,
+                'created_by'         => $userId,
+                'updated_by'         => $userId,
             ]);
 
             foreach ($data['items'] as $itemData) {
                 $requisition->items()->create([
-                    'product_id' => $itemData['product_id'] ?? null,
-                    'item_name' => $itemData['item_name'] ?? null,
-                    'product_unit_id' => $itemData['product_unit_id'] ?? null,
-                    'unit_name' => $itemData['unit_name'] ?? null,
-                    'quantity_requested' => $itemData['quantity_requested'],
-                    'quantity_approved' => 0.0000,
-                    'quantity_ordered' => 0.0000,
-                    'quantity_issued' => 0.0000,
-                    'estimated_unit_cost' => $itemData['estimated_unit_cost'] ?? 0.0000,
-                    'specifications' => $itemData['specifications'] ?? null,
-                    'notes' => $itemData['notes'] ?? null,
-                    'created_by' => $userId,
-                    'updated_by' => $userId,
+                    'product_id'           => $itemData['product_id'] ?? null,
+                    'item_name'            => $itemData['item_name'] ?? null,
+                    'product_unit_id'      => $itemData['product_unit_id'] ?? null,
+                    'unit_name'            => $itemData['unit_name'] ?? null,
+                    'quantity_requested'   => $itemData['quantity_requested'],
+                    'quantity_approved'    => 0.0000,
+                    'quantity_ordered'     => 0.0000,
+                    'quantity_issued'      => 0.0000,
+                    'quantity_transferred' => 0.0000,
+                    'estimated_unit_cost'  => $itemData['estimated_unit_cost'] ?? 0.0000,
+                    'specifications'       => $itemData['specifications'] ?? null,
+                    'notes'                => $itemData['notes'] ?? null,
+                    'created_by'           => $userId,
+                    'updated_by'           => $userId,
                 ]);
             }
 
@@ -156,12 +161,12 @@ class PurchaseRequisitionService
 
             $requisition->update([
                 'department_id' => $departmentId,
-                'received_by' => array_key_exists('received_by', $data) ? $data['received_by'] : $requisition->received_by,
-                'request_date' => $data['request_date'] ?? $requisition->request_date,
+                'received_by'   => array_key_exists('received_by', $data) ? $data['received_by'] : $requisition->received_by,
+                'request_date'  => $data['request_date'] ?? $requisition->request_date,
                 'required_date' => array_key_exists('required_date', $data) ? $data['required_date'] : $requisition->required_date,
-                'priority' => $data['priority'] ?? $requisition->priority,
-                'notes' => array_key_exists('notes', $data) ? $data['notes'] : $requisition->notes,
-                'updated_by' => $userId,
+                'priority'      => $data['priority'] ?? $requisition->priority,
+                'notes'         => array_key_exists('notes', $data) ? $data['notes'] : $requisition->notes,
+                'updated_by'    => $userId,
             ]);
 
             if (isset($data['items']) && is_array($data['items'])) {
@@ -181,32 +186,33 @@ class PurchaseRequisitionService
                         $existingItem = $requisition->items()->find($itemData['id']);
                         if ($existingItem) {
                             $existingItem->update([
-                                'product_id' => $itemData['product_id'] ?? null,
-                                'item_name' => $itemData['item_name'] ?? null,
-                                'product_unit_id' => $itemData['product_unit_id'] ?? null,
-                                'unit_name' => $itemData['unit_name'] ?? null,
-                                'quantity_requested' => $itemData['quantity_requested'],
+                                'product_id'          => $itemData['product_id'] ?? null,
+                                'item_name'           => $itemData['item_name'] ?? null,
+                                'product_unit_id'     => $itemData['product_unit_id'] ?? null,
+                                'unit_name'           => $itemData['unit_name'] ?? null,
+                                'quantity_requested'  => $itemData['quantity_requested'],
                                 'estimated_unit_cost' => $itemData['estimated_unit_cost'] ?? $existingItem->estimated_unit_cost,
-                                'specifications' => $itemData['specifications'] ?? null,
-                                'notes' => $itemData['notes'] ?? null,
-                                'updated_by' => $userId,
+                                'specifications'      => $itemData['specifications'] ?? null,
+                                'notes'               => $itemData['notes'] ?? null,
+                                'updated_by'          => $userId,
                             ]);
                         }
                     } else {
                         $requisition->items()->create([
-                            'product_id' => $itemData['product_id'] ?? null,
-                            'item_name' => $itemData['item_name'] ?? null,
-                            'product_unit_id' => $itemData['product_unit_id'] ?? null,
-                            'unit_name' => $itemData['unit_name'] ?? null,
-                            'quantity_requested' => $itemData['quantity_requested'],
-                            'quantity_approved' => 0.0000,
-                            'quantity_ordered' => 0.0000,
-                            'quantity_issued' => 0.0000,
-                            'estimated_unit_cost' => $itemData['estimated_unit_cost'] ?? 0.0000,
-                            'specifications' => $itemData['specifications'] ?? null,
-                            'notes' => $itemData['notes'] ?? null,
-                            'created_by' => $userId,
-                            'updated_by' => $userId,
+                            'product_id'           => $itemData['product_id'] ?? null,
+                            'item_name'            => $itemData['item_name'] ?? null,
+                            'product_unit_id'      => $itemData['product_unit_id'] ?? null,
+                            'unit_name'            => $itemData['unit_name'] ?? null,
+                            'quantity_requested'   => $itemData['quantity_requested'],
+                            'quantity_approved'    => 0.0000,
+                            'quantity_ordered'     => 0.0000,
+                            'quantity_issued'      => 0.0000,
+                            'quantity_transferred' => 0.0000,
+                            'estimated_unit_cost'  => $itemData['estimated_unit_cost'] ?? 0.0000,
+                            'specifications'       => $itemData['specifications'] ?? null,
+                            'notes'                => $itemData['notes'] ?? null,
+                            'created_by'           => $userId,
+                            'updated_by'           => $userId,
                         ]);
                     }
                 }
@@ -239,7 +245,7 @@ class PurchaseRequisitionService
         }
 
         $requisition->update([
-            'status' => RequisitionStatus::PENDING_APPROVAL,
+            'status'     => RequisitionStatus::PENDING_APPROVAL,
             'updated_by' => $userId,
         ]);
 
@@ -256,16 +262,16 @@ class PurchaseRequisitionService
             foreach ($requisition->items as $item) {
                 $item->update([
                     'quantity_approved' => $item->quantity_requested,
-                    'updated_by' => $userId,
+                    'updated_by'        => $userId,
                 ]);
             }
 
             $requisition->update([
-                'status' => RequisitionStatus::APPROVED,
-                'approved_by' => $userId,
-                'approved_at' => Carbon::now(),
+                'status'           => RequisitionStatus::APPROVED,
+                'approved_by'      => $userId,
+                'approved_at'      => Carbon::now(),
                 'rejection_reason' => null,
-                'updated_by' => $userId,
+                'updated_by'       => $userId,
             ]);
 
             return $this->find($requisition->id);
@@ -283,18 +289,18 @@ class PurchaseRequisitionService
         }
 
         $requisition->update([
-            'status' => RequisitionStatus::REJECTED,
+            'status'           => RequisitionStatus::REJECTED,
             'rejection_reason' => $rejectionReason,
-            'approved_by' => null,
-            'approved_at' => null,
-            'updated_by' => $userId,
+            'approved_by'      => null,
+            'approved_at'      => null,
+            'updated_by'       => $userId,
         ]);
 
         return $this->find($requisition->id);
     }
 
     /**
-     * استعراض الفرز الذكي وقراءة الأرصدة اللحظية للمستودع واقتراح مسار التنفيذ
+     * استعراض الفرز وقراءة الأرصدة واقتراح مسار التنفيذ الذكي والتغطية الجزئية
      */
     public function getTriageOverview(PurchaseRequisition $requisition, int $warehouseId): array
     {
@@ -302,6 +308,10 @@ class PurchaseRequisitionService
 
         $stockTableName = (new ProductStock)->getTable();
         $hasReservedColumn = Schema::hasColumn($stockTableName, 'reserved_quantity');
+
+        // جلب مخزن التشغيل الافتراضي المعتمد
+        $operatingWarehouse = Warehouse::operating()->where('is_active', true)->first();
+        $defaultOperatingWarehouseId = $operatingWarehouse?->id;
 
         $triageItems = [];
 
@@ -331,41 +341,69 @@ class PurchaseRequisitionService
             }
 
             $remainingQuantity = (float) $item->remaining_quantity;
+            $isChlorineOrWeightSerial = ($item->product?->tracking_type === 'by_weight_serial');
+            $internalAction = $isChlorineOrWeightSerial ? 'transfer' : 'issue';
+
+            $fulfillableQuantity = 0.0000;
+            $shortageQuantity = $remainingQuantity;
+
+            if ($isMatched && $remainingQuantity > 0) {
+                $fulfillableQuantity = min($availableStockInItemUnit, $remainingQuantity);
+                $fulfillableQuantity = max(0.0000, $fulfillableQuantity);
+                $shortageQuantity = max(0.0000, $remainingQuantity - $fulfillableQuantity);
+            }
 
             $suggestedAction = 'purchase';
             if ($remainingQuantity <= 0) {
                 $suggestedAction = 'fulfilled';
-            } elseif ($isMatched && $availableStockInItemUnit >= $remainingQuantity) {
-                $suggestedAction = 'issue';
+            } elseif (! $isMatched || $availableStockInItemUnit <= 0) {
+                $suggestedAction = 'purchase';
+            } elseif ($availableStockInItemUnit >= $remainingQuantity) {
+                $suggestedAction = $internalAction;
+            } else {
+                // رصيد جزئي متاح بالمخزن
+                $suggestedAction = 'partial';
             }
 
+            $canFulfillFully = $isMatched && $remainingQuantity > 0 && ($availableStockInItemUnit >= $remainingQuantity);
+            $canFulfillPartially = $isMatched && $remainingQuantity > 0 && ($availableStockInItemUnit > 0) && ($availableStockInItemUnit < $remainingQuantity);
+
             $triageItems[] = [
-                'requisition_item_id'      => $item->id,
-                'item_name'                => $item->product ? $item->product->name : $item->item_name,
-                'is_free_text'             => ! $isMatched,
-                'product_id'               => $item->product_id,
-                'product_unit_id'          => $item->product_unit_id,
-                'quantity_requested'       => (float) $item->quantity_requested,
-                'quantity_approved'        => (float) $item->quantity_approved,
-                'quantity_ordered'         => (float) $item->quantity_ordered,
-                'quantity_issued'          => (float) $item->quantity_issued,
-                'remaining_quantity'       => $remainingQuantity,
-                'available_stock'          => round($availableStockInItemUnit, 4),
-                'suggested_action'         => $suggestedAction,
-                'can_issue_from_warehouse' => $isMatched && $remainingQuantity > 0 && $availableStockInItemUnit >= $remainingQuantity,
+                'requisition_item_id'       => $item->id,
+                'item_name'                 => $item->product ? $item->product->name : $item->item_name,
+                'is_free_text'              => ! $isMatched,
+                'is_chlorine'               => $isChlorineOrWeightSerial,
+                'product_id'                => $item->product_id,
+                'product_unit_id'           => $item->product_unit_id,
+                'quantity_requested'        => (float) $item->quantity_requested,
+                'quantity_approved'         => (float) $item->quantity_approved,
+                'quantity_ordered'          => (float) $item->quantity_ordered,
+                'quantity_issued'           => (float) $item->quantity_issued,
+                'quantity_transferred'      => (float) $item->quantity_transferred,
+                'remaining_quantity'        => $remainingQuantity,
+                'available_stock'           => round($availableStockInItemUnit, 4),
+                'fulfillable_quantity'      => round($fulfillableQuantity, 4),
+                'shortage_quantity'         => round($shortageQuantity, 4),
+                'suggested_action'          => $suggestedAction,
+                'suggested_internal_action' => $internalAction,
+                'can_fulfill_from_stock'    => $canFulfillFully,
+                'can_fulfill_partially'     => $canFulfillPartially,
+                'can_issue_from_warehouse'  => $canFulfillFully || $canFulfillPartially,
+                'suggested_to_warehouse_id' => $isChlorineOrWeightSerial ? $defaultOperatingWarehouseId : null,
             ];
         }
 
         return [
-            'requisition_id'     => $requisition->id,
-            'requisition_number' => $requisition->requisition_number,
-            'warehouse_id'       => $warehouseId,
-            'items'              => $triageItems,
+            'requisition_id'                 => $requisition->id,
+            'requisition_number'             => $requisition->requisition_number,
+            'warehouse_id'                   => $warehouseId,
+            'default_operating_warehouse_id' => $defaultOperatingWarehouseId,
+            'items'                          => $triageItems,
         ];
     }
 
     /**
-     * تنفيذ التوزيع الآلي: إنشاء مسودة إذن صرف مخزني للبنود المخصصة للمخزن
+     * تنفيذ التوزيع الذكي: إنشاء مسودات أذونات الصرف وأوامر التحويل المخزني بحسب طبيعة كل صنف مع دعم الفرز الجزئي
      */
     public function executeTriage(PurchaseRequisition $requisition, array $data, int $userId): array
     {
@@ -375,7 +413,31 @@ class PurchaseRequisitionService
 
         return DB::transaction(function () use ($requisition, $data, $userId): array {
             $warehouseId = (int) $data['warehouse_id'];
+            $globalToWarehouseId = isset($data['to_warehouse_id']) ? (int) $data['to_warehouse_id'] : null;
+
+            // 1. التحقق التراكمي المسبق من أن إجمالي الكميات المدخلة لكل بند لا يتجاوز الكمية المتبقية
+            $itemAllocations = [];
+            foreach ($data['items'] as $itemData) {
+                $itemId = (int) $itemData['requisition_item_id'];
+                $qty = (float) $itemData['quantity'];
+                $itemAllocations[$itemId] = ($itemAllocations[$itemId] ?? 0.0) + $qty;
+            }
+
+            foreach ($itemAllocations as $itemId => $totalAllocatedQty) {
+                /** @var PurchaseRequisitionItem $rItem */
+                $rItem = $requisition->items()->lockForUpdate()->findOrFail($itemId);
+                $remaining = (float) $rItem->remaining_quantity;
+
+                if ($totalAllocatedQty > $remaining) {
+                    throw new InvalidArgumentException(
+                        "إجمالي الكميات الموزعة ({$totalAllocatedQty}) يتجاوز الكمية المتبقية المطلوبة ({$remaining}) للبند: {$rItem->item_name}"
+                    );
+                }
+            }
+
+            // 2. توزيع البنود بحسب الإجراءات المحددة
             $issueItemsPayload = [];
+            $transferItemsPayload = [];
             $purchaseItemsSummary = [];
 
             foreach ($data['items'] as $itemData) {
@@ -393,15 +455,11 @@ class PurchaseRequisitionService
                 $action = $itemData['action'];
                 $quantity = (float) $itemData['quantity'];
 
+                if ($quantity <= 0) {
+                    throw new InvalidArgumentException("الكمية المحددة للبند '{$requisitionItem->item_name}' يجب أن تكون أكبر من الصفر.");
+                }
+
                 if ($action === 'issue') {
-                    if ($quantity <= 0) {
-                        throw new InvalidArgumentException("الكمية المحددة للصرف للبند '{$requisitionItem->item_name}' يجب أن تكون أكبر من الصفر.");
-                    }
-
-                    if ($quantity > (float) $requisitionItem->remaining_quantity) {
-                        throw new InvalidArgumentException("الكمية المحددة للصرف ({$quantity}) تتجاوز الكمية المتبقية المطلوبة ({$requisitionItem->remaining_quantity}) للبند: {$requisitionItem->item_name}");
-                    }
-
                     $productId = $requisitionItem->product_id ?? $itemData['product_id'] ?? null;
                     $productUnitId = $requisitionItem->product_unit_id ?? $itemData['product_unit_id'] ?? null;
 
@@ -416,6 +474,38 @@ class PurchaseRequisitionService
                         'quantity'            => $quantity,
                         'unit_cost'           => isset($itemData['unit_cost']) ? (float) $itemData['unit_cost'] : (float) $requisitionItem->estimated_unit_cost,
                         'notes'               => $itemData['notes'] ?? $requisitionItem->notes,
+                    ];
+                } elseif ($action === 'transfer') {
+                    $productId = $requisitionItem->product_id ?? $itemData['product_id'] ?? null;
+                    $productUnitId = $requisitionItem->product_unit_id ?? $itemData['product_unit_id'] ?? null;
+
+                    if (! $productId || ! $productUnitId) {
+                        throw new InvalidArgumentException("لا يمكن تحويل البند '{$requisitionItem->item_name}' من المخزن دون مطابقته بصنف ووحدة رسمية.");
+                    }
+
+                    // تحديد المستودع الوجهة (مخزن التشغيل)
+                    $targetWarehouseId = $itemData['to_warehouse_id'] ?? $globalToWarehouseId;
+                    if (! $targetWarehouseId) {
+                        $operatingWarehouse = Warehouse::operating()->where('is_active', true)->first();
+                        $targetWarehouseId = $operatingWarehouse?->id;
+                    }
+
+                    if (! $targetWarehouseId) {
+                        throw new InvalidArgumentException("لم يتم العثور على مخزن تشغيل نشط لتحويل البند: {$requisitionItem->item_name}");
+                    }
+
+                    if ((int) $targetWarehouseId === $warehouseId) {
+                        throw new InvalidArgumentException("لا يمكن أن يكون مستودع التحويل الوجهة هو نفس المستودع المصدر للبند: {$requisitionItem->item_name}");
+                    }
+
+                    $transferItemsPayload[] = [
+                        'requisition_item' => $requisitionItem,
+                        'to_warehouse_id'  => (int) $targetWarehouseId,
+                        'product_id'       => (int) $productId,
+                        'product_unit_id'  => (int) $productUnitId,
+                        'quantity'         => $quantity,
+                        'unit_cost'        => isset($itemData['unit_cost']) ? (float) $itemData['unit_cost'] : (float) $requisitionItem->estimated_unit_cost,
+                        'notes'            => $itemData['notes'] ?? $requisitionItem->notes,
                     ];
                 } else {
                     $purchaseItemsSummary[] = [
@@ -437,11 +527,48 @@ class PurchaseRequisitionService
                 );
             }
 
+            /** @var Transfer|null $draftTransfer */
+            $draftTransfer = null;
+            if (! empty($transferItemsPayload)) {
+                $destinationWarehouseId = $transferItemsPayload[0]['to_warehouse_id'];
+
+                $transferItemsFormatted = [];
+                foreach ($transferItemsPayload as $transferItem) {
+                    $transferItemsFormatted[] = [
+                        'product_id'      => $transferItem['product_id'],
+                        'product_unit_id' => $transferItem['product_unit_id'],
+                        'quantity'        => $transferItem['quantity'],
+                        'unit_cost'       => $transferItem['unit_cost'],
+                        'notes'           => $transferItem['notes'],
+                    ];
+
+                    /** @var PurchaseRequisitionItem $rItem */
+                    $rItem = $transferItem['requisition_item'];
+                    $rItem->increment('quantity_transferred', $transferItem['quantity'], [
+                        'updated_by' => $userId,
+                    ]);
+                }
+
+                $draftTransfer = $this->transferService->createTransfer([
+                    'requisition_id'    => $requisition->id,
+                    'from_warehouse_id' => $warehouseId,
+                    'to_warehouse_id'   => $destinationWarehouseId,
+                    'transfer_date'     => Carbon::now()->toDateString(),
+                    'status'            => 'pending',
+                    'notes'             => "أمر تحويل ناتج آلياً عن فرز طلب الاحتياج رقم: {$requisition->requisition_number}",
+                    'items'             => $transferItemsFormatted,
+                ], $userId);
+            }
+
+            $this->syncRequisitionStatus((int) $requisition->id, $userId);
+
             return [
-                'requisition'          => $this->find($requisition->id),
-                'draft_issue'          => $draftIssue,
-                'issued_items_count'   => count($issueItemsPayload),
-                'purchase_items_count' => count($purchaseItemsSummary),
+                'requisition'             => $this->find($requisition->id),
+                'draft_issue'             => $draftIssue,
+                'draft_transfer'          => $draftTransfer,
+                'issued_items_count'      => count($issueItemsPayload),
+                'transferred_items_count' => count($transferItemsPayload),
+                'purchase_items_count'    => count($purchaseItemsSummary),
             ];
         });
     }
@@ -463,5 +590,31 @@ class PurchaseRequisitionService
         }
 
         return sprintf('%s-%04d', $prefix, $nextSequence);
+    }
+
+    protected function syncRequisitionStatus(int $requisitionId, int $userId): void
+    {
+        $requisition = PurchaseRequisition::with('items')->find($requisitionId);
+        if (! $requisition || in_array($requisition->status, [RequisitionStatus::CANCELLED, RequisitionStatus::REJECTED], true)) {
+            return;
+        }
+
+        $allFulfilled = $requisition->items->every(function ($item): bool {
+            $targetQty = (float) ($item->quantity_approved > 0 ? $item->quantity_approved : $item->quantity_requested);
+            $totalFulfilled = (float) $item->quantity_ordered + (float) $item->quantity_issued + (float) $item->quantity_transferred;
+            return $totalFulfilled >= $targetQty;
+        });
+
+        if ($allFulfilled && $requisition->status !== RequisitionStatus::ORDERED) {
+            $requisition->update([
+                'status'     => RequisitionStatus::ORDERED,
+                'updated_by' => $userId,
+            ]);
+        } elseif (! $allFulfilled && $requisition->status === RequisitionStatus::ORDERED) {
+            $requisition->update([
+                'status'     => RequisitionStatus::APPROVED,
+                'updated_by' => $userId,
+            ]);
+        }
     }
 }

@@ -19,6 +19,10 @@ class HRPermissionsSeeder extends Seeder
         $moduleDisplayName = 'الموارد البشرية';
 
         $permissionsData = [
+            'dashboard' => [
+                'title' => 'لوحة تحكم وإحصائيات الموارد البشرية',
+                'actions' => ['view' => 'رؤية الإحصائيات ولوحة التحكم']
+            ],
             'departments' => [
                 'title' => 'الإدارات والأقسام',
                 'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']

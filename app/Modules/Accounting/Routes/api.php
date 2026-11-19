@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Modules\Accounting\Http\Controllers\AccountingDashboardController;
 use App\Modules\Accounting\Http\Controllers\AccountController;
 use App\Modules\Accounting\Http\Controllers\CostCenterController;
 use App\Modules\Accounting\Http\Controllers\JournalEntryController;
@@ -19,6 +20,11 @@ use App\Modules\Accounting\Http\Controllers\BudgetController;
 Route::middleware('auth:sanctum')
     ->prefix('accounting')
     ->group(function () {
+
+    // ===========================================
+    // 0. لوحة التحكم والإحصائيات (Dashboard)
+    // ===========================================
+    Route::get('dashboard', [AccountingDashboardController::class, 'index']);
 
     // ===========================================
     // 1. البيانات الأساسية (Master Data)

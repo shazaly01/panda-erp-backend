@@ -7,6 +7,7 @@ namespace App\Modules\Purchasing\Models;
 use App\Models\User;
 use App\Modules\HR\Models\Department;
 use App\Modules\HR\Models\Employee;
+use App\Modules\Inventory\Models\Transfer;
 use App\Modules\Purchasing\Enums\RequisitionPriority;
 use App\Modules\Purchasing\Enums\RequisitionStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -90,5 +91,21 @@ class PurchaseRequisition extends Model
     public function purchaseOrders(): HasMany
     {
         return $this->hasMany(PurchaseOrder::class, 'requisition_id');
+    }
+
+    /**
+     * أوامر التحويل المخزني المنشأة عن هذا الطلب
+     */
+    public function transfers(): HasMany
+    {
+        return $this->hasMany(Transfer::class, 'requisition_id');
+    }
+
+    /**
+     * أذونات الصرف المخزني المنشأة عن هذا الطلب
+     */
+    public function issues(): HasMany
+    {
+        return $this->hasMany(PurchaseIssue::class, 'requisition_id');
     }
 }

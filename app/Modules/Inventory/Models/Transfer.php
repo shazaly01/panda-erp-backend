@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Models;
 
-
 use App\Models\User;
+use App\Modules\Purchasing\Models\PurchaseRequisition;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +21,7 @@ class Transfer extends Model
 
     protected $fillable = [
         'transfer_number',
+        'requisition_id',
         'from_warehouse_id',
         'to_warehouse_id',
         'transfer_date',
@@ -31,6 +32,7 @@ class Transfer extends Model
     ];
 
     protected $casts = [
+        'requisition_id' => 'integer',
         'from_warehouse_id' => 'integer',
         'to_warehouse_id' => 'integer',
         'created_by' => 'integer',
@@ -41,7 +43,14 @@ class Transfer extends Model
         'deleted_at' => 'datetime',
     ];
 
-   
+    /**
+     * طلب الاحتياج الداخلي المصدري المرتبط بأمر التحويل
+     */
+    public function requisition(): BelongsTo
+    {
+        return $this->belongsTo(PurchaseRequisition::class, 'requisition_id');
+    }
+
     /**
      * المستودع المصدر
      */

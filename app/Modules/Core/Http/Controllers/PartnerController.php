@@ -37,6 +37,38 @@ class PartnerController extends Controller
         ], Response::HTTP_OK);
     }
 
+    /**
+     * البحث السريع عن شريك/عميل برقم الهاتف من شاشة الكاشير والمبيعات
+     */
+    public function findByPhone(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Partner::class);
+
+        $phone = trim((string) $request->input('phone', ''));
+        if ($phone === '') {
+            return response()->json([
+                'message' => 'يرجى إدخال رقم الهاتف للبحث.',
+                'found' => false,
+                'data' => null,
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $role = (string) $request->input('role', 'customer');
+        $partner = $this->partnerService->findByPhone($phone, $role);
+
+        if (! $partner) {
+            return response()->json([
+                'found' => false,
+                'data' => null,
+            ], Response::HTTP_OK);
+        }
+
+        return response()->json([
+            'found' => true,
+            'data' => new PartnerResource($partner),
+        ], Response::HTTP_OK);
+    }
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Partner::class);
@@ -64,7 +96,7 @@ class PartnerController extends Controller
     {
         $this->authorize('view', $partner);
 
-        $partner->loadMissing(['currency', 'receivableAccount', 'payableAccount']);
+        $partner->loadMissing(['currency', 'priceList', 'receivableAccount', 'payableAccount']);
 
         return new PartnerResource($partner);
     }

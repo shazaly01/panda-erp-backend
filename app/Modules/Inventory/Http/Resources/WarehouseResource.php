@@ -17,30 +17,31 @@ class WarehouseResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'code' => $this->code,
-            'phone' => $this->phone,
-            'address' => $this->address,
-            'manager_id' => $this->manager_id,
-            'account_id' => $this->account_id,
-            'is_active' => (bool) $this->is_active,
-            'manager' => $this->whenLoaded('manager', function () {
+            'id'           => $this->id,
+            'name'         => $this->name,
+            'code'         => $this->code,
+            'phone'        => $this->phone,
+            'address'      => $this->address,
+            'manager_id'   => $this->manager_id,
+            'account_id'   => $this->account_id,
+            'is_operating' => (bool) $this->is_operating,
+            'is_active'    => (bool) $this->is_active,
+            'manager'      => $this->whenLoaded('manager', function () {
                 return [
-                    'id' => $this->manager->id,
-                    'name' => $this->manager->name,
+                    'id'    => $this->manager->id,
+                    'name'  => $this->manager->name,
                     'email' => $this->manager->email,
                 ];
             }),
-            'account' => $this->whenLoaded('account', function () {
+            'account'      => $this->whenLoaded('account', function () {
                 return [
-                    'id' => $this->account->id,
+                    'id'   => $this->account->id,
                     'code' => $this->account->code,
                     'name' => $this->account->name,
                 ];
             }),
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
+            'created_at'   => $this->created_at?->toIso8601String(),
+            'updated_at'   => $this->updated_at?->toIso8601String(),
         ];
     }
 }

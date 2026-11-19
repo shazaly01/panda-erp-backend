@@ -25,7 +25,10 @@ class BankAccountController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = BankAccount::with(['account', 'currency']);
+        $query = BankAccount::with([
+            'account' => fn ($q) => $q->withPostedSums(),
+            'currency',
+        ]);
 
         // 1. فلترة البحث (اسم البنك، اسم الحساب، أو رقم الحساب)
         $query->when($request->search, function ($q, $search) {
@@ -56,7 +59,10 @@ class BankAccountController extends Controller
         // السيرفس تقوم بإنشاء الحساب المالي (الأصول) آلياً + سجل البنك التشغيلي
         $bankAccount = $this->treasuryService->createBankAccount($request->validated());
 
-        $bankAccount->load(['account', 'currency']);
+        $bankAccount->load([
+            'account' => fn ($q) => $q->withPostedSums(),
+            'currency',
+        ]);
 
         return response()->json([
             'message' => 'تم إضافة الحساب البنكي وتوليد حسابه المالي آلياً بنجاح',
@@ -69,7 +75,10 @@ class BankAccountController extends Controller
      */
     public function show(BankAccount $bankAccount): JsonResponse
     {
-        $bankAccount->load(['account', 'currency']);
+        $bankAccount->load([
+            'account' => fn ($q) => $q->withPostedSums(),
+            'currency',
+        ]);
 
         return response()->json([
             'data' => new BankAccountResource($bankAccount)
@@ -86,7 +95,10 @@ class BankAccountController extends Controller
 
         return response()->json([
             'message' => 'تم تحديث بيانات الحساب البنكي بنجاح',
-            'data'    => new BankAccountResource($updatedAccount->load(['account', 'currency']))
+            'data'    => new BankAccountResource($updatedAccount->load([
+                'account' => fn ($q) => $q->withPostedSums(),
+                'currency',
+            ]))
         ]);
     }
 

@@ -19,6 +19,12 @@ class PurchasingPermissionsSeeder extends Seeder
         $moduleDisplayName = 'إدارة المشتريات والموردين';
 
         $permissionsData = [
+            'dashboard' => [
+                'title' => 'لوحة تحكم وإحصائيات المشتريات',
+                'actions' => [
+                    'view' => 'رؤية الإحصائيات ولوحة التحكم',
+                ],
+            ],
             'requisitions' => [
                 'title' => 'طلبات الشراء الداخلية',
                 'actions' => [

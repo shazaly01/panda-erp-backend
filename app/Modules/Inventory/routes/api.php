@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Modules\Inventory\Http\Controllers\AdjustmentController;
 use App\Modules\Inventory\Http\Controllers\CategoryController;
 use App\Modules\Inventory\Http\Controllers\GasLeakageController;
+use App\Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use App\Modules\Inventory\Http\Controllers\InventoryReportController;
 use App\Modules\Inventory\Http\Controllers\PriceListController;
 use App\Modules\Inventory\Http\Controllers\ProductController;
@@ -18,6 +19,11 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')
     ->prefix('inventory')
     ->group(function () {
+
+        // ===========================================
+        // 0. لوحة التحكم والإحصائيات (Dashboard)
+        // ===========================================
+        Route::get('dashboard', [InventoryDashboardController::class, 'index']);
 
         // ===========================================
         // 1. البيانات الأساسية والهياكل (Master Data)
@@ -55,8 +61,17 @@ Route::middleware('auth:sanctum')
         // جلب قائمة الأرقام التسلسلية (مع دعم الفلترة بحسب الحالة مثل with_vendor)
         Route::get('serials', [StockSerialController::class, 'index'])->name('inventory.serials.index');
 
+        // إرجاع مجموعة أسطوانات فارغة من مخزن التشغيل بالمحطة إلى المخزن الرئيسي
+        Route::post('serials/return-to-main', [StockSerialController::class, 'returnToMainWarehouse'])->name('inventory.serials.return-to-main');
+
+        // تسليم مجموعة أسطوانات فارغة من المخزن الرئيسي إلى المورد للتعبئة
+        Route::post('serials/dispatch-to-vendor', [StockSerialController::class, 'dispatchToVendor'])->name('inventory.serials.dispatch-to-vendor');
+
         // عرض تفاصيل رقم تسلسلي / أسطوانة محددة
         Route::get('serials/{serial}', [StockSerialController::class, 'show'])->name('inventory.serials.show');
+
+        // تعديل وتصحيح بيانات الأسطوانة والتراجع عن التسليم الخاطئ للمورد
+        Route::put('serials/{serial}', [StockSerialController::class, 'update'])->name('inventory.serials.update');
 
         // إثبات فراغ الأسطوانة بالمحطة وتحويل حالتها إلى فارغة بالمستودع
         Route::post('serials/{serial}/mark-as-empty', [StockSerialController::class, 'markAsEmpty'])->name('inventory.serials.mark-as-empty');

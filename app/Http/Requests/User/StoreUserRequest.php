@@ -34,10 +34,12 @@ class StoreUserRequest extends FormRequest
             'roles'     => 'required|array',
             'roles.*'   => 'string|exists:roles,name,guard_name,api',
 
-            // --- [الافتراضيات الذكية للربط المحاسبي] ---
+            // --- [الافتراضيات الذكية للربط المحاسبي والمخزني] ---
             'default_cost_center_id'  => 'nullable|integer|exists:cost_centers,id',
+            'default_warehouse_id'    => 'nullable|integer|exists:inventory_warehouses,id',
             'default_box_id'          => 'nullable|integer|exists:boxes,id',
             'default_bank_account_id' => 'nullable|integer|exists:bank_accounts,id',
+            'stock_control'           => 'nullable|boolean',
         ];
     }
 }

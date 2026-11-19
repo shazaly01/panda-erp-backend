@@ -42,6 +42,15 @@ class PartnerResource extends JsonResource
                     'symbol' => $this->currency->symbol,
                 ];
             }),
+            'price_list_id' => $this->price_list_id,
+            'price_list' => $this->whenLoaded('priceList', function () {
+                return [
+                    'id' => $this->priceList->id,
+                    'code' => $this->priceList->code,
+                    'name' => $this->priceList->name,
+                    'is_default' => (bool) $this->priceList->is_default,
+                ];
+            }),
             'receivable_account_id' => $this->receivable_account_id,
             'receivable_account' => $this->whenLoaded('receivableAccount', function () {
                 return [
