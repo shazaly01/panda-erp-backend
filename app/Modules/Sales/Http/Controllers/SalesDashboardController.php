@@ -710,11 +710,11 @@ class SalesDashboardController extends Controller
 
         $rows = $query->selectRaw('
                 users.id as user_id,
-                users.name as user_name,
+                users.full_name as user_name,
                 COUNT(sales_invoices.id) as invoices_count,
                 COALESCE(SUM(sales_invoices.total_amount * COALESCE(NULLIF(sales_invoices.exchange_rate, 0), 1)), 0) as total_sales
             ')
-            ->groupBy('users.id', 'users.name')
+            ->groupBy('users.id', 'users.full_name')
             ->orderByDesc('total_sales')
             ->limit(6)
             ->get();
@@ -746,7 +746,7 @@ class SalesDashboardController extends Controller
     {
         $openQuery = PosShift::query()
             ->where('status', 'open')
-            ->with(['user:id,name', 'warehouse:id,name'])
+            ->with(['user:id,full_name', 'warehouse:id,name'])
             ->withCount(['invoices as active_invoices_count' => fn (Builder $q) => $q->where('status', '!=', 'cancelled')])
             ->withSum(['invoices as live_sales' => fn (Builder $q) => $q->where('status', '!=', 'cancelled')], 'total_amount')
             ->withSum(['returns as live_returns' => fn (Builder $q) => $q->where('status', '!=', 'cancelled')], 'total_amount');
@@ -765,7 +765,7 @@ class SalesDashboardController extends Controller
             return [
                 'id'             => $shift->id,
                 'shift_number'   => $shift->shift_number,
-                'cashier_name'   => $shift->user?->name,
+                'cashier_name'   => $shift->user?->full_name,
                 'warehouse_name' => $shift->warehouse?->name,
                 'opened_at'      => $shift->opened_at?->format('Y-m-d H:i'),
                 'opening_cash'   => round((float) $shift->opening_cash, 2),
@@ -778,7 +778,7 @@ class SalesDashboardController extends Controller
 
         $closedQuery = PosShift::query()
             ->where('status', 'closed')
-            ->with(['user:id,name', 'closedBy:id,name']);
+            ->with(['user:id,full_name', 'closedBy:id,full_name']);
 
         if ($filters['branch_id'] !== null) {
             $closedQuery->where('branch_id', $filters['branch_id']);
@@ -794,8 +794,8 @@ class SalesDashboardController extends Controller
                 return [
                     'id'            => $shift->id,
                     'shift_number'  => $shift->shift_number,
-                    'cashier_name'  => $shift->user?->name,
-                    'closed_by'     => $shift->closedBy?->name,
+                    'cashier_name'  => $shift->user?->full_name,
+                    'closed_by'     => $shift->closedBy?->full_name,
                     'closed_at'     => $shift->closed_at?->format('Y-m-d H:i'),
                     'total_sales'   => round((float) $shift->total_sales, 2),
                     'closing_cash'  => round((float) ($shift->closing_cash ?? 0.0), 2),
@@ -848,7 +848,7 @@ class SalesDashboardController extends Controller
         }
 
         $recentQuery = SalesInvoice::query()
-            ->with(['partner:id,name', 'creator:id,name', 'currency:id,code,symbol']);
+            ->with(['partner:id,name', 'creator:id,full_name', 'currency:id,code,symbol']);
         $this->applyInvoiceScopeFilters($recentQuery, $filters);
 
         $recentInvoices = $recentQuery->orderByDesc('invoice_date')
@@ -872,7 +872,7 @@ class SalesDashboardController extends Controller
                     'paid_amount'     => round((float) $invoice->paid_amount, 2),
                     'remaining_amount'=> round((float) $invoice->remaining_amount, 2),
                     'currency_symbol' => $invoice->currency?->symbol ?? '',
-                    'cashier_name'    => $invoice->creator?->name,
+                    'cashier_name'    => $invoice->creator?->full_name,
                 ];
             })->values()->toArray();
 

@@ -20,13 +20,12 @@ use App\Modules\Accounting\Models\FiscalYear;
 use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Models\JournalEntryDetail;
 use App\Modules\Accounting\Models\Voucher;
+use App\Modules\Core\Models\Partner;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Throwable;
 
 class AccountingDashboardController extends Controller
 {
@@ -824,6 +823,7 @@ class AccountingDashboardController extends Controller
 
     /**
      * استخراج أعلى 5 أطراف مدينة (عملاء) وأعلى 5 أطراف دائنة (موردون)
+     * يقتصر الاستعلام حصراً على الشركاء (Partner) ويستبعد الخزائن والبنوك
      *
      * @param array<int, int>|null $costCenterIds
      * @return array<string, array<int, array<string, mixed>>>
@@ -836,7 +836,7 @@ class AccountingDashboardController extends Controller
             ->whereNull('journal_entries.deleted_at')
             ->whereNull('accounts.deleted_at')
             ->where('journal_entries.status', EntryStatus::Posted->value)
-            ->whereNotNull('journal_entry_details.party_type')
+            ->where('journal_entry_details.party_type', Partner::class)
             ->whereNotNull('journal_entry_details.party_id')
             ->whereDate('journal_entries.date', '<=', $endDate->format('Y-m-d'));
 
@@ -872,9 +872,23 @@ class AccountingDashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $allPartyIds = $debtorsRaw->pluck('party_id')
+            ->merge($creditorsRaw->pluck('party_id'))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $partnersMap = ! empty($allPartyIds)
+            ? Partner::withTrashed()
+                ->whereIn('id', $allPartyIds)
+                ->get(['id', 'partner_code', 'name', 'commercial_name'])
+                ->keyBy('id')
+            : collect();
+
         return [
-            'top_debtors'   => $this->hydratePartyNames($debtorsRaw),
-            'top_creditors' => $this->hydratePartyNames($creditorsRaw),
+            'top_debtors'   => $this->hydratePartyNames($debtorsRaw, $partnersMap),
+            'top_creditors' => $this->hydratePartyNames($creditorsRaw, $partnersMap),
         ];
     }
 
@@ -905,7 +919,7 @@ class AccountingDashboardController extends Controller
 
         $recentQuery = JournalEntry::query()
             ->where('status', EntryStatus::Posted->value)
-            ->with(['creator:id,name'])
+            ->with(['creator:id,full_name'])
             ->withSum('details as total_amount', 'debit');
 
         if ($costCenterIds !== null) {
@@ -930,7 +944,7 @@ class AccountingDashboardController extends Controller
                     'source_label' => $sourceEnum?->label() ?? (string) $entry->source,
                     'description'  => $entry->description,
                     'total_amount' => round((float) ($entry->total_amount ?? 0.0), 2),
-                    'created_by'   => $entry->creator?->name,
+                    'created_by'   => $entry->creator?->full_name,
                     'posted_at'    => $entry->posted_at?->format('Y-m-d H:i'),
                 ];
             })
@@ -1113,37 +1127,29 @@ class AccountingDashboardController extends Controller
     }
 
     /**
-     * تحميل أسماء الأطراف البوليمورفية بأمان (عملاء / موردون / موظفون)
+     * تحميل أسماء الشركاء (العملاء والموردين) دفعة واحدة دون استعلامات متكررة (N+1)
      *
      * @param Collection<int, object> $rows
+     * @param Collection<int, Partner> $partnersMap
      * @return array<int, array<string, mixed>>
      */
-    private function hydratePartyNames(Collection $rows): array
+    private function hydratePartyNames(Collection $rows, Collection $partnersMap): array
     {
-        return $rows->map(function ($row) {
-            $partyType = (string) $row->party_type;
-            $partyId = $row->party_id;
-            $name = 'طرف #' . $partyId;
+        return $rows->map(function ($row) use ($partnersMap) {
+            $partyId = (int) $row->party_id;
+            /** @var Partner|null $partner */
+            $partner = $partnersMap->get($partyId);
 
-            try {
-                if (class_exists($partyType)) {
-                    $record = $partyType::find($partyId);
-                    if ($record) {
-                        $name = $record->name
-                            ?? $record->full_name
-                            ?? $record->company_name
-                            ?? $name;
-                    }
-                }
-            } catch (Throwable) {
-                // تجاهل أي تعارض في اسم الموديل والحفاظ على الاسم البديل الآمن
-            }
+            $name = $partner
+                ? ($partner->name ?: ($partner->commercial_name ?: 'شريك #' . $partyId))
+                : 'شريك #' . $partyId;
 
             return [
-                'party_type' => class_basename($partyType),
-                'party_id'   => $partyId,
-                'name'       => $name,
-                'balance'    => round((float) $row->balance, 2),
+                'party_type'   => 'Partner',
+                'party_id'     => $partyId,
+                'partner_code' => $partner?->partner_code,
+                'name'         => $name,
+                'balance'      => round((float) $row->balance, 2),
             ];
         })->values()->toArray();
     }

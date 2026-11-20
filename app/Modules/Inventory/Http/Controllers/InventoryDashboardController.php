@@ -881,7 +881,7 @@ class InventoryDashboardController extends Controller
                 'product:id,name,sku',
                 'warehouse:id,name,code',
                 'productUnit.unit:id,name',
-                'creator:id,name',
+                'creator:id,full_name',
             ]);
 
         $this->applyMovementScopeFilters($recentMovementsQuery, $filters);
@@ -907,7 +907,7 @@ class InventoryDashboardController extends Controller
                     'unit_cost'              => round((float) $mv->unit_cost, 2),
                     'total_cost'             => round((float) $mv->total_cost, 2),
                     'balance_after_movement' => round((float) $mv->balance_after_movement, 2),
-                    'created_by'             => $mv->creator?->name,
+                    'created_by'             => $mv->creator?->full_name,
                     'notes'                  => $mv->notes,
                 ];
             })->values()->toArray();
