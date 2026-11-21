@@ -35,6 +35,10 @@ class VoucherResource extends JsonResource
 
             // الفرع
             'branch'          => $this->whenLoaded('branch', function () {
+                if (! $this->branch) {
+                    return null;
+                }
+
                 return [
                     'id'   => $this->branch->id,
                     'name' => $this->branch->name,

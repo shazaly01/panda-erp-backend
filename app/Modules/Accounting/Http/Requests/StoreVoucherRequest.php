@@ -21,7 +21,7 @@ class StoreVoucherRequest extends FormRequest
     {
         return [
             // --- بيانات رأس السند ---
-            'branch_id' => ['required', 'exists:cost_centers,id'],
+            'branch_id' => ['nullable', 'exists:cost_centers,id'],
             'type' => ['required', new Enum(VoucherType::class)],
             'date' => ['required', 'date', new PeriodIsOpenRule()],
             'paper_ref' => ['nullable', 'string', 'max:255'],

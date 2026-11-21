@@ -45,9 +45,11 @@ class VoucherService
                 );
             }
 
-            // 1. تجهيز بيانات الترقيم
-            $branch = CostCenter::findOrFail($data['branch_id']);
-            $prefix = $branch->code_prefix;
+            // 1. تجهيز بيانات الترقيم (الفرع اختياري)
+            $branch = ! empty($data['branch_id'])
+                ? CostCenter::find($data['branch_id'])
+                : null;
+            $prefix = $branch?->code_prefix;
 
             // تحديد كود الترقيم بحسب نوع السند (PAYMENT أو RECEIPT)
             $documentCode = $typeValue === 'payment'
@@ -64,7 +66,7 @@ class VoucherService
 
             // 3. إنشاء رأس السند
             $voucher = Voucher::create([
-                'branch_id'       => $data['branch_id'],
+                'branch_id'       => $data['branch_id'] ?? null,
                 'type'            => $data['type'],
                 'number'          => $number,
                 'paper_ref'       => $data['paper_ref'] ?? null,
@@ -145,7 +147,7 @@ class VoucherService
 
             // تحديث رأس السند مع الحفاظ على نفس الرقم والحالة
             $voucher->update([
-                'branch_id'       => $data['branch_id'] ?? $voucher->branch_id,
+                'branch_id'       => array_key_exists('branch_id', $data) ? $data['branch_id'] : $voucher->branch_id,
                 'date'            => $data['date'],
                 'paper_ref'       => array_key_exists('paper_ref', $data) ? $data['paper_ref'] : $voucher->paper_ref,
                 'bank_ref_number' => array_key_exists('bank_ref_number', $data) ? $data['bank_ref_number'] : $voucher->bank_ref_number,

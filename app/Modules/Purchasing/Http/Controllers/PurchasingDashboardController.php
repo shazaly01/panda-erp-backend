@@ -540,9 +540,10 @@ class PurchasingDashboardController extends Controller
     {
         $query = PurchaseBillItem::query()
             ->join('purchasing_bills', 'purchasing_bill_items.bill_id', '=', 'purchasing_bills.id')
-            ->join('products', 'purchasing_bill_items.product_id', '=', 'products.id')
+            ->join('inventory_products', 'purchasing_bill_items.product_id', '=', 'inventory_products.id')
             ->whereNull('purchasing_bills.deleted_at')
             ->whereNull('purchasing_bill_items.deleted_at')
+            ->whereNull('inventory_products.deleted_at')
             ->whereIn('purchasing_bills.status', [
                 BillStatus::POSTED->value,
                 BillStatus::PAID->value,
@@ -554,12 +555,12 @@ class PurchasingDashboardController extends Controller
         $this->applyBillScopeFilters($query, $filters, 'purchasing_bills');
 
         $rows = $query->selectRaw('
-                products.id as product_id,
-                products.name as product_name,
+                inventory_products.id as product_id,
+                inventory_products.name as product_name,
                 COALESCE(SUM(purchasing_bill_items.quantity), 0) as total_qty,
                 COALESCE(SUM(purchasing_bill_items.total * COALESCE(NULLIF(purchasing_bills.exchange_rate, 0), 1)), 0) as total_cost
             ')
-            ->groupBy('products.id', 'products.name')
+            ->groupBy('inventory_products.id', 'inventory_products.name')
             ->orderByDesc('total_cost')
             ->limit(6)
             ->get();

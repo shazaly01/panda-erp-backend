@@ -18,7 +18,7 @@ class UpdateVoucherRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'branch_id' => ['required', 'exists:cost_centers,id'],
+            'branch_id' => ['nullable', 'exists:cost_centers,id'],
             'date' => ['required', 'date', new PeriodIsOpenRule()],
             'paper_ref' => ['nullable', 'string', 'max:255'],
             'bank_ref_number' => ['nullable', 'string', 'max:255'],

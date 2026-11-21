@@ -18,7 +18,6 @@ use Carbon\CarbonPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class SalesDashboardController extends Controller
 {
@@ -600,22 +599,23 @@ class SalesDashboardController extends Controller
     {
         $query = SalesInvoiceItem::query()
             ->join('sales_invoices', 'sales_invoice_items.sales_invoice_id', '=', 'sales_invoices.id')
-            ->join('products', 'sales_invoice_items.product_id', '=', 'products.id')
+            ->join('inventory_products', 'sales_invoice_items.product_id', '=', 'inventory_products.id')
             ->whereNull('sales_invoices.deleted_at')
             ->whereNull('sales_invoice_items.deleted_at')
+            ->whereNull('inventory_products.deleted_at')
             ->whereNotIn('sales_invoices.status', ['draft', 'cancelled'])
             ->whereBetween('sales_invoices.invoice_date', [$startDate, $endDate]);
 
         $this->applyInvoiceScopeFilters($query, $filters, 'sales_invoices');
 
         $rows = $query->selectRaw('
-                products.id as product_id,
-                products.name as product_name,
+                inventory_products.id as product_id,
+                inventory_products.name as product_name,
                 COALESCE(SUM(sales_invoice_items.quantity), 0) as total_qty,
                 COALESCE(SUM(sales_invoice_items.total_amount * COALESCE(NULLIF(sales_invoices.exchange_rate, 0), 1)), 0) as total_revenue,
                 COALESCE(SUM((sales_invoice_items.subtotal - (sales_invoice_items.quantity * sales_invoice_items.cost_price)) * COALESCE(NULLIF(sales_invoices.exchange_rate, 0), 1)), 0) as total_profit
             ')
-            ->groupBy('products.id', 'products.name')
+            ->groupBy('inventory_products.id', 'inventory_products.name')
             ->orderByDesc('total_revenue')
             ->limit(6)
             ->get();
