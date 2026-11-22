@@ -4,25 +4,22 @@ declare(strict_types=1);
 
 namespace App\Modules\HR\Models;
 
-use App\Modules\HR\Database\Factories\EmployeeFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Models\User;
-use App\Modules\HR\Models\Contract;
-use App\Modules\HR\Models\Department;
-use App\Modules\HR\Models\Position;
-use App\Modules\HR\Models\EmployeeShift;
+use App\Modules\HR\Database\Factories\EmployeeFactory;
 use App\Modules\HR\Enums\EmployeeStatus;
 use App\Modules\HR\Enums\EmploymentType;
 use App\Modules\HR\Enums\Gender;
 use App\Modules\HR\Enums\MaritalStatus;
-use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
 {
@@ -35,18 +32,18 @@ class Employee extends Model
         'application_type',
         'department_id', 'position_id', 'manager_id', 'user_id',
         'internship_start_date', 'internship_end_date', 'internship_status',
-        'academic_institution', 'academic_major', 'required_training_hours', 'internship_notes'
+        'academic_institution', 'academic_major', 'required_training_hours', 'internship_notes',
     ];
 
     protected $casts = [
-        'date_of_birth' => 'date',
-        'join_date' => 'date',
-        'status' => EmployeeStatus::class,
-        'employment_type' => EmploymentType::class,
-        'gender' => Gender::class,
-        'marital_status' => MaritalStatus::class,
+        'date_of_birth'         => 'date',
+        'join_date'             => 'date',
+        'status'                => EmployeeStatus::class,
+        'employment_type'       => EmploymentType::class,
+        'gender'                => Gender::class,
+        'marital_status'        => MaritalStatus::class,
         'internship_start_date' => 'date',
-        'internship_end_date' => 'date',
+        'internship_end_date'   => 'date',
     ];
 
     /**
@@ -55,24 +52,18 @@ class Employee extends Model
      */
     protected static function booted(): void
     {
-        static::addGlobalScope('exclude_interns', function (Builder $query) {
+        static::addGlobalScope('exclude_interns', function (Builder $query): void {
             $query->where('employment_type', '!=', EmploymentType::Intern->value);
         });
     }
 
-    // --- آليات كسر العزل الآمنة المستدعاة في الـ الخدمة والمتحكم الجديد ---
+    // --- آليات كسر العزل الآمنة المستدعاة في الخدمة والمتحكم ---
 
-    /**
-     * جلب الموظفين مع المتدربين (لتعويض الدالة المكسورة في الخدمة)
-     */
     public static function withInterns(): Builder
     {
         return static::withoutGlobalScope('exclude_interns');
     }
 
-    /**
-     * جلب المتدربين فقط وعزل الموظفين الرسميين (معدلة لتلائم الـ Global Scope)
-     */
     public function scopeOnlyInterns(Builder $query): Builder
     {
         return $query->withoutGlobalScope('exclude_interns')
@@ -80,10 +71,6 @@ class Employee extends Model
             ->where('internship_status', 'active');
     }
 
-    /**
-     * جلب المتدربين المنتهية فترتهم التدريبية ولم يتم تثبيتهم بعد
-     * (تاريخ انتهاء التدريب أصغر من تاريخ اليوم وحالة التدريب ما زالت نشطة)
-     */
     public function scopeOnlyCompletedInterns(Builder $query): Builder
     {
         return $query->withoutGlobalScope('exclude_interns')
@@ -91,12 +78,105 @@ class Employee extends Model
             ->where('internship_status', 'completed');
     }
 
+    // --- دوال جلب العقود السارية حسب الفترة أو التاريخ ---
+
+    /**
+     * جلب العقد الساري والمتوافق مع الفترة المالية المحددة (يدعم التحميل المسبق لمنع N+1)
+     */
+    public function contractForPeriod(PayPeriod $period): ?Contract
+    {
+        $startDate = $period->start_date->toDateString();
+        $endDate = $period->end_date->toDateString();
+
+        if ($this->relationLoaded('contracts')) {
+            return $this->contracts
+                ->filter(function (Contract $contract) use ($period, $startDate, $endDate): bool {
+                    if (!$contract->is_active || !$contract->salary_structure_id) {
+                        return false;
+                    }
+
+                    if ($period->pay_group_id && (int) $contract->pay_group_id !== (int) $period->pay_group_id) {
+                        return false;
+                    }
+
+                    $contractStart = $contract->start_date?->toDateString();
+                    $contractEnd = $contract->end_date?->toDateString();
+
+                    if (!$contractStart || $contractStart > $endDate) {
+                        return false;
+                    }
+
+                    if ($contractEnd !== null && $contractEnd < $startDate) {
+                        return false;
+                    }
+
+                    return true;
+                })
+                ->sortByDesc(fn (Contract $c) => $c->start_date?->toDateString())
+                ->first();
+        }
+
+        return $this->contracts()
+            ->where('is_active', true)
+            ->when($period->pay_group_id, fn ($q) => $q->where('pay_group_id', $period->pay_group_id))
+            ->whereNotNull('salary_structure_id')
+            ->where('start_date', '<=', $endDate)
+            ->where(function ($query) use ($startDate): void {
+                $query->whereNull('end_date')
+                      ->orWhere('end_date', '>=', $startDate);
+            })
+            ->latest('start_date')
+            ->first();
+    }
+
+    /**
+     * جلب العقد الساري في تاريخ محدد (يدعم التحميل المسبق لمنع N+1)
+     */
+    public function contractForDate(Carbon|string $date): ?Contract
+    {
+        $dateString = $date instanceof Carbon ? $date->toDateString() : Carbon::parse($date)->toDateString();
+
+        if ($this->relationLoaded('contracts')) {
+            return $this->contracts
+                ->filter(function (Contract $contract) use ($dateString): bool {
+                    if (!$contract->is_active) {
+                        return false;
+                    }
+
+                    $contractStart = $contract->start_date?->toDateString();
+                    $contractEnd = $contract->end_date?->toDateString();
+
+                    if (!$contractStart || $contractStart > $dateString) {
+                        return false;
+                    }
+
+                    if ($contractEnd !== null && $contractEnd < $dateString) {
+                        return false;
+                    }
+
+                    return true;
+                })
+                ->sortByDesc(fn (Contract $c) => $c->start_date?->toDateString())
+                ->first();
+        }
+
+        return $this->contracts()
+            ->where('is_active', true)
+            ->where('start_date', '<=', $dateString)
+            ->where(function ($query) use ($dateString): void {
+                $query->whereNull('end_date')
+                      ->orWhere('end_date', '>=', $dateString);
+            })
+            ->latest('start_date')
+            ->first();
+    }
+
     public function activeContract(): HasOne
     {
         return $this->hasOne(Contract::class)
             ->where('is_active', true)
             ->where('start_date', '<=', now()->toDateString())
-            ->where(function ($query) {
+            ->where(function ($query): void {
                 $query->whereNull('end_date')
                       ->orWhere('end_date', '>=', now()->toDateString());
             })
@@ -165,7 +245,7 @@ class Employee extends Model
         return $this->hasMany(AttendanceLog::class, 'employee_id');
     }
 
-    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function documents(): MorphMany
     {
         return $this->morphMany(\App\Models\Document::class, 'documentable');
     }
@@ -178,42 +258,17 @@ class Employee extends Model
             ->latestOfMany();
     }
 
-    // --- العلاقات المستحدثة لحل انهيار الـ EmployeeResource ---
-
-    /**
-     * سجل ورديات الموظف/المتدرب التاريخية
-     */
-    public function employeeShifts(): HasMany
-    {
-        return $this->hasMany(EmployeeShift::class, 'employee_id');
-    }
-
-    /**
-     * الوردية الأخيرة النشطة
-     */
-    public function latestShift(): HasOne
-    {
-        return $this->hasOne(EmployeeShift::class, 'employee_id')->latestOfMany();
-    }
-
     // --- العلاقات والدوال الخاصة بنظام أذونات الأمن والسلامة (HSE) ---
 
-    /**
-     * جميع أذونات الخروج المؤقت الخاصة بالموظف
-     */
     public function leavePasses(): HasMany
     {
         return $this->hasMany(HrLeavePass::class, 'employee_id');
     }
 
-    /**
-     * محرك الحالات اللحظي لفحص وتحديد التواجد الفعلي داخل أو خارج أسوار المنشأة
-     */
     public function getCurrentPresenceStatusAttribute(): string
     {
         $today = now()->toDateString();
 
-        // 1. فحص ما إذا كان الموظف قد سجل بصمة حضور اليوم
         $hasAttendedToday = $this->attendanceLogs()
             ->where('date', $today)
             ->whereNotNull('check_in')
@@ -224,7 +279,6 @@ class Employee extends Model
             return 'Outside_Duty';
         }
 
-        // 2. فحص ما إذا كان خارج أسوار المؤسسة بموجب إذن خروج فعال
         $isCurrentlyOutOnPass = $this->leavePasses()
             ->where('date', $today)
             ->where('status', 'out')

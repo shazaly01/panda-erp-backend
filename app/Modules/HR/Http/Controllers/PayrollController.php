@@ -5,54 +5,68 @@ declare(strict_types=1);
 namespace App\Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\HR\Enums\PayrollRunType;
+use App\Modules\HR\Http\Requests\Payroll\GetEligibleEmployeesRequest;
+use App\Modules\HR\Http\Requests\Payroll\PayrollSummaryRequest;
+use App\Modules\HR\Http\Requests\Payroll\PostPayrollBatchRequest;
+use App\Modules\HR\Http\Requests\Payroll\PreviewPayrollRequest;
+use App\Modules\HR\Http\Requests\Payroll\RollbackPayrollBatchRequest;
+use App\Modules\HR\Http\Resources\EligiblePayrollEmployeeResource;
 use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Models\PayPeriod;
 use App\Modules\HR\Models\PayrollBatch;
 use App\Modules\HR\Models\Payslip;
-use App\Modules\HR\Services\PayrollService;
-use App\Modules\HR\Services\PayrollPostingService;
-use App\Modules\HR\Enums\PayrollRunType;
 use App\Modules\HR\Policies\PayrollPolicy;
+use App\Modules\HR\Services\PayrollPostingService;
+use App\Modules\HR\Services\PayrollService;
+use App\Modules\HR\Services\ScheduleResolutionService;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use App\Modules\HR\Http\Requests\Payroll\GetEligibleEmployeesRequest;
-use App\Modules\HR\Http\Resources\EligiblePayrollEmployeeResource;
-use Exception;
 
 class PayrollController extends Controller
 {
     public function __construct(
         private readonly PayrollService $payrollService,
-        private readonly PayrollPostingService $payrollPostingService
+        private readonly PayrollPostingService $payrollPostingService,
+        private readonly ScheduleResolutionService $scheduleResolutionService
     ) {
         $this->middleware('auth:sanctum');
     }
 
     /**
+     * العلاقات القياسية المطلوبة لاحتساب رواتب الموظفين دون استعلامات متكررة
+     */
+    private function employeePayrollRelations(): array
+    {
+        return [
+            'department',
+            'contracts.salaryStructure.rules',
+            'contracts.overtimePolicy',
+            'contracts.workingSchedule.lines.shift',
+            'activeContract.salaryStructure.rules',
+            'activeContract.overtimePolicy',
+            'currentContract.salaryStructure.rules',
+            'currentContract.overtimePolicy',
+        ];
+    }
+
+    /**
      * معاينة قسيمة راتب (قبل الاعتماد والحفظ)
      */
-    public function preview(Request $request): JsonResponse
+    public function preview(PreviewPayrollRequest $request): JsonResponse
     {
         $this->authorize('preview', PayrollPolicy::class);
 
-        $request->validate([
-            'employee_id'   => 'required|exists:employees,id',
-            'pay_period_id' => 'required|exists:hr_pay_periods,id',
-            'run_type'      => 'required|in:regular,overtime_only',
-        ]);
-
         try {
-            $employee = Employee::with([
-                'department',
-                'activeContract.salaryStructure.rules',
-                'activeContract.overtimePolicy',
-                'currentContract.salaryStructure.rules',
-                'currentContract.overtimePolicy',
-            ])->findOrFail($request->employee_id);
+            $validated = $request->validated();
 
-            $period = PayPeriod::findOrFail($request->pay_period_id);
-            $runType = PayrollRunType::from($request->run_type);
+            $employee = Employee::with($this->employeePayrollRelations())
+                ->findOrFail($validated['employee_id']);
+
+            $period = PayPeriod::findOrFail($validated['pay_period_id']);
+            $runType = PayrollRunType::from($validated['run_type']);
 
             $payslipData = $this->payrollService->previewPayslip($employee, $period, $runType);
 
@@ -71,35 +85,25 @@ class PayrollController extends Controller
     /**
      * اعتماد الرواتب وترحيلها للحسابات
      */
-    public function postBatch(Request $request): JsonResponse
+    public function postBatch(PostPayrollBatchRequest $request): JsonResponse
     {
         $this->authorize('postBatch', PayrollPolicy::class);
 
-        $request->validate([
-            'employee_ids'   => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'pay_period_id'  => 'required|exists:hr_pay_periods,id',
-            'run_type'       => 'required|in:regular,overtime_only',
-            'description'    => 'required|string|max:255',
-        ]);
-
         try {
-            $employees = Employee::with([
-                'department',
-                'activeContract.salaryStructure.rules',
-                'activeContract.overtimePolicy',
-                'currentContract.salaryStructure.rules',
-                'currentContract.overtimePolicy',
-            ])->whereIn('id', $request->employee_ids)->get();
+            $validated = $request->validated();
 
-            $period = PayPeriod::findOrFail($request->pay_period_id);
-            $runType = PayrollRunType::from($request->run_type);
+            $employees = Employee::with($this->employeePayrollRelations())
+                ->whereIn('id', $validated['employee_ids'])
+                ->get();
+
+            $period = PayPeriod::findOrFail($validated['pay_period_id']);
+            $runType = PayrollRunType::from($validated['run_type']);
 
             $batch = $this->payrollPostingService->postPayrollBatch(
                 $employees,
                 $period,
                 $runType,
-                $request->description
+                $validated['description']
             );
 
             return response()->json([
@@ -117,13 +121,9 @@ class PayrollController extends Controller
     /**
      * إلغاء والتراجع عن مسير الرواتب المعتمد وعكس القيد المحاسبي
      */
-    public function rollbackBatch(Request $request, int|string $batchId): JsonResponse
+    public function rollbackBatch(RollbackPayrollBatchRequest $request, int|string $batchId): JsonResponse
     {
         $this->authorize('rollback', PayrollPolicy::class);
-
-        $request->validate([
-            'reason' => 'required|string|max:255',
-        ]);
 
         try {
             $batch = PayrollBatch::with([
@@ -132,7 +132,10 @@ class PayrollController extends Controller
                 'payslips',
             ])->findOrFail($batchId);
 
-            $this->payrollPostingService->rollbackPayrollBatch($batch, $request->reason);
+            $this->payrollPostingService->rollbackPayrollBatch(
+                $batch,
+                $request->validated('reason')
+            );
 
             return response()->json([
                 'message' => 'تم التراجع عن مسير الرواتب بنجاح، وعكس القيد المحاسبي وإعادة فتح الفترة.',
@@ -146,7 +149,7 @@ class PayrollController extends Controller
     }
 
     /**
-     * جلب سجل المسيرات السابقة المعتمدة مع إجمالي مبالغها وعدد موظفيها
+     * جلب سجل المسيرات السابقة (المعتمدة والملغاة) مع إجمالي مبالغها وعدد موظفيها
      */
     public function getBatches(): JsonResponse
     {
@@ -168,55 +171,53 @@ class PayrollController extends Controller
     /**
      * حساب ملخص المسير (للواجهة الأمامية)
      */
-    public function getSummary(Request $request): JsonResponse
+    public function getSummary(PayrollSummaryRequest $request): JsonResponse
     {
         $this->authorize('view', PayrollPolicy::class);
 
-        $request->validate([
-            'employee_ids'   => 'required|array|min:1',
-            'employee_ids.*' => 'exists:employees,id',
-            'pay_period_id'  => 'required|exists:hr_pay_periods,id',
-            'run_type'       => 'required|in:regular,overtime_only',
-        ]);
+        try {
+            $validated = $request->validated();
 
-        $employees = Employee::with([
-            'department',
-            'activeContract.salaryStructure.rules',
-            'activeContract.overtimePolicy',
-            'currentContract.salaryStructure.rules',
-            'currentContract.overtimePolicy',
-        ])->whereIn('id', $request->employee_ids)->get();
+            $employees = Employee::with($this->employeePayrollRelations())
+                ->whereIn('id', $validated['employee_ids'])
+                ->get();
 
-        $period = PayPeriod::findOrFail($request->pay_period_id);
-        $runType = PayrollRunType::from($request->run_type);
+            $period = PayPeriod::findOrFail($validated['pay_period_id']);
+            $runType = PayrollRunType::from($validated['run_type']);
 
-        $summary = [
-            'total_basic'      => 0.0,
-            'total_allowances' => 0.0,
-            'total_deductions' => 0.0,
-            'total_net'        => 0.0,
-            'employee_count'   => $employees->count(),
-        ];
+            $this->scheduleResolutionService->preloadForPeriod(
+                $employees->pluck('id')->all(),
+                $period->start_date->format('Y-m-d'),
+                $period->end_date->format('Y-m-d')
+            );
 
-        foreach ($employees as $employee) {
-            $payslip = $this->payrollService->previewPayslip($employee, $period, $runType);
+            $summary = [
+                'total_basic'      => 0.0,
+                'total_allowances' => 0.0,
+                'total_deductions' => 0.0,
+                'total_net'        => 0.0,
+                'employee_count'   => $employees->count(),
+            ];
 
-            $summary['total_basic']      += (float) $payslip['contract_basic'];
-            $summary['total_allowances'] += (float) $payslip['totals']['total_allowances'];
-            $summary['total_deductions'] += (float) $payslip['totals']['total_deductions'];
-            $summary['total_net']        += (float) $payslip['totals']['net_salary'];
+            foreach ($employees as $employee) {
+                $payslip = $this->payrollService->previewPayslip($employee, $period, $runType);
+
+                $summary['total_basic']      = round($summary['total_basic'] + (float) $payslip['contract_basic'], 2);
+                $summary['total_allowances'] = round($summary['total_allowances'] + (float) $payslip['totals']['total_allowances'], 2);
+                $summary['total_deductions'] = round($summary['total_deductions'] + (float) $payslip['totals']['total_deductions'], 2);
+                $summary['total_net']        = round($summary['total_net'] + (float) $payslip['totals']['net_salary'], 2);
+            }
+
+            return response()->json([
+                'message' => 'تم حساب ملخص الفترة بنجاح',
+                'data'    => $summary,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'خطأ في احتساب ملخص المسير',
+                'error'   => $e->getMessage(),
+            ], 422);
         }
-
-        return response()->json([
-            'message' => 'تم حساب ملخص الفترة بنجاح',
-            'data'    => [
-                'total_basic'      => round($summary['total_basic'], 2),
-                'total_allowances' => round($summary['total_allowances'], 2),
-                'total_deductions' => round($summary['total_deductions'], 2),
-                'total_net'        => round($summary['total_net'], 2),
-                'employee_count'   => $summary['employee_count'],
-            ],
-        ]);
     }
 
     /**
@@ -231,7 +232,7 @@ class PayrollController extends Controller
             'run_type'      => 'required|in:regular,overtime_only',
         ]);
 
-        $processedEmployeeIds = Payslip::whereHas('batch', function ($query) use ($request) {
+        $processedEmployeeIds = Payslip::whereHas('batch', function ($query) use ($request): void {
             $query->where('status', 'posted')
                   ->where('pay_period_id', $request->pay_period_id)
                   ->where('run_type', $request->run_type);
@@ -250,7 +251,7 @@ class PayrollController extends Controller
      */
     public function exportBankFile(int|string $batchId): StreamedResponse
     {
-        $this->authorize('view', Employee::class);
+        $this->authorize('view', PayrollPolicy::class);
 
         $batch = PayrollBatch::with([
             'payslips.employee.primaryBankAccount',
@@ -270,7 +271,7 @@ class PayrollController extends Controller
 
         $callback = function () use ($batch, $columns): void {
             $file = fopen('php://output', 'w');
-            fputs($file, "\xEF\xBB\xBF"); // UTF-8 BOM لدعم اللغة العربية في Excel
+            fputs($file, "\xEF\xBB\xBF");
             fputcsv($file, $columns);
 
             foreach ($batch->payslips as $payslip) {
@@ -291,7 +292,6 @@ class PayrollController extends Controller
 
         return response()->stream($callback, 200, $headers);
     }
-
 
     /**
      * جلب قائمة الموظفين المؤهلين لمسير الفترة المالية المحددة

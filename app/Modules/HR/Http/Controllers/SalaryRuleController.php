@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\JsonResponse;
-use App\Modules\HR\Models\SalaryRule;
 use App\Modules\HR\Http\Requests\SalaryRule\SalaryRuleRequest;
 use App\Modules\HR\Http\Resources\SalaryRuleResource;
+use App\Modules\HR\Models\SalaryRule;
+use Illuminate\Http\JsonResponse;
 
 class SalaryRuleController extends Controller
 {
@@ -17,20 +17,19 @@ class SalaryRuleController extends Controller
      */
     public function __construct()
     {
-        /**
-         * تفعيل SalaryRulePolicy
-         * - تأكد أن مسمى المتغير في الراوت هو 'salary_rule' ليعمل الربط التلقائي
-         */
         $this->authorizeResource(SalaryRule::class, 'salary_rule');
     }
 
     /**
-     * عرض جميع قواعد الراتب مرتبة حسب الفئة (بدلات/خصومات)
+     * عرض جميع قواعد الراتب مرتبة حسب الفئة (بدلات / خصومات / مساهمات شركة)
      */
-  public function index(): JsonResponse
+    public function index(): JsonResponse
     {
         $rules = SalaryRule::query()
-            ->with('accountMapping.account') // <--- جلب التوجيه المحاسبي مع الحساب الفعلي
+            ->with([
+                'accountMapping.account',
+                'creditAccountMapping.account',
+            ])
             ->orderBy('category')
             ->orderBy('id')
             ->get();
@@ -43,12 +42,15 @@ class SalaryRuleController extends Controller
      */
     public function store(SalaryRuleRequest $request): JsonResponse
     {
-        // تم التحقق تلقائياً عبر SalaryRulePolicy@create
         $salaryRule = SalaryRule::create($request->validated());
+        $salaryRule->load([
+            'accountMapping.account',
+            'creditAccountMapping.account',
+        ]);
 
         return response()->json([
             'message' => 'تم إنشاء قاعدة الراتب بنجاح',
-            'data' => new SalaryRuleResource($salaryRule)
+            'data'    => new SalaryRuleResource($salaryRule),
         ], 201);
     }
 
@@ -57,8 +59,10 @@ class SalaryRuleController extends Controller
      */
     public function show(SalaryRule $salaryRule): JsonResponse
     {
-        // تحميل العلاقات للقاعدة المحددة قبل تمريرها للـ Resource
-        $salaryRule->load('accountMapping.account');
+        $salaryRule->load([
+            'accountMapping.account',
+            'creditAccountMapping.account',
+        ]);
 
         return response()->json(new SalaryRuleResource($salaryRule));
     }
@@ -68,12 +72,15 @@ class SalaryRuleController extends Controller
      */
     public function update(SalaryRuleRequest $request, SalaryRule $salaryRule): JsonResponse
     {
-        // تم التحقق تلقائياً عبر SalaryRulePolicy@update
         $salaryRule->update($request->validated());
+        $salaryRule->load([
+            'accountMapping.account',
+            'creditAccountMapping.account',
+        ]);
 
         return response()->json([
             'message' => 'تم تحديث قاعدة الراتب بنجاح',
-            'data' => new SalaryRuleResource($salaryRule)
+            'data'    => new SalaryRuleResource($salaryRule),
         ]);
     }
 
@@ -82,13 +89,10 @@ class SalaryRuleController extends Controller
      */
     public function destroy(SalaryRule $salaryRule): JsonResponse
     {
-        // تم التحقق تلقائياً عبر SalaryRulePolicy@delete
-
-        // ملاحظة: يفضل التحقق مستقبلاً إذا كانت القاعدة مرتبطة بهياكل رواتب نشطة
         $salaryRule->delete();
 
         return response()->json([
-            'message' => 'تم أرشفة قاعدة الراتب بنجاح'
+            'message' => 'تم أرشفة قاعدة الراتب بنجاح',
         ]);
     }
 }

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Modules\HR\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Modules\HR\Enums\SalaryFrequency;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Contract extends Model
 {
@@ -26,33 +27,28 @@ class Contract extends Model
         'end_date',
         'is_active',
         'attachment_path',
-        'attendance_mode' // 🔥 تمت الإضافة
+        'attendance_mode',
     ];
 
     protected $casts = [
-        'basic_salary' => 'decimal:2',
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'basic_salary'        => 'decimal:2',
+        'start_date'          => 'date',
+        'end_date'            => 'date',
         'schedule_start_date' => 'date',
-        'is_active' => 'boolean',
-        'attendance_mode' => 'string', // 🔥 تمت الإضافة للتحقق من النوع
-        'salary_frequency' => SalaryFrequency::class,
+        'is_active'           => 'boolean',
+        'attendance_mode'     => 'string',
     ];
 
     /**
-     * البوت المخصص للموديل (Model Events)
-     * هنا يتم تطبيق النقطة المرجعية الثابتة لضمان مزامنة الجداول
+     * ضبط القيم الافتراضية عند إنشاء العقد
      */
     protected static function booted(): void
     {
-        static::creating(function (Contract $contract) {
-            // 🔥 حقن النقطة المرجعية (Epoch Date) آلياً لكل عقد جديد
-            // استخدمنا بداية عام 2026 كنقطة انطلاق لجميع حسابات دورة الورديات
+        static::creating(function (Contract $contract): void {
             if (empty($contract->schedule_start_date)) {
-                $contract->schedule_start_date = '2026-01-01';
+                $contract->schedule_start_date = $contract->start_date ?? now()->toDateString();
             }
 
-            // ضمان وجود القيمة الافتراضية
             if (empty($contract->attendance_mode)) {
                 $contract->attendance_mode = 'manual';
             }
@@ -84,13 +80,10 @@ class Contract extends Model
         return $this->belongsTo(WorkingSchedule::class, 'working_schedule_id');
     }
 
-
-
     /**
      * الملفات والمرفقات الرسمية المؤرشفة التابعة لعقد العمل (DMS Integration)
-     * العقد يمكن أن يحتوي على وثيقة العقد الموقعة، الملاحق، الشروط الإضافية
      */
-    public function documents(): \Illuminate\Database\Eloquent\Relations\MorphMany
+    public function documents(): MorphMany
     {
         return $this->morphMany(\App\Models\Document::class, 'documentable');
     }
@@ -98,7 +91,7 @@ class Contract extends Model
     /**
      * جلب ملف العقد الأساسي المعتمد
      */
-    public function mainAttachment()
+    public function mainAttachment(): HasOne
     {
         return $this->hasOne(\App\Models\Document::class, 'documentable_id')
             ->where('documentable_type', self::class)

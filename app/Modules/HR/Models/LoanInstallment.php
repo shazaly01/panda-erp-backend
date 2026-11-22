@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\HR\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class LoanInstallment extends Model
 {
@@ -23,12 +23,17 @@ class LoanInstallment extends Model
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
+        'amount'    => 'decimal:2',
         'due_month' => 'date',
     ];
 
     public function loan(): BelongsTo
     {
         return $this->belongsTo(Loan::class);
+    }
+
+    public function payrollBatch(): BelongsTo
+    {
+        return $this->belongsTo(PayrollBatch::class, 'payroll_batch_id');
     }
 }

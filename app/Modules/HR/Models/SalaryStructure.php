@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\HR\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SalaryStructure extends Model
 {
@@ -16,20 +16,39 @@ class SalaryStructure extends Model
     protected $fillable = [
         'name',
         'description',
-        'is_active'
+        'is_active',
     ];
 
-  /**
-     * القواعد المرتبطة بهذا الهيكل
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
+    /**
+     * القواعد النشطة المرتبطة بهذا الهيكل مرتبة حسب التسلسل
      */
     public function rules(): BelongsToMany
     {
-        // نحدد أسماء الأعمدة يدوياً (structure_id و rule_id)
         return $this->belongsToMany(
             SalaryRule::class,
-            'structure_rules', // اسم الجدول الوسيط
-            'structure_id',    // المفتاح الخاص بالهيكل (الحالي)
-            'rule_id'          // المفتاح الخاص بالقاعدة (المرتبط)
+            'structure_rules',
+            'structure_id',
+            'rule_id'
+        )
+        ->where('salary_rules.is_active', true)
+        ->withPivot('sequence')
+        ->orderByPivot('sequence', 'asc');
+    }
+
+    /**
+     * كافة القواعد المرتبطة بهذا الهيكل (بما فيها المعطلة لأغراض العرض الإداري)
+     */
+    public function allRules(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            SalaryRule::class,
+            'structure_rules',
+            'structure_id',
+            'rule_id'
         )
         ->withPivot('sequence')
         ->orderByPivot('sequence', 'asc');

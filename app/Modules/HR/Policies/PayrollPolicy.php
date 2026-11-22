@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Modules\HR\Policies;
 
 use App\Models\User;
@@ -14,7 +16,7 @@ class PayrollPolicy
      */
     public function view(User $user): bool
     {
-        return $user->can('hr.payroll.view');
+        return $user->hasPermissionTo('hr.payroll.view');
     }
 
     /**
@@ -22,7 +24,7 @@ class PayrollPolicy
      */
     public function preview(User $user): bool
     {
-        return $user->can('hr.payroll.view');
+        return $user->hasPermissionTo('hr.payroll.view');
     }
 
     /**
@@ -30,7 +32,7 @@ class PayrollPolicy
      */
     public function postBatch(User $user): bool
     {
-        return $user->can('hr.payroll.post');
+        return $user->hasPermissionTo('hr.payroll.post');
     }
 
     /**
@@ -38,6 +40,6 @@ class PayrollPolicy
      */
     public function rollback(User $user): bool
     {
-        return $user->can('hr.payroll.post');
+        return $user->hasPermissionTo('hr.payroll.post');
     }
 }
