@@ -16,32 +16,93 @@ use Carbon\Carbon;
 
 class InternshipService
 {
-   /**
-     * 1. معالجة وحفظ طلب التدريب القادم من الرابط الخارجي وتوليد كود المتابعة (5 أرقام) آلياً
+    /**
+     * توليد كود متابعة آمن ومكون من 5 أرقام مع ضمان عدم تكراره بين الطلبات النشطة
      */
-    public function storePublicApplication(array $data, UploadedFile $photo): InternshipApplication
+    private function generateTrackingCode(): string
     {
-        // تخزين الصورة الشخصية في المجلد الآمن المخصص لملفات الموارد البشرية
-        $photoPath = $photo->store('hr/interns/applications', 'public');
+        do {
+            $trackingCode = str_pad((string) random_int(0, 99999), 5, '0', STR_PAD_LEFT);
+            $exists = InternshipApplication::where('tracking_code', $trackingCode)
+                ->whereIn('status', ['pending', 'interview', 'approved'])
+                ->exists();
+        } while ($exists);
 
-        // توليد كود متابعة آمن ومكون من 5 أرقام مشتق عشوائياً وحمايته من التكرار اللحظي
-        $trackingCode = str_pad((string) random_int(0, 99999), 5, '0', STR_PAD_LEFT);
+        return $trackingCode;
+    }
 
-        return InternshipApplication::create([
+    /**
+     * 1. معالجة وحفظ طلب التدريب أو التوظيف القادم من الرابط الخارجي وتوليد كود المتابعة (5 أرقام) آلياً
+     */
+    public function storePublicApplication(
+        array $data,
+        ?UploadedFile $photo = null,
+        ?UploadedFile $cv = null
+    ): InternshipApplication {
+        $photoPath = $photo ? $photo->store('hr/interns/applications', 'public') : null;
+        $cvPath = $cv ? $cv->store('hr/interns/cvs', 'public') : null;
+        $trackingCode = $this->generateTrackingCode();
+
+        $application = InternshipApplication::create([
+            'application_type' => $data['application_type'] ?? 'internship',
+            'source' => 'online',
             'full_name' => $data['full_name'],
             'email' => $data['email'] ?? null,
             'phone' => $data['phone'],
             'national_id' => $data['national_id'] ?? null,
-            'academic_institution' => $data['academic_institution'],
-            'academic_major' => $data['academic_major'],
+            'academic_institution' => $data['academic_institution'] ?? null,
+            'academic_major' => $data['academic_major'] ?? null,
             'required_training_hours' => isset($data['required_training_hours']) ? (int) $data['required_training_hours'] : null,
-            'internship_start_date' => $data['internship_start_date'] ?? null, // 🔥 تم التعديل لتقبل فارغ
-            'internship_end_date' => $data['internship_end_date'] ?? null,     // 🔥 تم التعديل لتقبل فارغ
+            'position_id' => $data['position_id'] ?? null,
+            'qualification' => $data['qualification'] ?? null,
+            'experience_years' => isset($data['experience_years']) ? (int) $data['experience_years'] : null,
+            'internship_start_date' => $data['internship_start_date'] ?? null,
+            'internship_end_date' => $data['internship_end_date'] ?? null,
             'photo_path' => $photoPath,
+            'cv_path' => $cvPath,
             'tracking_code' => $trackingCode,
             'status' => 'pending',
             'notes' => $data['notes'] ?? null,
         ]);
+
+        return $application->load('position');
+    }
+
+    /**
+     * 1-ب. معالجة وحفظ طلب التدريب أو التوظيف المدخل يدوياً من لوحة الإدارة (لوكال)
+     */
+    public function storeManualApplication(
+        array $data,
+        ?UploadedFile $photo = null,
+        ?UploadedFile $cv = null
+    ): InternshipApplication {
+        $photoPath = $photo ? $photo->store('hr/interns/applications', 'public') : null;
+        $cvPath = $cv ? $cv->store('hr/interns/cvs', 'public') : null;
+        $trackingCode = $this->generateTrackingCode();
+
+        $application = InternshipApplication::create([
+            'application_type' => $data['application_type'],
+            'source' => 'manual',
+            'full_name' => $data['full_name'],
+            'email' => $data['email'] ?? null,
+            'phone' => $data['phone'],
+            'national_id' => $data['national_id'] ?? null,
+            'academic_institution' => $data['academic_institution'] ?? null,
+            'academic_major' => $data['academic_major'] ?? null,
+            'required_training_hours' => isset($data['required_training_hours']) ? (int) $data['required_training_hours'] : null,
+            'position_id' => $data['position_id'] ?? null,
+            'qualification' => $data['qualification'] ?? null,
+            'experience_years' => isset($data['experience_years']) ? (int) $data['experience_years'] : null,
+            'internship_start_date' => $data['internship_start_date'] ?? null,
+            'internship_end_date' => $data['internship_end_date'] ?? null,
+            'photo_path' => $photoPath,
+            'cv_path' => $cvPath,
+            'tracking_code' => $trackingCode,
+            'status' => 'pending',
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        return $application->load('position');
     }
 
     /**
@@ -49,16 +110,21 @@ class InternshipService
      */
     public function trackApplication(string $phone, string $trackingCode): InternshipApplication
     {
-        return InternshipApplication::where('phone', $phone)
+        return InternshipApplication::with('position')
+            ->where('phone', $phone)
             ->where('tracking_code', $trackingCode)
             ->firstOrFail();
     }
 
-   /**
-     * 3. تحديث بيانات الطلب الخارجي بواسطة المتدرب نفسه بشرط أن يكون معلقاً (Pending)
+    /**
+     * 3. تحديث بيانات الطلب الخارجي بواسطة المتقدم نفسه بشرط أن يكون معلقاً (Pending)
      */
-    public function updatePublicApplication(int $id, array $data, ?UploadedFile $photo = null): InternshipApplication
-    {
+    public function updatePublicApplication(
+        int $id,
+        array $data,
+        ?UploadedFile $photo = null,
+        ?UploadedFile $cv = null
+    ): InternshipApplication {
         $application = InternshipApplication::findOrFail($id);
 
         // حماية برمجية صارمة: منع التعديل نهائياً إذا تغيرت حالة الطلب عن معلق
@@ -72,25 +138,60 @@ class InternshipService
             $application->photo_path = $photo->store('hr/interns/applications', 'public');
         }
 
+        if ($cv) {
+            if ($application->cv_path && Storage::disk('public')->exists($application->cv_path)) {
+                Storage::disk('public')->delete($application->cv_path);
+            }
+            $application->cv_path = $cv->store('hr/interns/cvs', 'public');
+        }
+
         $application->update([
             'full_name' => $data['full_name'],
             'email' => $data['email'] ?? null,
             'phone' => $data['phone'],
             'national_id' => $data['national_id'] ?? null,
-            'academic_institution' => $data['academic_institution'],
-            'academic_major' => $data['academic_major'],
+            'academic_institution' => $data['academic_institution'] ?? null,
+            'academic_major' => $data['academic_major'] ?? null,
             'required_training_hours' => isset($data['required_training_hours']) ? (int) $data['required_training_hours'] : null,
-            'internship_start_date' => $data['internship_start_date'] ?? null, // 🔥 تم التعديل لتقبل فارغ
-            'internship_end_date' => $data['internship_end_date'] ?? null,     // 🔥 تم التعديل لتقبل فارغ
+            'position_id' => array_key_exists('position_id', $data) ? $data['position_id'] : $application->position_id,
+            'qualification' => array_key_exists('qualification', $data) ? $data['qualification'] : $application->qualification,
+            'experience_years' => array_key_exists('experience_years', $data)
+                ? (isset($data['experience_years']) ? (int) $data['experience_years'] : null)
+                : $application->experience_years,
+            'internship_start_date' => $data['internship_start_date'] ?? $application->internship_start_date,
+            'internship_end_date' => $data['internship_end_date'] ?? $application->internship_end_date,
             'photo_path' => $application->photo_path,
+            'cv_path' => $application->cv_path,
             'notes' => $data['notes'] ?? null,
         ]);
 
-        return $application;
+        return $application->load('position');
     }
 
-/**
-     * 4. اعتماد طلب التدريب وتحويله إلى متدرب رسمي مع حفظ نسخة من الباركود والتواريخ الجديدة
+    /**
+     * 3-ب. نقل الطلب إلى مرحلة المعاينة وتحديد موعد وملاحظات المعاينة
+     */
+    public function scheduleInterview(int $applicationId, array $interviewData): InternshipApplication
+    {
+        $application = InternshipApplication::findOrFail($applicationId);
+
+        abort_if(
+            in_array($application->status, ['approved', 'rejected'], true),
+            422,
+            'لا يمكن جدولة معاينة لطلب تم قبوله أو رفضه مسبقاً.'
+        );
+
+        $application->update([
+            'status' => 'interview',
+            'interview_date' => $interviewData['interview_date'],
+            'interview_notes' => $interviewData['interview_notes'] ?? $application->interview_notes,
+        ]);
+
+        return $application->load('position');
+    }
+
+    /**
+     * 4. اعتماد طلب التدريب أو التوظيف وتحويله إلى متدرب رسمي تحت التدريب مع حفظ نسخة من الباركود والتواريخ الجديدة
      */
     public function approveApplication(int $applicationId, array $approvalData): Employee
     {
@@ -124,15 +225,17 @@ class InternshipService
                 'employee_number' => $employeeNumber,
                 'barcode' => $barcode,
                 'tracking_code' => $application->tracking_code,
-                'join_date' => $approvalData['internship_start_date'], // 🔥 تم التعديل ليأخذ من مدخلات المشرف
+                'join_date' => $approvalData['internship_start_date'],
                 'status' => EmployeeStatus::Training->value,
                 'employment_type' => EmploymentType::Intern->value,
+                'application_type' => $application->application_type ?? 'internship',
                 'department_id' => $approvalData['department_id'] ?? null,
+                'position_id' => $approvalData['position_id'] ?? $application->position_id,
                 'manager_id' => $approvalData['manager_id'] ?? null,
 
                 // الحقول التاريخية الأكاديمية للمتدربين
-                'internship_start_date' => $approvalData['internship_start_date'], // 🔥 تم التعديل ليأخذ من مدخلات المشرف
-                'internship_end_date' => $approvalData['internship_end_date'],     // 🔥 تم التعديل ليأخذ من مدخلات المشرف
+                'internship_start_date' => $approvalData['internship_start_date'],
+                'internship_end_date' => $approvalData['internship_end_date'],
                 'internship_status' => 'active',
                 'academic_institution' => $application->academic_institution,
                 'academic_major' => $application->academic_major,
@@ -145,8 +248,8 @@ class InternshipService
                 'employee_id' => $employee->id,
                 'working_schedule_id' => $approvalData['working_schedule_id'],
                 'basic_salary' => $approvalData['basic_salary'],
-                'start_date' => $approvalData['internship_start_date'], // 🔥 تم التعديل ليأخذ من مدخلات المشرف
-                'end_date' => $approvalData['internship_end_date'],     // 🔥 تم التعديل ليأخذ من مدخلات المشرف
+                'start_date' => $approvalData['internship_start_date'],
+                'end_date' => $approvalData['internship_end_date'],
                 'is_active' => true,
                 'attendance_mode' => 'manual',
                 'salary_structure_id' => null,
@@ -154,35 +257,37 @@ class InternshipService
                 'pay_group_id' => null,
             ]);
 
-            // إصلاح جذري لثغرة التقارير التخزينية: قراءة حجم ملف الصورة الفعلي من السيرفر
-            $realFileSize = Storage::disk('public')->exists($application->photo_path)
-                ? Storage::disk('public')->size($application->photo_path)
-                : 0;
+            // إدراج الصورة الشخصية في جدول المستندات فقط في حال توفرها لتفادي أي خطأ في الطلبات اليدوية أو التوظيف
+            if ($application->photo_path) {
+                $realFileSize = Storage::disk('public')->exists($application->photo_path)
+                    ? Storage::disk('public')->size($application->photo_path)
+                    : 0;
 
-            $extension = pathinfo($application->photo_path, PATHINFO_EXTENSION);
+                $extension = pathinfo($application->photo_path, PATHINFO_EXTENSION);
 
-            DB::table('documents')->insert([
-                'documentable_type' => Employee::class,
-                'documentable_id' => $employee->id,
-                'document_type' => \App\Enums\DocumentType::EMPLOYEE_PHOTO instanceof \BackedEnum
-                    ? \App\Enums\DocumentType::EMPLOYEE_PHOTO->value
-                    : (\App\Enums\DocumentType::EMPLOYEE_PHOTO ?? 'employee_photo'),
-                'file_path' => $application->photo_path,
-                'name' => basename($application->photo_path),
-                'mime_type' => 'image/' . $extension,
-                'extension' => $extension,
-                'disk' => 'public',
-                'file_size' => $realFileSize,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+                DB::table('documents')->insert([
+                    'documentable_type' => Employee::class,
+                    'documentable_id' => $employee->id,
+                    'document_type' => \App\Enums\DocumentType::EMPLOYEE_PHOTO instanceof \BackedEnum
+                        ? \App\Enums\DocumentType::EMPLOYEE_PHOTO->value
+                        : (\App\Enums\DocumentType::EMPLOYEE_PHOTO ?? 'employee_photo'),
+                    'file_path' => $application->photo_path,
+                    'name' => basename($application->photo_path),
+                    'mime_type' => 'image/' . $extension,
+                    'extension' => $extension,
+                    'disk' => 'public',
+                    'file_size' => $realFileSize,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             // تحديث حالة الطلب الخارجي وحقن الباركود المولد والتواريخ المقررة بواسطة المشرف
             $application->update([
                 'status' => 'approved',
                 'approved_barcode' => $barcode,
-                'internship_start_date' => $approvalData['internship_start_date'], // 🔥 حفظ تاريخ البدء المعتمد في الطلب
-                'internship_end_date' => $approvalData['internship_end_date']       // 🔥 حفظ تاريخ الانتهاء المعتمد في الطلب
+                'internship_start_date' => $approvalData['internship_start_date'],
+                'internship_end_date' => $approvalData['internship_end_date'],
             ]);
 
             return $employee;
@@ -190,7 +295,7 @@ class InternshipService
     }
 
     /**
-     * 5. رفض طلب التدريب ونقل المنطق برمته للطبقة الخدمية حماية للهندسة المعمارية للنظام
+     * 5. رفض طلب التدريب أو التوظيف ونقل المنطق برمته للطبقة الخدمية حماية للهندسة المعمارية للنظام
      */
     public function reject(int $applicationId): InternshipApplication
     {
@@ -201,7 +306,7 @@ class InternshipService
     }
 
     /**
-     * 6. رفض طلب التدريب ونقل المنطق برمته للطبقة الخدمية حماية للهندسة المعمارية للنظام (دالة الدعم للمتحكم القديم)
+     * 6. رفض طلب التدريب أو التوظيف (دالة الدعم للمتحكم القديم)
      */
     public function rejectApplication(int $applicationId): InternshipApplication
     {
@@ -222,7 +327,7 @@ class InternshipService
                 ->where('is_active', true)
                 ->update([
                     'is_active' => false,
-                    'end_date' => Carbon::today()->subDay()->toDateString()
+                    'end_date' => Carbon::today()->subDay()->toDateString(),
                 ]);
 
             // إنشاء عقد التعيين الرسمي الدائم الجديد بكافة حساباته وتفاصيله المالية
@@ -235,10 +340,9 @@ class InternshipService
                 'basic_salary' => $conversionData['basic_salary'],
                 'start_date' => Carbon::today()->toDateString(),
                 'is_active' => true,
-                'attendance_mode' => 'manual', // 🔥 تم التعديل إلى manual لتتوافق مع خيارات الـ ENUM في قاعدة البيانات
+                'attendance_mode' => 'manual',
             ]);
 
-            // حل معضلة الحساب الرقمي وفصل فوضى الـ IDs المشتركة عن الموظفين الحقيقيين:
             // نبحث عن آخر موظف رسمي يحمل كود EMP لهذا العام لنولد الرقم التالي له بدقة وهندسة مستقرة
             $latestEmp = Employee::where('employee_number', 'like', 'EMP-' . date('Y') . '-%')
                 ->latest('id')
@@ -261,37 +365,53 @@ class InternshipService
                 'employment_type' => EmploymentType::FullTime->value,
                 'status' => EmployeeStatus::InService->value,
                 'employee_number' => $newEmployeeNumber,
-                'barcode' => $newBarcode, // حقن الباركود المحدث بنجاح ليعمل فورياً مع الكشك
+                'barcode' => $newBarcode,
                 'join_date' => Carbon::today()->toDateString(),
                 'position_id' => $conversionData['position_id'],
                 'department_id' => $conversionData['department_id'],
                 'manager_id' => $conversionData['manager_id'] ?? $employee->manager_id,
 
                 // تحديث الحالة التاريخية للتدريب لتبقى مرجعاً للأبد في لوحات تحليل ذكاء الأعمال BI
-                'internship_status' => 'converted'
+                'internship_status' => 'converted',
             ]);
 
             return $employee;
         });
     }
 
-
-
     // =========================================================================
-    // 8. محركات الفلترة والبحث المتقدم لـ (الطلبات، المتدربين النشطين، والمنتهية فترتهم)
+    // 8. محركات الفلترة والبحث المتقدم لـ (الطلبات، المعاينات، المتدربين النشطين، والمنتهية فترتهم)
     // =========================================================================
 
     /**
-     * جلب طلبات التدريب (معلقة / مرفوضة) مع تطبيق فلاتر البحث والتاريخ
+     * جلب طلبات التدريب والتوظيف (معلقة / معاينة / مرفوضة) مع تطبيق فلاتر البحث والتاريخ ونوع الطلب ومصدره
      */
     public function getApplicationsWithFilters(string $status, array $filters): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        $query = \App\Modules\HR\Models\InternshipApplication::where('status', $status);
+        $query = InternshipApplication::with('position');
+
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        if (!empty($filters['application_type'])) {
+            $query->where('application_type', $filters['application_type']);
+        }
+
+        if (!empty($filters['source'])) {
+            $query->where('source', $filters['source']);
+        }
+
+        if (!empty($filters['position_id'])) {
+            $query->where('position_id', $filters['position_id']);
+        }
 
         if (!empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
                 $q->where('full_name', 'like', '%' . $filters['search'] . '%')
-                  ->orWhere('phone', 'like', '%' . $filters['search'] . '%');
+                  ->orWhere('phone', 'like', '%' . $filters['search'] . '%')
+                  ->orWhere('national_id', 'like', '%' . $filters['search'] . '%')
+                  ->orWhere('tracking_code', 'like', '%' . $filters['search'] . '%');
             });
         }
 
@@ -311,30 +431,33 @@ class InternshipService
     }
 
     /**
- * المحرك الأوتوماتيكي للمزامنة اللحظية (On-Demand Lazy Sync)
- */
-public function syncExpiredInternships(): void
-{
-    Employee::withoutGlobalScope('exclude_interns')
-        ->where('employment_type', EmploymentType::Intern->value)
-        ->where('internship_status', 'active')
-        ->whereNotNull('internship_end_date')
-        ->where('internship_end_date', '<', Carbon::today()->toDateString())
-        ->update([
-            'internship_status' => 'completed',
-        ]);
-}
+     * المحرك الأوتوماتيكي للمزامنة اللحظية (On-Demand Lazy Sync)
+     */
+    public function syncExpiredInternships(): void
+    {
+        Employee::withoutGlobalScope('exclude_interns')
+            ->where('employment_type', EmploymentType::Intern->value)
+            ->where('internship_status', 'active')
+            ->whereNotNull('internship_end_date')
+            ->where('internship_end_date', '<', Carbon::today()->toDateString())
+            ->update([
+                'internship_status' => 'completed',
+            ]);
+    }
 
     /**
-     * جلب المتدربين النشطين مع تطبيق فلاتر البحث ونطاق تاريخ بدء التدريب
+     * جلب المتدربين النشطين (أكاديمي وتوظيف تحت التدريب) مع تطبيق فلاتر البحث ونطاق تاريخ بدء التدريب
      */
     public function getActiveInternsWithFilters(array $filters): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-
-    $this->syncExpiredInternships();
+        $this->syncExpiredInternships();
 
         $query = Employee::onlyInterns()
             ->with(['department', 'position', 'manager', 'profilePhoto']);
+
+        if (!empty($filters['application_type'])) {
+            $query->where('application_type', $filters['application_type']);
+        }
 
         if (!empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {
@@ -358,13 +481,12 @@ public function syncExpiredInternships(): void
         return $query->oldest()->paginate(15);
     }
 
-
     /**
      * 9. تمديد فترة التدريب وتعديل تواريخ البدء والانتهاء للمتدرب مع مزامنة العقد المالي والزمني
      */
-    public function updateInternshipDates(int $employeeId, array $data): \App\Modules\HR\Models\Employee
+    public function updateInternshipDates(int $employeeId, array $data): Employee
     {
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($employeeId, $data) {
+        return DB::transaction(function () use ($employeeId, $data) {
             // جلب سجل المتدرب عبر آلية كسر العزل الآمنة شاملة المتدربين
             $employee = Employee::withInterns()->findOrFail($employeeId);
 
@@ -389,7 +511,7 @@ public function syncExpiredInternships(): void
                 ]);
 
             return $employee;
-    });
+        });
     }
 
     /**
@@ -401,6 +523,10 @@ public function syncExpiredInternships(): void
 
         $query = Employee::onlyCompletedInterns()
             ->with(['department', 'position', 'manager', 'profilePhoto']);
+
+        if (!empty($filters['application_type'])) {
+            $query->where('application_type', $filters['application_type']);
+        }
 
         if (!empty($filters['search'])) {
             $query->where(function ($q) use ($filters) {

@@ -10,6 +10,8 @@ use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Http\Requests\Employee\ApproveInternApplicationRequest;
 use App\Modules\HR\Http\Requests\Employee\ConvertInternToFullTimeRequest;
 use App\Modules\HR\Http\Requests\Employee\RejectInternApplicationRequest;
+use App\Modules\HR\Http\Requests\Employee\StoreManualApplicationRequest;
+use App\Modules\HR\Http\Requests\Employee\ScheduleInterviewRequest;
 use App\Modules\HR\Http\Resources\InternshipApplicationResource;
 use App\Modules\HR\Http\Resources\EmployeeResource;
 use App\Modules\HR\Services\InternshipService;
@@ -29,40 +31,57 @@ class InternshipDashboardController extends Controller
     }
 
     /**
-     * جلب حالة استقبال طلبات التدريب الخارجية الحالية
+     * جلب حالة استقبال طلبات التدريب والتوظيف الخارجية الحالية
      */
     public function getRegistrationStatus(): JsonResponse
     {
         Gate::authorize('viewAny', InternshipApplication::class);
 
-        $isOpen = (bool) Cache::get('hr_internship_applications_open', true);
+        $internshipOpen = (bool) Cache::get('hr_internship_applications_open', true);
+        $jobOpen = (bool) Cache::get('hr_job_applications_open', true);
 
         return response()->json([
-            'is_open' => $isOpen,
-            'message' => $isOpen ? 'استقبال الطلبات مفتوح' : 'استقبال الطلبات مغلق'
+            'is_open' => $internshipOpen, // التوافق العكسي الكامل مع واجهة التدريب القائمة
+            'internship_open' => $internshipOpen,
+            'job_open' => $jobOpen,
+            'message' => $internshipOpen ? 'استقبال الطلبات مفتوح' : 'استقبال الطلبات مغلق'
         ], 200);
     }
 
     /**
-     * تبديل حالة استقبال طلبات التدريب الخارجية (فتح / قفل)
+     * تبديل حالة استقبال الطلبات الخارجية (فتح / قفل) للتدريب أو التوظيف
      */
-    public function toggleRegistrationStatus(): JsonResponse
+    public function toggleRegistrationStatus(Request $request): JsonResponse
     {
         Gate::authorize('toggleStatus', InternshipApplication::class);
 
-        $currentStatus = (bool) Cache::get('hr_internship_applications_open', true);
+        $type = $request->input('type', 'internship');
+        $cacheKey = $type === 'employment'
+            ? 'hr_job_applications_open'
+            : 'hr_internship_applications_open';
+
+        $currentStatus = (bool) Cache::get($cacheKey, true);
         $newStatus = !$currentStatus;
 
-        Cache::forever('hr_internship_applications_open', $newStatus);
+        Cache::forever($cacheKey, $newStatus);
+
+        $internshipOpen = (bool) Cache::get('hr_internship_applications_open', true);
+        $jobOpen = (bool) Cache::get('hr_job_applications_open', true);
+
+        $label = $type === 'employment' ? 'التوظيف' : 'التدريب';
 
         return response()->json([
             'is_open' => $newStatus,
-            'message' => $newStatus ? 'تم فتح استقبال الطلبات بنجاح.' : 'تم قفل استقبال الطلبات بنجاح.'
+            'internship_open' => $internshipOpen,
+            'job_open' => $jobOpen,
+            'message' => $newStatus
+                ? "تم فتح استقبال طلبات {$label} بنجاح."
+                : "تم قفل استقبال طلبات {$label} بنجاح."
         ], 200);
     }
 
     /**
-     * استعراض كافة طلبات التدريب الخارجية المعلقة والمرفوضة مع الفلترة المتقدمة والتاريخ
+     * استعراض كافة طلبات التدريب والتوظيف الخارجية والمحلية (معلقة / معاينة / مرفوضة) مع الفلترة المتقدمة
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -70,6 +89,8 @@ class InternshipDashboardController extends Controller
 
         if ($status === 'rejected') {
             Gate::authorize('viewRejected', InternshipApplication::class);
+        } elseif ($status === 'all') {
+            Gate::authorize('viewAny', InternshipApplication::class);
         } else {
             Gate::authorize('viewPending', InternshipApplication::class);
         }
@@ -77,6 +98,41 @@ class InternshipDashboardController extends Controller
         $applications = $this->internshipService->getApplicationsWithFilters($status, $request->all());
 
         return InternshipApplicationResource::collection($applications);
+    }
+
+    /**
+     * إدخال طلب تدريب أو توظيف يدوياً من لوحة التحكم (لوكال)
+     */
+    public function storeManual(StoreManualApplicationRequest $request): JsonResponse
+    {
+        Gate::authorize('create', InternshipApplication::class);
+
+        $application = $this->internshipService->storeManualApplication(
+            $request->validated(),
+            $request->file('photo'),
+            $request->file('cv')
+        );
+
+        return response()->json([
+            'message' => 'تم تسجيل الطلب يدوياً بنجاح وإصدار كود المتابعة الخاص به.',
+            'data' => new InternshipApplicationResource($application)
+        ], 201);
+    }
+
+    /**
+     * تحديد موعد المعاينة ونقل الطلب إلى مرحلة المعاينة
+     */
+    public function scheduleInterview(ScheduleInterviewRequest $request, int $id): JsonResponse
+    {
+        $application = InternshipApplication::findOrFail($id);
+        Gate::authorize('scheduleInterview', $application);
+
+        $updatedApplication = $this->internshipService->scheduleInterview($id, $request->validated());
+
+        return response()->json([
+            'message' => 'تم تحديد موعد المعاينة ونقل الطلب إلى مرحلة المعاينة بنجاح.',
+            'data' => new InternshipApplicationResource($updatedApplication)
+        ], 200);
     }
 
     /**
@@ -128,13 +184,13 @@ class InternshipDashboardController extends Controller
         $employee = $this->internshipService->updateInternshipDates($id, $validated);
 
         return response()->json([
-            'message' => 'تم تحديث وتمديد فترات التدريب الأكاديمي بنجاح، ومزامنة العقد المالي التابع له.',
+            'message' => 'تم تحديث وتمديد فترات التدريب بنجاح، ومزامنة العقد المالي التابع له.',
             'data' => new EmployeeResource($employee->load(['department', 'position', 'currentContract']))
         ], 200);
     }
 
     /**
-     * اعتماد وقبول طلب التدريب وتحويله لمتدرب رسمي
+     * اعتماد وقبول الطلب لدخول فترة التدريب وتحويله لمتدرب رسمي
      */
     public function approve(ApproveInternApplicationRequest $request, int $id): JsonResponse
     {
@@ -144,13 +200,13 @@ class InternshipDashboardController extends Controller
         $employee = $this->internshipService->approveApplication($id, $request->validated());
 
         return response()->json([
-            'message' => 'تم قبول المتدرب بنجاح، وإصدار الرقم الوظيفي والباركود الخاص به، وتوليد عقده آلياً.',
+            'message' => 'تم قبول المتقدم بنجاح، وإصدار الرقم الوظيفي والباركود الخاص به، وتوليد عقده آلياً.',
             'data' => new EmployeeResource($employee->load(['department', 'position']))
         ], 200);
     }
 
     /**
-     * رفض طلب التدريب المقدم (محقون بطبقة الفحص المستحدثة ومعزول تماماً داخل الـ Service)
+     * رفض الطلب المقدم (محقون بطبقة الفحص المستحدثة ومعزول تماماً داخل الـ Service)
      */
     public function reject(RejectInternApplicationRequest $request, int $id): JsonResponse
     {
@@ -160,7 +216,7 @@ class InternshipDashboardController extends Controller
         $this->internshipService->rejectApplication($id);
 
         return response()->json([
-            'message' => 'تم رفض طلب التدريب بنجاح.'
+            'message' => 'تم رفض الطلب بنجاح.'
         ], 200);
     }
 
@@ -175,7 +231,7 @@ class InternshipDashboardController extends Controller
         $employee = $this->internshipService->convertToFullTime($id, $request->validated());
 
         return response()->json([
-            'message' => 'تهانينا! تم تثبيت المتدرب بنجاح كموظف دائم، وإصدار رقمه الوظيفي الرسمي وعقد العمل الجديد.',
+            'message' => 'تهانينا! تم تثبيت الموظف بنجاح كموظف دائم، وإصدار رقمه الوظيفي الرسمي وعقد العمل الجديد.',
             'data' => new EmployeeResource($employee->load(['department', 'position', 'currentContract']))
         ], 200);
     }

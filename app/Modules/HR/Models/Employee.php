@@ -32,6 +32,7 @@ class Employee extends Model
         'full_name', 'date_of_birth', 'gender', 'marital_status',
         'national_id', 'email', 'phone', 'address',
         'employee_number', 'barcode', 'tracking_code', 'join_date', 'status', 'employment_type',
+        'application_type',
         'department_id', 'position_id', 'manager_id', 'user_id',
         'internship_start_date', 'internship_end_date', 'internship_status',
         'academic_institution', 'academic_major', 'required_training_hours', 'internship_notes'

@@ -48,6 +48,7 @@ Route::post('hr/visitors/public-register', [VisitorController::class, 'publicSto
 Route::get('hr/visitors/search-hosts', [VisitorController::class, 'searchHosts']);
 Route::get('hr/visitors/check-status/{token}', [\App\Modules\HR\Http\Controllers\VisitorController::class, 'checkStatus']);
 
+Route::get('hr/internship/registration-status', [PublicInternshipController::class, 'registrationStatus'])->middleware('throttle:30,1');
 Route::post('hr/internship/apply', [PublicInternshipController::class, 'store'])->middleware('throttle:5,1');
 Route::post('hr/internship/track', [PublicInternshipController::class, 'track'])->middleware('throttle:10,1');
 Route::post('hr/internship/update/{id}', [PublicInternshipController::class, 'update'])->middleware('throttle:5,1');
@@ -83,14 +84,16 @@ Route::middleware('auth:sanctum')
     Route::apiResource('employees', EmployeeController::class);
 
     // -------------------------------------------
-    // إدارة المتدربين والتحويلات (Internship Management)
+    // إدارة المتدربين وطلبات التوظيف والتحويلات (Internship & Recruitment Management)
     // -------------------------------------------
     Route::get('internship-applications', [InternshipDashboardController::class, 'index']);
+    Route::post('internship-applications/manual', [InternshipDashboardController::class, 'storeManual']);
     Route::get('internship-applications/active-interns', [InternshipDashboardController::class, 'activeInterns']);
     Route::get('internship-applications/completed-interns', [InternshipDashboardController::class, 'completedInterns']);
-    // جلب حالة التقديم الحالية (مفتوح / مغلق)
+    // جلب وتبديل حالة التقديم الحالية (مفتوح / مغلق) للتدريب والتوظيف
     Route::get('internship-applications/registration-status', [InternshipDashboardController::class, 'getRegistrationStatus']);
     Route::post('internship-applications/toggle-registration-status', [InternshipDashboardController::class, 'toggleRegistrationStatus']);
+    Route::post('internship-applications/{id}/interview', [InternshipDashboardController::class, 'scheduleInterview']);
     Route::put('internship-applications/{id}/update-dates', [InternshipDashboardController::class, 'updateDates']);
     Route::post('internship-applications/{id}/approve', [InternshipDashboardController::class, 'approve']);
     Route::post('internship-applications/{id}/reject', [InternshipDashboardController::class, 'reject']);

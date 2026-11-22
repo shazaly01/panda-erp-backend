@@ -13,7 +13,7 @@ class InternshipApplicationPolicy
     use HandlesAuthorization;
 
     /**
-     * التحقق الشامل من امتلاك المستخدم لحيّز صلاحيات التدريب
+     * التحقق الشامل من امتلاك المستخدم لحيّز صلاحيات التدريب والتوظيف
      */
     public function viewAny(User $user): bool
     {
@@ -26,7 +26,7 @@ class InternshipApplicationPolicy
     }
 
     /**
-     * صلاحية استعراض طلبات التقديم المعلقة
+     * صلاحية استعراض طلبات التقديم المعلقة والمعاينات
      */
     public function viewPending(User $user): bool
     {
@@ -58,7 +58,7 @@ class InternshipApplicationPolicy
     }
 
     /**
-     * صلاحية عرض تفاصيل طلب تدريب معين
+     * صلاحية عرض تفاصيل طلب معين
      */
     public function view(User $user, InternshipApplication $application): bool
     {
@@ -66,7 +66,23 @@ class InternshipApplicationPolicy
     }
 
     /**
-     * صلاحية فتح وقفل استقبال طلبات التدريب
+     * صلاحية إدخال طلب تدريب أو توظيف يدوياً من لوحة الإدارة
+     */
+    public function create(User $user): bool
+    {
+        return $user->hasPermissionTo('hr.internship_applications.create');
+    }
+
+    /**
+     * صلاحية تحديد موعد المعاينة ونقل الطلب لمرحلة المعاينة
+     */
+    public function scheduleInterview(User $user, InternshipApplication $application): bool
+    {
+        return $user->hasPermissionTo('hr.internship_applications.interview');
+    }
+
+    /**
+     * صلاحية فتح وقفل استقبال طلبات التدريب والتوظيف
      */
     public function toggleStatus(User $user): bool
     {
@@ -74,7 +90,7 @@ class InternshipApplicationPolicy
     }
 
     /**
-     * صلاحية اعتماد وقبول طلب التدريب
+     * صلاحية اعتماد وقبول الطلب لدخول فترة التدريب
      */
     public function approve(User $user, InternshipApplication $application): bool
     {
@@ -82,7 +98,7 @@ class InternshipApplicationPolicy
     }
 
     /**
-     * صلاحية رفض طلب التدريب
+     * صلاحية رفض الطلب
      */
     public function reject(User $user, InternshipApplication $application): bool
     {
@@ -90,7 +106,7 @@ class InternshipApplicationPolicy
     }
 
     /**
-     * صلاحية حذف طلب التدريب
+     * صلاحية حذف الطلب
      */
     public function delete(User $user, InternshipApplication $application): bool
     {
