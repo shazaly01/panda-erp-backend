@@ -31,8 +31,8 @@ class PayrollService
     ) {}
 
     /**
-     * تجميع المدخلات المتغيرة للموظف في فترة معينة (آلياً)
-     * تشمل: أقساط السلف المصروفة والمستحقة، الحوافز والبدلات والاستقطاعات اليدوية، الإجازات غير المدفوعة، والغياب والتأخير.
+     * تجميع المدخلات المتغيرة للموظف في فترة معينة (آلياً) مع تفاصيل الشفافية الكاملة
+     * تشمل: أقساط السلف المصروفة والمستحقة، الحوافز والبدلات والاستقطاعات اليدوية بأسبابها، الإجازات غير المدفوعة، والغياب والتأخير.
      */
     protected function gatherAutomatedInputs(
         Employee $employee,
@@ -40,21 +40,36 @@ class PayrollService
         string $endDate,
         SupportCollection $rules,
         ?Collection $preloadedAttendanceLogs = null,
-        bool $isOvertimeOnly = false
+        bool $isOvertimeOnly = false,
+        ?int $editingBatchId = null
     ): array {
         if ($isOvertimeOnly) {
-            return []; // تجاهل السلف والخصومات والإجازات في مسير الإضافي المنفصل
+            return [
+                '_INPUT_ITEMS'         => [],
+                '_LOAN_ITEMS'          => [],
+                '_ABSENT_DATES'        => [],
+                '_UNPAID_LEAVE_RANGES' => [],
+            ];
         }
 
         $inputs = [];
 
-        // 1. جلب أقساط السلف المستحقة في هذه الفترة (يشترط أن تكون السلفة مصروفة فعلياً للموظف)
+        // 1. جلب أقساط السلف المستحقة في هذه الفترة (يشمل الأقساط المرتبطة بالمسير الجاري تعديله إن وجد)
         $installments = LoanInstallment::whereHas('loan', function ($q) use ($employee): void {
                 $q->where('employee_id', $employee->id)
                   ->where('status', 'paid_to_employee');
             })
-            ->where('status', 'pending')
+            ->where(function ($q) use ($editingBatchId): void {
+                $q->where('status', 'pending');
+                if ($editingBatchId !== null) {
+                    $q->orWhere(function ($sub) use ($editingBatchId): void {
+                        $sub->where('status', 'deducted')
+                            ->where('payroll_batch_id', $editingBatchId);
+                    });
+                }
+            })
             ->whereBetween('due_month', [$startDate, $endDate])
+            ->orderBy('due_month')
             ->get();
 
         $totalLoanDeduction = (float) $installments->sum('amount');
@@ -62,11 +77,43 @@ class PayrollService
             $inputs['LOAN_DEDUCTION'] = round($totalLoanDeduction, 2);
         }
 
-        // 2. جلب كافة المدخلات المتغيرة غير المعالجة (bonus, allowance, penalty, deduction)
+        $loanItems = [];
+        foreach ($installments as $inst) {
+            $remainingQuery = LoanInstallment::where('loan_id', $inst->loan_id)
+                ->where('status', 'pending')
+                ->where('id', '!=', $inst->id);
+
+            $loanItems[] = [
+                'id'               => $inst->id,
+                'loan_id'          => $inst->loan_id,
+                'amount'           => round((float) $inst->amount, 2),
+                'due_month'        => $inst->due_month?->format('Y-m-d'),
+                'remaining_amount' => round((float) (clone $remainingQuery)->sum('amount'), 2),
+                'remaining_count'  => (int) (clone $remainingQuery)->count(),
+            ];
+        }
+        $inputs['_LOAN_ITEMS'] = $loanItems;
+
+        // 2. جلب كافة المدخلات المتغيرة غير المعالجة (أو المرتبطة بالمسير الجاري تعديله)
         $payrollInputs = PayrollInput::where('employee_id', $employee->id)
-            ->where('is_processed', false)
+            ->where(function ($q) use ($editingBatchId): void {
+                $q->where('is_processed', false);
+                if ($editingBatchId !== null) {
+                    $q->orWhere('payroll_batch_id', $editingBatchId);
+                }
+            })
             ->whereBetween('date', [$startDate, $endDate])
+            ->orderBy('date')
+            ->orderBy('id')
             ->get();
+
+        $inputs['_INPUT_ITEMS'] = $payrollInputs->map(fn (PayrollInput $item): array => [
+            'id'     => $item->id,
+            'type'   => $item->type,
+            'amount' => round((float) $item->amount, 2),
+            'date'   => $item->date?->format('Y-m-d'),
+            'reason' => $item->reason,
+        ])->values()->all();
 
         $totalBonus = (float) $payrollInputs->where('type', 'bonus')->sum('amount');
         $totalVariableAllowance = (float) $payrollInputs->where('type', 'allowance')->sum('amount');
@@ -111,6 +158,7 @@ class PayrollService
         $periodStartCarbon = Carbon::parse($startDate)->startOfDay();
         $periodEndCarbon = Carbon::parse($endDate)->startOfDay();
         $unpaidLeaveDays = 0.0;
+        $unpaidLeaveRanges = [];
 
         $unpaidLeaves = LeaveRequest::where('employee_id', $employee->id)
             ->where('status', 'approved')
@@ -124,19 +172,30 @@ class PayrollService
         foreach ($unpaidLeaves as $leave) {
             $leaveStart = Carbon::parse($leave->start_date)->startOfDay();
             $leaveEnd = Carbon::parse($leave->end_date)->startOfDay();
+            $daysInPeriod = 0.0;
 
             if ($leaveStart->gte($periodStartCarbon) && $leaveEnd->lte($periodEndCarbon) && (float) $leave->total_days > 0) {
-                $unpaidLeaveDays += (float) $leave->total_days;
+                $daysInPeriod = (float) $leave->total_days;
             } else {
                 $overlapStart = $leaveStart->gt($periodStartCarbon) ? $leaveStart : $periodStartCarbon;
                 $overlapEnd = $leaveEnd->lt($periodEndCarbon) ? $leaveEnd : $periodEndCarbon;
                 if ($overlapEnd->gte($overlapStart)) {
-                    $unpaidLeaveDays += (float) ($overlapStart->diffInDays($overlapEnd) + 1);
+                    $daysInPeriod = (float) ($overlapStart->diffInDays($overlapEnd) + 1);
                 }
+            }
+
+            $unpaidLeaveDays += $daysInPeriod;
+            if ($daysInPeriod > 0) {
+                $unpaidLeaveRanges[] = [
+                    'start_date' => $leaveStart->format('Y-m-d'),
+                    'end_date'   => $leaveEnd->format('Y-m-d'),
+                    'days'       => round($daysInPeriod, 2),
+                ];
             }
         }
 
         $inputs['UNPAID_LEAVE_DAYS'] = round($unpaidLeaveDays, 2);
+        $inputs['_UNPAID_LEAVE_RANGES'] = $unpaidLeaveRanges;
 
         // 4. جلب التأخيرات والانصراف المبكر والغياب (مع استبعاد أيام الإجازة غير المدفوعة لمنع ازدواجية الخصم)
         $attendanceLogs = $preloadedAttendanceLogs ?? AttendanceLog::where('employee_id', $employee->id)
@@ -161,14 +220,19 @@ class PayrollService
         $inputs['DELAY_MINUTES'] = (int) $attendanceLogs->sum('delay_minutes');
         $inputs['EARLY_LEAVE_MINUTES'] = (int) $attendanceLogs->sum('early_leave_minutes');
         $inputs['ABSENT_DAYS'] = (int) $absentLogs->count();
+        $inputs['_ABSENT_DATES'] = $absentLogs
+            ->map(fn (AttendanceLog $log): string => Carbon::parse($log->date)->format('Y-m-d'))
+            ->sort()
+            ->values()
+            ->all();
 
         return $inputs;
     }
 
     /**
-     * حساب قسيمة راتب افتراضية (Preview) لموظف معين لفترة محددة
+     * حساب قسيمة راتب افتراضية (Preview) لموظف معين لفترة محددة مع كامل تفاصيل الشفافية
      */
-    public function previewPayslip(Employee $employee, PayPeriod $period, PayrollRunType $runType): array
+    public function previewPayslip(Employee $employee, PayPeriod $period, PayrollRunType $runType, ?int $editingBatchId = null): array
     {
         // 1. جلب العقد النشط والساري المتوافق مع تواريخ الفترة ومجموعة الدفع
         $contract = $employee->contractForPeriod($period);
@@ -218,7 +282,8 @@ class PayrollService
             $endDate,
             $rules,
             $attendanceLogs,
-            $isOvertimeOnly
+            $isOvertimeOnly,
+            $editingBatchId
         );
 
         $timeEvaluations = $this->timeEvaluation->evaluatePeriod(
@@ -279,7 +344,7 @@ class PayrollService
         $otWeekendHours = (float) ($timeEvaluations['OT_WEEKEND_HOURS'] ?? 0.0);
         $otHolidayHours = (float) ($timeEvaluations['OT_HOLIDAY_HOURS'] ?? 0.0);
 
-        // حساب الاستحقاق الإضافي (يشمل الساعات العادية والأيام الإضافية عند تفعيل is_daily_basis)
+        // حساب الاستحقاق الإضافي
         $holidayEarnings = $otHolidayHours * $normalHourRate * $holidayRate;
         $weekendEarnings = $otWeekendHours * $normalHourRate * $weekendRate;
         $regularHourlyEarnings = $otRegularHours * $normalHourRate * $regularRate;
@@ -305,7 +370,7 @@ class PayrollService
         $overtimeTax = round($grossOvertime * $effectiveTaxRate, 2);
         $netOvertime = round($grossOvertime - $overtimeTax, 2);
 
-        // 7. تهيئة ذاكرة السياق الحسابي (Context) بكافة القيم الديناميكية
+        // 7. تهيئة ذاكرة السياق الحسابي (Context) بكافة القيم الديناميكية وتفاصيل الشفافية
         $context = array_merge([
             'BASIC'                => $isOvertimeOnly ? 0.0 : $proratedBasic,
             'CONTRACT_BASIC'       => $basicSalary,
@@ -398,6 +463,37 @@ class PayrollService
             ];
         }
 
+        $netSalary = round($totalAllowances - $totalDeductions, 2);
+
+        // جلب بيانات الصرف والمديونية المتراكمة للموظف لتعزيز الشفافية
+        $existingPayslip = $editingBatchId !== null
+            ? Payslip::with('batch:id,disbursement_percentage')
+                ->where('payroll_batch_id', $editingBatchId)
+                ->where('employee_id', $employee->id)
+                ->first()
+            : Payslip::with('batch:id,disbursement_percentage')
+                ->where('employee_id', $employee->id)
+                ->whereHas('batch', function ($q) use ($period, $runType): void {
+                    $q->where('status', 'posted')
+                      ->where('pay_period_id', $period->id)
+                      ->where('run_type', $runType->value);
+                })
+                ->first();
+
+        $previousUnpaidBalance = (float) Payslip::where('employee_id', $employee->id)
+            ->when($existingPayslip, fn ($q) => $q->where('id', '!=', $existingPayslip->id))
+            ->whereHas('batch', fn ($q) => $q->where('status', 'posted'))
+            ->sum('remaining_amount');
+
+        $disbursementInfo = [
+            'disbursement_percentage'   => $existingPayslip?->batch?->disbursement_percentage !== null
+                ? (float) $existingPayslip->batch->disbursement_percentage
+                : 100.00,
+            'paid_amount'               => $existingPayslip ? (float) $existingPayslip->paid_amount : $netSalary,
+            'remaining_amount'          => $existingPayslip ? (float) $existingPayslip->remaining_amount : 0.00,
+            'previous_unpaid_balance'   => round($previousUnpaidBalance, 2),
+        ];
+
         // 9. إخراج النتيجة النهائية للقسيمة
         return [
             'employee_name'  => $employee->full_name,
@@ -409,7 +505,16 @@ class PayrollService
                 'total_allowances'            => round($totalAllowances, 2),
                 'total_deductions'            => round($totalDeductions, 2),
                 'total_company_contributions' => round($totalCompanyContributions, 2),
-                'net_salary'                  => round($totalAllowances - $totalDeductions, 2),
+                'net_salary'                  => $netSalary,
+            ],
+            'disbursement'   => $disbursementInfo,
+            'transparency'   => [
+                'input_items'         => $automatedInputs['_INPUT_ITEMS'] ?? [],
+                'loan_items'          => $automatedInputs['_LOAN_ITEMS'] ?? [],
+                'absent_dates'        => $automatedInputs['_ABSENT_DATES'] ?? [],
+                'unpaid_leave_ranges' => $automatedInputs['_UNPAID_LEAVE_RANGES'] ?? [],
+                'delay_minutes'       => (int) ($automatedInputs['DELAY_MINUTES'] ?? 0),
+                'early_leave_minutes' => (int) ($automatedInputs['EARLY_LEAVE_MINUTES'] ?? 0),
             ],
             'raw_inputs'     => $context,
         ];
@@ -467,14 +572,14 @@ class PayrollService
     }
 
     /**
-     * جلب الموظفين المؤهلين لمسير الرواتب بناءً على مجموعة دفع الفترة وتواريخ سريان العقد مع تحديد حالة ترحيلهم مسبقاً
+     * جلب الموظفين المؤهلين لمسير الرواتب مرتبين أبجدياً بالاسم بناءً على مجموعة دفع الفترة وتواريخ سريان العقد
      */
-    public function getEligibleEmployees(PayPeriod $period, PayrollRunType $runType): Collection
+    public function getEligibleEmployees(PayPeriod $period, PayrollRunType $runType, ?int $editingBatchId = null): Collection
     {
         $startDate = $period->start_date->format('Y-m-d');
         $endDate = $period->end_date->format('Y-m-d');
 
-        // 1. جلب الموظفين النشطين الذين لديهم عقد سارٍ متوافق مع مجموعة دفع وتواريخ الفترة وهيكل الرواتب
+        // 1. جلب الموظفين النشطين مرتبين أبجدياً بالاسم الكامل
         $employees = Employee::query()
             ->with([
                 'department:id,name',
@@ -497,14 +602,19 @@ class PayrollService
                             ->orWhere('end_date', '>=', $startDate);
                       });
             })
-            ->latest('id')
+            ->orderBy('full_name', 'asc')
+            ->orderBy('id', 'asc')
             ->get();
 
-        // 2. جلب أرقام الموظفين الذين تم ترحيل رواتبهم لنفس الفترة ونوع المسير
-        $processedEmployeeIds = Payslip::whereHas('batch', function ($query) use ($period, $runType): void {
+        // 2. جلب أرقام الموظفين الذين تم ترحيل رواتبهم في مسيرات أخرى لنفس الفترة ونوع المسير
+        $processedEmployeeIds = Payslip::whereHas('batch', function ($query) use ($period, $runType, $editingBatchId): void {
             $query->where('status', 'posted')
                   ->where('pay_period_id', $period->id)
                   ->where('run_type', $runType->value);
+
+            if ($editingBatchId !== null) {
+                $query->where('id', '!=', $editingBatchId);
+            }
         })
         ->distinct()
         ->pluck('employee_id')

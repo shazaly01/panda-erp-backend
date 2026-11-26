@@ -19,6 +19,8 @@ use App\Modules\HR\Http\Controllers\ShiftController;
 use App\Modules\HR\Http\Controllers\OvertimePolicyController;
 use App\Modules\HR\Http\Controllers\PayGroupController;
 use App\Modules\HR\Http\Controllers\PayPeriodController;
+use App\Modules\HR\Http\Controllers\ViolationTypeController;
+use App\Modules\HR\Http\Controllers\EmployeeDisciplinaryActionController;
 
 // 🌟 المتحكمات الجديدة الخاصة بمعمارية الجدولة
 use App\Modules\HR\Http\Controllers\WorkingScheduleController;
@@ -105,7 +107,7 @@ Route::middleware('auth:sanctum')
     Route::apiResource('contracts', ContractController::class);
 
     // ===========================================
-    // 3. إعدادات الرواتب (Payroll Settings)
+    // 3. إعدادات الرواتب واللوائح (Payroll & Disciplinary Settings)
     // ===========================================
     Route::apiResource('salary-rules', SalaryRuleController::class)
         ->parameters(['salary-rules' => 'salary_rule']);
@@ -119,6 +121,10 @@ Route::middleware('auth:sanctum')
     Route::apiResource('pay-groups', PayGroupController::class);
     Route::post('pay-periods/generate', [PayPeriodController::class, 'generate']);
     Route::apiResource('pay-periods', PayPeriodController::class);
+
+    // لوائح المخالفات وسلالم التدرج العقابي
+    Route::apiResource('violation-types', ViolationTypeController::class)
+        ->parameters(['violation-types' => 'violation_type']);
 
     // ===========================================
     // 4. العمليات والخدمة الذاتية (Operations & Self-Service)
@@ -175,6 +181,14 @@ Route::middleware('auth:sanctum')
     // المدخلات المالية المتغيرة (حوافز/خصومات)
     Route::apiResource('payroll-inputs', PayrollInputController::class);
 
+    // سجل المخالفات والجزاءات التأديبية
+    Route::post('disciplinary-actions/preview-escalation', [EmployeeDisciplinaryActionController::class, 'previewEscalation']);
+    Route::post('disciplinary-actions/{disciplinary_action}/approve', [EmployeeDisciplinaryActionController::class, 'approve']);
+    Route::post('disciplinary-actions/{disciplinary_action}/cancel', [EmployeeDisciplinaryActionController::class, 'cancel']);
+    Route::apiResource('disciplinary-actions', EmployeeDisciplinaryActionController::class)
+        ->parameters(['disciplinary-actions' => 'disciplinary_action'])
+        ->except(['update']);
+
     // -------------------------------------------
     // أكواد الإنترنت (Internet Vouchers)
     // -------------------------------------------
@@ -190,6 +204,10 @@ Route::middleware('auth:sanctum')
     // 🌟 تم تجميع كل مسارات الرواتب في Group واحد لترتيب الكود
     Route::prefix('payroll')->name('payroll.')->group(function () {
 
+        // مسار التهيئة التلقائية للشهر الحالي أو المسير الجاري تعديله
+        Route::get('initialize', [PayrollController::class, 'initialize'])
+            ->middleware('can:hr.payroll.view');
+
         // مسارات الاستعلامات والجلب
         Route::get('batches', [PayrollController::class, 'getBatches']);
         Route::get('eligible-employees', [PayrollController::class, 'getEligibleEmployees'])
@@ -202,7 +220,7 @@ Route::middleware('auth:sanctum')
         Route::post('preview', [PayrollController::class, 'preview'])
             ->middleware('can:hr.payroll.view');
 
-        // اعتماد وترحيل الرواتب (Post Batch)
+        // اعتماد وترحيل الرواتب أو تحديث مسير قائم (Post / Update Batch)
         Route::post('post-batch', [PayrollController::class, 'postBatch'])
             ->middleware('can:hr.payroll.post');
 

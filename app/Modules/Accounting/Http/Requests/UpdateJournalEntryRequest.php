@@ -6,6 +6,7 @@ namespace App\Modules\Accounting\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
+use App\Modules\Accounting\Rules\PeriodIsOpenRule;
 
 class UpdateJournalEntryRequest extends FormRequest
 {
@@ -18,7 +19,7 @@ class UpdateJournalEntryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'date' => ['sometimes', 'required', 'date'],
+            'date' => ['sometimes', 'required', 'date', new PeriodIsOpenRule()],
             'description' => ['nullable', 'string', 'max:255'],
             'currency_id' => ['nullable', 'integer'],
 

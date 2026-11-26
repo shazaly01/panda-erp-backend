@@ -23,6 +23,7 @@ class PayrollInput extends Model
         'reason',
         'is_processed',
         'payroll_batch_id',
+        'disciplinary_action_id',
         'created_by',
     ];
 
@@ -40,6 +41,11 @@ class PayrollInput extends Model
     public function payrollBatch(): BelongsTo
     {
         return $this->belongsTo(PayrollBatch::class, 'payroll_batch_id');
+    }
+
+    public function disciplinaryAction(): BelongsTo
+    {
+        return $this->belongsTo(EmployeeDisciplinaryAction::class, 'disciplinary_action_id');
     }
 
     public function creator(): BelongsTo

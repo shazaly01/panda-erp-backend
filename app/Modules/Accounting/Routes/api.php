@@ -33,6 +33,7 @@ Route::middleware('auth:sanctum')
     Route::get('accounts/suggest-code', [AccountController::class, 'suggestCode']);
     Route::apiResource('accounts', AccountController::class);
     Route::apiResource('cost-centers', CostCenterController::class);
+    Route::get('fiscal-years/check-status', [FiscalYearController::class, 'checkStatus']);
     Route::apiResource('fiscal-years', FiscalYearController::class);
 
     // --- البحث الموحد في الحسابات والأطراف المساعدة ---

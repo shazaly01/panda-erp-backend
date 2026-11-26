@@ -4,18 +4,24 @@ declare(strict_types=1);
 
 namespace App\Modules\HR\Services;
 
-use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Models\AttendanceLog;
+use App\Modules\HR\Models\Employee;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class AttendanceService
 {
-    private ScheduleResolutionService $scheduleResolutionService;
+    private readonly ScheduleResolutionService $scheduleResolutionService;
+    private readonly DisciplinaryEngineService $disciplinaryEngineService;
 
-    public function __construct(ScheduleResolutionService $scheduleResolutionService)
-    {
+    public function __construct(
+        ScheduleResolutionService $scheduleResolutionService,
+        ?DisciplinaryEngineService $disciplinaryEngineService = null
+    ) {
         $this->scheduleResolutionService = $scheduleResolutionService;
+        $this->disciplinaryEngineService = $disciplinaryEngineService ?? app(DisciplinaryEngineService::class);
     }
 
     /**
@@ -138,7 +144,7 @@ class AttendanceService
         }
 
         // 2. حفظ أو تحديث السجل في قاعدة البيانات
-        return AttendanceLog::updateOrCreate(
+        $log = AttendanceLog::updateOrCreate(
             ['employee_id' => $employee->id, 'date' => $date],
             [
                 'shift_id'              => $shift ? $shift->id : null,
@@ -151,6 +157,15 @@ class AttendanceService
                 'status'                => $status,
             ]
         );
+
+        // 3. تقييم اللوائح والجزاءات المتدرجة آلياً (مع عزل الأخطاء لحماية سير البصمة اليومية)
+        try {
+            $this->disciplinaryEngineService->evaluateAttendanceLog($log);
+        } catch (Throwable $e) {
+            Log::warning("تعذر التقييم الآلي للوائح والجزاءات لسجل الحضور #{$log->id}: {$e->getMessage()}");
+        }
+
+        return $log;
     }
 
     /**
@@ -215,7 +230,7 @@ class AttendanceService
                 $actionData = [
                     'status'  => 'warning',
                     'action'  => 'ignored',
-                    'message' => 'تم تسجيل حضورك وانصرافك لهذا اليوم مسبقاً.'
+                    'message' => 'تم تسجيل حضورك وانصرافك لهذا اليوم مسبقاً.',
                 ];
             } else {
                 $shiftStart = Carbon::parse($date . ' ' . $shift->start_time);
@@ -233,7 +248,7 @@ class AttendanceService
                 $actionData = [
                     'status'  => 'success',
                     'action'  => 'check_in',
-                    'message' => 'أهلاً بك، تم تسجيل الحضور والانصراف تلقائياً بناءً على ورديتك (' . round($shiftDurationMinutes / 60, 1) . ' ساعة).'
+                    'message' => 'أهلاً بك، تم تسجيل الحضور والانصراف تلقائياً بناءً على ورديتك (' . round($shiftDurationMinutes / 60, 1) . ' ساعة).',
                 ];
             }
         } elseif ($attendanceMode === 'single_punch') {
@@ -291,13 +306,13 @@ class AttendanceService
                 $logId = AttendanceLog::where('employee_id', $employee->id)->where('date', $date)->value('id');
 
                 if ($logId) {
-                    $voucher = app(\App\Modules\HR\Services\InternetVoucherService::class)
+                    $voucher = app(InternetVoucherService::class)
                         ->assignAutoVoucher($employee->id, $logId);
 
                     $voucherCode = $voucher->code;
                 }
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::warning('فشل صرف كود إنترنت آلي للموظف ' . $employee->id . ': ' . $e->getMessage());
+                Log::warning('فشل صرف كود إنترنت آلي للموظف ' . $employee->id . ': ' . $e->getMessage());
             }
         }
 
@@ -305,7 +320,7 @@ class AttendanceService
             'status'  => 'success',
             'action'  => $actionData['action'],
             'message' => $actionData['message'],
-            'voucher' => $voucherCode
+            'voucher' => $voucherCode,
         ];
     }
 
@@ -375,7 +390,7 @@ class AttendanceService
         return [
             'status'  => 'success',
             'action'  => $action,
-            'message' => $message
+            'message' => $message,
         ];
     }
 }

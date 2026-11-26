@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Modules\Accounting\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use App\Modules\Accounting\Models\FiscalYear;
 use App\Modules\Accounting\Services\FiscalYearService;
 use App\Modules\Accounting\Http\Requests\StoreFiscalYearRequest;
@@ -24,6 +26,20 @@ class FiscalYearController extends Controller
         $years = FiscalYear::latest('start_date')->get();
 
         return FiscalYearResource::collection($years);
+    }
+
+    public function checkStatus(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+        ]);
+
+        $isOpen = FiscalYear::checkDate((string) $validated['date']);
+
+        return response()->json([
+            'status' => $isOpen ? 'open' : 'closed',
+            'allowed' => $isOpen,
+        ]);
     }
 
     public function show(FiscalYear $fiscalYear)

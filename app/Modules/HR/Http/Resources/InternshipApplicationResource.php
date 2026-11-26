@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\HR\Http\Resources;
 
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -17,6 +18,9 @@ class InternshipApplicationResource extends JsonResource
     {
         $applicationType = $this->application_type ?? 'internship';
         $source = $this->source ?? 'online';
+
+        /** @var FilesystemAdapter $publicDisk */
+        $publicDisk = Storage::disk('public');
 
         return [
             'id' => $this->id,
@@ -47,8 +51,8 @@ class InternshipApplicationResource extends JsonResource
             'internship_end_date' => $this->internship_end_date?->format('Y-m-d'),
 
             // 🛡️ التطابق المعماري: القراءة من قرص الـ public لضمان ثبات الروابط
-            'photo_url' => $this->photo_path ? Storage::disk('public')->url($this->photo_path) : null,
-            'cv_url' => $this->cv_path ? Storage::disk('public')->url($this->cv_path) : null,
+            'photo_url' => $this->photo_path ? $publicDisk->url($this->photo_path) : null,
+            'cv_url' => $this->cv_path ? $publicDisk->url($this->cv_path) : null,
 
             'tracking_code' => $this->tracking_code,
             'status' => $this->status,

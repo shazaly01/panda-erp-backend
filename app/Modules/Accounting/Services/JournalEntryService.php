@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Accounting\Services;
 
 use App\Modules\Accounting\DTO\JournalEntryDto;
-use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Accounting\Enums\EntryStatus;
+use App\Modules\Accounting\Models\JournalEntry;
 use App\Modules\Core\Services\SequenceService;
-use Illuminate\Support\Facades\DB;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Exception;
 
 class JournalEntryService
 {
@@ -48,7 +48,7 @@ class JournalEntryService
     }
 
     /**
-     * تعديل قيد موجود
+     * تعديل قيد موجود (مسودة)
      * الاستراتيجية: الحذف الكامل للتفاصيل وإعادة إنشائها (Recreation Strategy)
      */
     public function updateEntry(JournalEntry $entry, JournalEntryDto $dto): JournalEntry
@@ -56,7 +56,7 @@ class JournalEntryService
         // 1. حماية القيود المرحلة
         if ($entry->status !== EntryStatus::Draft) {
             throw ValidationException::withMessages([
-                'status' => ['لا يمكن تعديل القيد لأنه مرحل أو ملغي.']
+                'status' => ['لا يمكن تعديل القيد لأنه مرحل أو ملغي.'],
             ]);
         }
 
@@ -75,11 +75,59 @@ class JournalEntryService
             ]);
 
             // حذف التفاصيل القديمة (Hard Delete)
-            // ملاحظة: JournalEntryDetail لا يستخدم SoftDeletes، لذا سيتم الحذف نهائياً وهو المطلوب
             $entry->details()->delete();
 
             // إعادة إنشاء التفاصيل الجديدة
             $this->createDetails($entry, $dto->details);
+
+            return $entry->refresh()->load('details');
+        });
+    }
+
+    /**
+     * تحديث قيد نظامي مُرحّل (مثل مسير الرواتب) مع الاحتفاظ بنفس رقم القيد:
+     * يتم تحديث بيانات الرأس وحذف التفاصيل القديمة وإعادة إدراج التفاصيل الجديدة المتوازنة
+     */
+    public function updatePostedSystemEntry(JournalEntry $entry, JournalEntryDto $dto): JournalEntry
+    {
+        if (!in_array($entry->status, [EntryStatus::Draft, EntryStatus::Posted], true)) {
+            throw ValidationException::withMessages([
+                'status' => ['لا يمكن تعديل قيد محاسبي ملغي أو في حالة غير صالحة.'],
+            ]);
+        }
+
+        if ($entry->source !== 'hr_payroll') {
+            throw ValidationException::withMessages([
+                'source' => ['هذا الإجراء مخصص لتحديث قيود مسيرات الرواتب فقط.'],
+            ]);
+        }
+
+        $this->validateBalance($dto);
+
+        return DB::transaction(function () use ($entry, $dto) {
+            $entry->update([
+                'date'        => $dto->date,
+                'description' => $dto->description,
+                'currency_id' => $dto->currency_id,
+                'posted_at'   => now(),
+            ]);
+
+            // حذف السطور القديمة نهائياً وإعادة إدراج السطور المحدثة مع الإبقاء على نفس رقم القيد
+            $entry->details()->delete();
+            $this->createDetails($entry, $dto->details);
+
+            if ($entry->status === EntryStatus::Draft) {
+                $entryNumber = $entry->entry_number ?: $this->sequenceService->generateNumber(
+                    'acc_journal_entry',
+                    null,
+                    null,
+                    (string) $dto->date
+                );
+                $entry->update([
+                    'status'       => EntryStatus::Posted,
+                    'entry_number' => $entryNumber,
+                ]);
+            }
 
             return $entry->refresh()->load('details');
         });
@@ -93,7 +141,7 @@ class JournalEntryService
         // حماية القيود المرحلة
         if ($entry->status !== EntryStatus::Draft) {
             throw ValidationException::withMessages([
-                'status' => ['لا يمكن حذف قيد مرحل. يجب عمل قيد عكسي بدلاً من ذلك.']
+                'status' => ['لا يمكن حذف قيد مرحل. يجب عمل قيد عكسي بدلاً من ذلك.'],
             ]);
         }
 
@@ -114,7 +162,7 @@ class JournalEntryService
         // التحقق من الحالة
         if ($entry->status !== EntryStatus::Draft) {
             throw ValidationException::withMessages([
-                'status' => ['القيد مرحل مسبقاً أو ملغي.']
+                'status' => ['القيد مرحل مسبقاً أو ملغي.'],
             ]);
         }
 
@@ -123,21 +171,30 @@ class JournalEntryService
         $creditSum = $entry->details()->sum('credit');
 
         if (abs($debitSum - $creditSum) > 0.0001) {
-             throw ValidationException::withMessages([
-                'balance' => ["لا يمكن ترحيل قيد غير متزن."]
+            throw ValidationException::withMessages([
+                'balance' => ['لا يمكن ترحيل قيد غير متزن.'],
             ]);
         }
 
         return DB::transaction(function () use ($entry) {
-            // استدعاء الكود العالمي لتوليد رقم القيد
-            $entryNumber = $this->sequenceService->generateNumber('acc_journal_entry');
-        
+            $entryDate = $entry->date instanceof CarbonInterface
+                ? $entry->date->toDateString()
+                : (string) $entry->date;
+
+            // استدعاء الكود العالمي لتوليد رقم القيد بناءً على تاريخ القيد الفعلي
+            $entryNumber = $this->sequenceService->generateNumber(
+                'acc_journal_entry',
+                null,
+                null,
+                $entryDate
+            );
+
             $entry->update([
                 'status'       => EntryStatus::Posted,
                 'entry_number' => $entryNumber,
                 'posted_at'    => now(),
             ]);
-        
+
             return $entry;
         });
     }
@@ -176,7 +233,7 @@ class JournalEntryService
 
         if (abs($totalDebit - $totalCredit) > 0.0001) {
             throw ValidationException::withMessages([
-                'balance' => ["القيد غير متزن! إجمالي المدين ({$totalDebit}) لا يساوي إجمالي الدائن ({$totalCredit})."]
+                'balance' => ["القيد غير متزن! إجمالي المدين ({$totalDebit}) لا يساوي إجمالي الدائن ({$totalCredit})."],
             ]);
         }
     }

@@ -19,6 +19,8 @@ class Payslip extends Model
         'total_allowances',
         'total_deductions',
         'net_salary',
+        'paid_amount',
+        'remaining_amount',
         'details',
     ];
 
@@ -27,6 +29,8 @@ class Payslip extends Model
         'total_allowances' => 'decimal:2',
         'total_deductions' => 'decimal:2',
         'net_salary'       => 'decimal:2',
+        'paid_amount'      => 'decimal:2',
+        'remaining_amount' => 'decimal:2',
         'details'          => 'array',
     ];
 

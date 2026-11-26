@@ -110,6 +110,8 @@ class ModuleServiceProvider extends ServiceProvider
         Gate::policy(\App\Modules\HR\Models\Loan::class, \App\Modules\HR\Policies\LoanPolicy::class);
         Gate::policy(\App\Modules\HR\Models\HrLeavePass::class, \App\Modules\HR\Policies\HrLeavePassPolicy::class);
         Gate::policy(\App\Modules\HR\Models\InternshipApplication::class, \App\Modules\HR\Policies\InternshipApplicationPolicy::class);
+        Gate::policy(\App\Modules\HR\Models\ViolationType::class, \App\Modules\HR\Policies\ViolationTypePolicy::class);
+        Gate::policy(\App\Modules\HR\Models\EmployeeDisciplinaryAction::class, \App\Modules\HR\Policies\EmployeeDisciplinaryActionPolicy::class);
     }
 
     /**

@@ -27,6 +27,17 @@ class PayrollInputResource extends JsonResource
             // إظهار رقم مسير الرواتب فقط إذا تم الترحيل
             'payroll_batch_id' => $this->whenNotNull($this->payroll_batch_id),
 
+            // بيانات ربط الجزاء التأديبي (لإظهار الشارة ومنع التعديل/الحذف المباشر في الواجهة)
+            'disciplinary_action_id' => $this->disciplinary_action_id,
+            'disciplinary_action' => $this->whenLoaded('disciplinaryAction', function () {
+                return $this->disciplinaryAction ? [
+                    'id'                => $this->disciplinaryAction->id,
+                    'number'            => $this->disciplinaryAction->number,
+                    'step_order'        => (int) $this->disciplinaryAction->step_order,
+                    'action_type_label' => $this->disciplinaryAction->action_type_label,
+                ] : null;
+            }),
+
             'created_by_name' => $this->whenLoaded('creator', fn() => $this->creator->name),
         ];
     }

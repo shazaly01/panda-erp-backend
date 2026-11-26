@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\HR\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\HR\Models\PayrollInput;
 use App\Modules\HR\Models\Employee;
 use App\Modules\HR\Http\Requests\Payroll\StorePayrollInputRequest;
@@ -38,12 +39,13 @@ class PayrollInputController extends Controller
     {
         // تم الفحص تلقائياً عبر PayrollInputPolicy@viewAny
 
+        /** @var User|null $user */
         $user = Auth::user();
-        $query = PayrollInput::with(['employee', 'creator']);
+        $query = PayrollInput::with(['employee', 'creator', 'disciplinaryAction']);
 
         // فلترة بوابة الخدمة الذاتية (ESS)
         // إذا لم يكن لديه صلاحية الإدارة أو العرض العام، يرى مدخلاته الشخصية فقط
-        if (!$user->can('hr.payroll_inputs.manage') && !$user->can('hr.payroll_inputs.view') && $user->employee_id) {
+        if ($user && !$user->can('hr.payroll_inputs.manage') && !$user->can('hr.payroll_inputs.view') && $user->employee_id) {
             $query->where('employee_id', $user->employee_id);
         }
 
@@ -81,7 +83,7 @@ class PayrollInputController extends Controller
 
             return response()->json([
                 'message' => 'تم تسجيل الحركة المالية بنجاح.',
-                'data' => new PayrollInputResource($payrollInput->load(['employee', 'creator']))
+                'data' => new PayrollInputResource($payrollInput->load(['employee', 'creator', 'disciplinaryAction']))
             ], 201);
 
         } catch (\Exception $e) {
@@ -95,14 +97,20 @@ class PayrollInputController extends Controller
     public function show(PayrollInput $payrollInput): PayrollInputResource
     {
         // تم الفحص تلقائياً عبر PayrollInputPolicy@view
-        return new PayrollInputResource($payrollInput->load(['employee', 'creator']));
+        return new PayrollInputResource($payrollInput->load(['employee', 'creator', 'disciplinaryAction']));
     }
 
     /**
-     * تعديل الحركة المالية (مسموح فقط إذا لم تُرحّل)
+     * تعديل الحركة المالية (مسموح فقط إذا لم تُرحّل ولم تكن مرتبطة بجزاء تأديبي)
      */
     public function update(UpdatePayrollInputRequest $request, PayrollInput $payrollInput): JsonResponse
     {
+        if ($payrollInput->disciplinary_action_id !== null) {
+            return response()->json([
+                'message' => 'لا يمكن تعديل هذا الاستقطاع مباشرة لأنه ناتج عن جزاء تأديبي؛ يجب إدارة الجزاء من شاشة المخالفات والجزاءات.',
+            ], 422);
+        }
+
         // تم الفحص تلقائياً عبر PayrollInputPolicy@update
         // السياسة ستمنع التعديل إذا كانت الحالة is_processed = true
 
@@ -110,7 +118,7 @@ class PayrollInputController extends Controller
 
         return response()->json([
             'message' => 'تم تحديث الحركة المالية بنجاح.',
-            'data' => new PayrollInputResource($payrollInput->load(['employee', 'creator']))
+            'data' => new PayrollInputResource($payrollInput->load(['employee', 'creator', 'disciplinaryAction']))
         ], 200);
     }
 
@@ -119,6 +127,12 @@ class PayrollInputController extends Controller
      */
     public function destroy(PayrollInput $payrollInput): JsonResponse
     {
+        if ($payrollInput->disciplinary_action_id !== null) {
+            return response()->json([
+                'message' => 'لا يمكن حذف هذا الاستقطاع مباشرة لأنه ناتج عن جزاء تأديبي؛ يرجى إلغاء الجزاء من شاشة المخالفات والجزاءات.',
+            ], 422);
+        }
+
         // تم الفحص تلقائياً عبر PayrollInputPolicy@delete
         $payrollInput->delete();
 

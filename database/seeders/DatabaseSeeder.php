@@ -37,6 +37,8 @@ class DatabaseSeeder extends Seeder
             \App\Modules\HR\Database\Seeders\ShiftSeeder::class,
 
             \App\Modules\HR\Database\Seeders\WorkingScheduleSeeder::class,
+
+            \App\Modules\HR\Database\Seeders\ViolationTypeSeeder::class,
         ]);
     }
 }

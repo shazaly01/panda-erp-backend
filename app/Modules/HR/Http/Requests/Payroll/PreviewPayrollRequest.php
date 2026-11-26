@@ -23,6 +23,7 @@ class PreviewPayrollRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'batch_id'      => ['nullable', 'integer', 'exists:payroll_batches,id'],
             'employee_id'   => ['required', 'integer', 'exists:employees,id'],
             'pay_period_id' => ['required', 'integer', 'exists:hr_pay_periods,id'],
             'run_type'      => ['required', 'string', 'in:regular,overtime_only'],
@@ -35,6 +36,8 @@ class PreviewPayrollRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'batch_id.integer'       => 'معرف المسير يجب أن يكون رقماً صحيحاً.',
+            'batch_id.exists'        => 'مسير الرواتب المحدد غير موجود في النظام.',
             'employee_id.required'   => 'يجب تحديد الموظف المراد معاينة راتبه.',
             'employee_id.integer'    => 'معرف الموظف يجب أن يكون رقماً صحيحاً.',
             'employee_id.exists'     => 'الموظف المحدد غير موجود في النظام.',

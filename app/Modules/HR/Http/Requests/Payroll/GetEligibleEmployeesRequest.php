@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Modules\HR\Http\Requests\Payroll;
@@ -24,6 +25,7 @@ class GetEligibleEmployeesRequest extends FormRequest
         return [
             'pay_period_id' => ['required', 'integer', 'exists:hr_pay_periods,id'],
             'run_type'      => ['required', 'string', 'in:regular,overtime_only'],
+            'batch_id'      => ['nullable', 'integer', 'exists:payroll_batches,id'],
         ];
     }
 
@@ -38,6 +40,8 @@ class GetEligibleEmployeesRequest extends FormRequest
             'pay_period_id.exists'   => 'الفترة المالية المحددة غير موجودة في النظام.',
             'run_type.required'      => 'يجب تحديد نوع المسير (اعتيادي أو إضافي).',
             'run_type.in'            => 'نوع المسير غير صالح. الخيارات المتاحة: regular أو overtime_only.',
+            'batch_id.integer'       => 'معرف المسير يجب أن يكون رقماً صحيحاً.',
+            'batch_id.exists'        => 'مسير الرواتب المحدد غير موجود في النظام.',
         ];
     }
 }

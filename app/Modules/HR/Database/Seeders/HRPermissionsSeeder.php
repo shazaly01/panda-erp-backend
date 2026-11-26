@@ -21,19 +21,25 @@ class HRPermissionsSeeder extends Seeder
         $permissionsData = [
             'dashboard' => [
                 'title' => 'لوحة تحكم وإحصائيات الموارد البشرية',
-                'actions' => ['view' => 'رؤية الإحصائيات ولوحة التحكم']
+                'actions' => ['view' => 'رؤية الإحصائيات ولوحة التحكم'],
             ],
             'departments' => [
                 'title' => 'الإدارات والأقسام',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
+                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
             ],
             'positions' => [
                 'title' => 'الوظائف والمهن',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
+                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
             ],
             'employees' => [
                 'title' => 'ملفات الموظفين والمتدربين',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف', 'convert' => 'تثبيت متدرب كموظف دائم']
+                'actions' => [
+                    'view' => 'عرض',
+                    'create' => 'إضافة',
+                    'update' => 'تعديل',
+                    'delete' => 'حذف',
+                    'convert' => 'تثبيت متدرب كموظف دائم',
+                ],
             ],
             'internship_applications' => [
                 'title' => 'إدارة برنامج وطلبات التدريب والتوظيف',
@@ -48,35 +54,54 @@ class HRPermissionsSeeder extends Seeder
                     'approve' => 'اعتماد وقبول المتقدم للتدريب',
                     'reject' => 'رفض الطلب',
                     'delete' => 'حذف الطلب',
-                ]
+                ],
             ],
             'contracts' => [
                 'title' => 'العقود والتوظيف',
-                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة']
+                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة'],
             ],
             'payroll' => [
                 'title' => 'الرواتب والأجور',
-                'actions' => ['view' => 'عرض', 'post' => 'ترحيل مالي']
+                'actions' => ['view' => 'عرض', 'post' => 'ترحيل مالي'],
             ],
             'settings' => [
                 'title' => 'إعدادات الموارد البشرية',
-                'actions' => ['manage' => 'إدارة كاملة']
+                'actions' => ['manage' => 'إدارة كاملة'],
+            ],
+            'violation_types' => [
+                'title' => 'لوائح المخالفات وسلالم الجزاءات',
+                'actions' => [
+                    'view' => 'عرض',
+                    'create' => 'إضافة',
+                    'update' => 'تعديل',
+                    'delete' => 'حذف',
+                ],
+            ],
+            'disciplinary_actions' => [
+                'title' => 'سجل المخالفات والجزاءات التأديبية',
+                'actions' => [
+                    'view' => 'عرض',
+                    'create' => 'تسجيل مخالفة',
+                    'approve' => 'اعتماد وتنفيذ الجزاء',
+                    'cancel' => 'إلغاء الجزاء',
+                    'delete' => 'حذف',
+                ],
             ],
             'shifts' => [
                 'title' => 'الورديات وساعات العمل',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
+                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
             ],
             'working_schedules' => [
                 'title' => 'جداول العمل الأسبوعية',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
+                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
             ],
             'calendar_exceptions' => [
                 'title' => 'العطلات والإجازات الرسمية',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
+                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
             ],
             'shift_overrides' => [
                 'title' => 'تجاوزات الورديات',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف']
+                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف'],
             ],
             'attendance' => [
                 'title' => 'الحضور والانصراف (كشك)',
@@ -84,7 +109,7 @@ class HRPermissionsSeeder extends Seeder
                     'view' => 'عرض',
                     'manage' => 'إدارة كاملة',
                     'manual_entry' => 'إدخال يدوي',
-                ]
+                ],
             ],
             'team_attendance' => [
                 'title' => 'إدارة حضور الفريق',
@@ -92,39 +117,46 @@ class HRPermissionsSeeder extends Seeder
                     'manage' => 'إدارة الفريق',
                     'check_in' => 'تسجيل وتعديل الدخول',
                     'check_out' => 'تسجيل وتعديل الخروج',
-                ]
+                ],
             ],
             'leaves' => [
                 'title' => 'طلبات الإجازات',
-                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد', 'request' => 'تقديم طلب']
+                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد', 'request' => 'تقديم طلب'],
             ],
             'loans' => [
                 'title' => 'السلف والقروض للموظفين',
-                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد', 'request' => 'تقديم طلب']
+                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد', 'request' => 'تقديم طلب'],
             ],
             'payroll_inputs' => [
                 'title' => 'المكافآت والجزاءات المباشرة',
-                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد']
+                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة', 'approve' => 'اعتماد'],
             ],
             'pay_groups' => [
                 'title' => 'مجموعات وفئات الدفع',
-                'actions' => ['view' => 'عرض']
+                'actions' => ['view' => 'عرض'],
             ],
             'pay_periods' => [
                 'title' => 'فترات الدفع المالية',
-                'actions' => ['view' => 'عرض']
+                'actions' => ['view' => 'عرض'],
             ],
             'overtime_policies' => [
                 'title' => 'سياسات العمل الإضافي',
-                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة']
+                'actions' => ['view' => 'عرض', 'manage' => 'إدارة كاملة'],
             ],
             'internet_vouchers' => [
                 'title' => 'كوبونات الإنترنت والشبكة',
-                'actions' => ['view' => 'عرض']
+                'actions' => ['view' => 'عرض'],
             ],
             'hr_leave_passes' => [
                 'title' => 'أذونات الخروج المؤقتة للموظفين',
-                'actions' => ['view' => 'عرض', 'create' => 'إضافة', 'update' => 'تعديل', 'delete' => 'حذف', 'approve' => 'اعتماد إداري', 'gate_check' => 'فحص حراسة البوابة']
+                'actions' => [
+                    'view' => 'عرض',
+                    'create' => 'إضافة',
+                    'update' => 'تعديل',
+                    'delete' => 'حذف',
+                    'approve' => 'اعتماد إداري',
+                    'gate_check' => 'فحص حراسة البوابة',
+                ],
             ],
             'hr_visitors' => [
                 'title' => 'إدارة سجلات الزوار',
@@ -134,14 +166,13 @@ class HRPermissionsSeeder extends Seeder
                     'update' => 'تعديل',
                     'delete' => 'حذف',
                     'check_in' => 'تسجيل دخول من البوابة',
-                    'check_out' => 'تسجيل خروج من البوابة'
-                ]
+                    'check_out' => 'تسجيل خروج من البوابة',
+                ],
             ],
         ];
 
         foreach ($permissionsData as $groupKey => $groupData) {
             foreach ($groupData['actions'] as $actionKey => $displayName) {
-
                 if ($groupKey === 'internet_vouchers' || $groupKey === 'hr_leave_passes' || $groupKey === 'hr_visitors') {
                     $permissionName = "{$groupKey}.{$actionKey}";
                 } else {
@@ -156,7 +187,7 @@ class HRPermissionsSeeder extends Seeder
                         'group_name' => $groupKey,
                         'group_display_name' => $groupData['title'],
                         'action_name' => $actionKey,
-                        'display_name' => $displayName
+                        'display_name' => $displayName,
                     ]
                 );
             }

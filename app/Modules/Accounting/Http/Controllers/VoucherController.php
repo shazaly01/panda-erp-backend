@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Modules\Accounting\Models\Voucher;
+use App\Modules\Accounting\Models\FiscalYear;
 use App\Modules\Accounting\Services\VoucherService;
 use App\Modules\Accounting\Http\Requests\StoreVoucherRequest;
 use App\Modules\Accounting\Http\Requests\UpdateVoucherRequest;
@@ -25,7 +26,7 @@ class VoucherController extends Controller
 
     /**
      * عرض قائمة السندات
-     * يقبل الفلترة: ?type=payment&status=posted&date_from=...&date_to=...&per_page=...
+     * يقبل الفلترة: ?type=payment&fiscal_year_id=1&status=posted&date_from=...&date_to=...&per_page=...
      */
     public function index(Request $request)
     {
@@ -44,6 +45,15 @@ class VoucherController extends Controller
         // فلترة نوع السند (صرف / قبض)
         $query->when($request->filled('type'), function ($q) use ($request) {
             $q->where('type', $request->type);
+        });
+
+        // فلترة حسب السنة المالية
+        $query->when($request->filled('fiscal_year_id'), function ($q) use ($request) {
+            $fiscalYear = FiscalYear::find($request->integer('fiscal_year_id'));
+            if ($fiscalYear) {
+                $q->whereDate('date', '>=', $fiscalYear->start_date->toDateString())
+                  ->whereDate('date', '<=', $fiscalYear->end_date->toDateString());
+            }
         });
 
         // فلترة حالة السند (مسودة / معتمد / مرحل)

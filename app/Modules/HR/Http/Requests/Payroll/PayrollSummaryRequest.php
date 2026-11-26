@@ -23,6 +23,7 @@ class PayrollSummaryRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'batch_id'       => ['nullable', 'integer', 'exists:payroll_batches,id'],
             'employee_ids'   => ['required', 'array', 'min:1'],
             'employee_ids.*' => ['integer', 'exists:employees,id'],
             'pay_period_id'  => ['required', 'integer', 'exists:hr_pay_periods,id'],
@@ -36,6 +37,8 @@ class PayrollSummaryRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'batch_id.integer'        => 'معرف المسير يجب أن يكون رقماً صحيحاً.',
+            'batch_id.exists'         => 'مسير الرواتب المحدد غير موجود في النظام.',
             'employee_ids.required'   => 'يجب اختيار موظف واحد على الأقل لحساب الملخص.',
             'employee_ids.array'      => 'قائمة الموظفين المرسلة غير صالحة.',
             'employee_ids.min'        => 'يجب اختيار موظف واحد على الأقل.',
